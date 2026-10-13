@@ -70,6 +70,7 @@ BC.Game = class Game {
   reset() { try { if (this.mode === 'shared') localStorage.removeItem(this.SHARED_KEY); else localStorage.removeItem(this.SAVE_KEY); } catch (e) { } location.reload(); }
   // Save, disconnect and return to the title screen (the world stays available via Continue / Rejoin).
   async exitToTitle() { this.running = false; if (document.exitPointerLock) document.exitPointerLock(); try { await this.save(true); } catch (e) { } if (this.mode === 'shared') { try { await this.net.leave(); } catch (e) { } } location.reload(); }
+  async deleteSharedWorld() { if (this.mode !== 'shared') return; this.running = false; try { await this.net.deleteWorld(); } catch (e) { this.running = true; this.toast('Could not delete: ' + this.net.friendly(e), 'bad'); return; } try { await this.net.leave(); } catch (e) { } this.forgetWorld(this.net.creds.world + '|' + this.net.creds.player); try { localStorage.removeItem(this.SHARED_KEY); } catch (e) { } location.reload(); }
   async leaveShared() { this.running = false; try { await this.save(true); } catch (e) { } await this.net.leave(); try { localStorage.removeItem(this.SHARED_KEY); } catch (e) { } location.reload(); }
   // ---------- shared worlds remembered on this device ----------
   knownWorlds() { try { return JSON.parse(localStorage.getItem(this.WORLDS_KEY)) || []; } catch (e) { return []; } }

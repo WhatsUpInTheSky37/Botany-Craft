@@ -18,6 +18,7 @@ BC.Net = class Net {
   savePlayer(state, online) { return this.rpc('bc_player_save', { p_world: this.creds.world, p_pin: this.creds.pin, p_player: this.creds.player, p_state: state, p_online: online !== false }); }
   playerOffline() { if (!this.creds) return Promise.resolve(); return this.rpc('bc_player_offline', { p_world: this.creds.world, p_pin: this.creds.pin, p_player: this.creds.player }); }
   listWorlds() { return this.rpc('bc_world_list', {}); }
+  deleteWorld() { return this.rpc('bc_world_delete', { p_name: this.creds.world, p_pin: this.creds.pin }); }
   listPlayers() { return this.rpc('bc_world_players', { p_world: this.creds.world, p_pin: this.creds.pin }); }
   // ---- realtime ----
   on(event, fn) { this.handlers[event] = fn; }
