@@ -151,3 +151,15 @@ body.touch #shared-pill { top: calc(60px + env(safe-area-inset-top, 0px)); max-w
 @media (max-width: 640px) { body.touch #quest-tracker { top: calc(100px + env(safe-area-inset-top, 0px)); } body.touch #side-buttons { top: calc(78px + env(safe-area-inset-top, 0px)); } }
 #shared-pill.live span { color: #9fe39a; } #shared-pill.down span { color: #ffb3a3; white-space: normal; } #shared-pill.wait span { color: #f0d08a; }
 #side-buttons button.exit { margin-top: 6px; border-color: rgba(255,170,150,0.45); color: #ffd9cf; }
+
+/* ---------- Characters: colours, compass ---------- */
+.swatches { display: flex; gap: 6px; flex-wrap: wrap; padding-top: 2px; }
+.swatches button { width: 30px; height: 30px; border-radius: 50%; border: 3px solid transparent; cursor: pointer; padding: 0; }
+.swatches button.on { border-color: #fff; box-shadow: 0 0 0 2px var(--sun); }
+#compass { position: absolute; left: 50%; transform: translateX(-50%); top: calc(118px + env(safe-area-inset-top, 0px)); display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; pointer-events: none; max-width: 70vw; }
+#compass .peer { display: flex; align-items: center; gap: 8px; background: var(--hud-bg); backdrop-filter: blur(6px); border-radius: 20px; padding: 4px 12px 4px 6px; font-size: 13px; color: var(--hud-fg); font-variant-numeric: tabular-nums; }
+#compass .peer i { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; color: #111; font-style: normal; font-weight: 800; font-size: 18px; line-height: 1; }
+#compass .peer i span { display: block; transform-origin: 50% 50%; }
+#compass .peer b { font-family: var(--font-display); }
+body.touch #compass { top: calc(104px + env(safe-area-inset-top, 0px)); } @media (max-height: 460px) { body.touch #compass { top: calc(96px + env(safe-area-inset-top, 0px)); } }
+#shared-pill i, .menu .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }

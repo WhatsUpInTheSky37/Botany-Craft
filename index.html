@@ -22,6 +22,7 @@
       <div id="score" class="pill"><span id="level"></span><span id="points"></span></div>
     </div>
     <div id="shared-pill" class="pill" hidden></div>
+    <div id="compass" hidden></div>
     <div id="ff" hidden>Fast-forward ×5</div>
     <div id="quest-tracker"></div>
     <div id="side-buttons">
@@ -59,6 +60,7 @@
         <label>World name<input id="sh-world" maxlength="32" placeholder="e.g. Farrar Garden"></label>
         <label>PIN<input id="sh-pin" type="password" inputmode="numeric" maxlength="12" placeholder="4+ digits"></label>
         <label>Region (new worlds)<select id="sh-region"></select></label>
+        <label>Your character colour<div id="sh-colors" class="swatches"></div></label>
         <div class="row"><button type="button" id="sh-create" class="primary">Create shared world</button><button type="button" id="sh-join" class="ghost">Join existing world</button></div>
         <div id="sh-status" class="status-line" hidden></div>
         <div id="sh-error" class="error-line" hidden></div>

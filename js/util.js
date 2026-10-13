@@ -14,3 +14,4 @@ BC.util = {
   isTouch: () => ('ontouchstart' in window || navigator.maxTouchPoints > 0) && !window.matchMedia('(pointer: fine)').matches,
   esc: s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])),
 };
+BC.PLAYER_COLORS = ['#4f7a3a', '#e3a62b', '#d8405a', '#3a7ac8', '#8a4ac8', '#e8702a', '#2fb5a0', '#f0e0a0'];

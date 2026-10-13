@@ -75,7 +75,7 @@ BC.Game = class Game {
     const status = m => this.ui.sharedStatus(m);
     try {
       const player = (opts.player || '').trim(); if (player.length < 2) throw new Error('Enter a player name (at least 2 letters).');
-      this.net.creds = { world: opts.world, pin: opts.pin, player };
+      this.net.creds = { world: opts.world, pin: opts.pin, player, color: opts.color || BC.PLAYER_COLORS[0] }; this.myColor = this.net.creds.color;
       let data;
       if (opts.action === 'create') {
         status('Growing a new world…'); this.seed = (Math.random() * 4294967295) >>> 0; this.region = opts.region || 'temperate';
@@ -92,7 +92,7 @@ BC.Game = class Game {
       this.spawnAnimals((this.sharedAnimals && this.sharedAnimals.length) ? this.sharedAnimals : this.world.spawnAnimals);
       try { localStorage.setItem(this.SHARED_KEY, JSON.stringify(this.net.creds)); } catch (e) { }
       status('Connecting to the live session…'); this.bindNetEvents(); let liveError = null;
-      try { await this.net.join(this.net.creds.world, player); } catch (e) { liveError = e; await this.net.leave(); }
+      try { await this.net.join(this.net.creds.world, player, this.myColor); } catch (e) { liveError = e; await this.net.leave(); }
       status(''); this.begin(); if (!ps || !ps.inventory) this.welcome(this.region);
       if (liveError) { this.liveWasDown = true; this.toast('Live session failed: ' + this.net.friendly(liveError) + ' You can still play; the world saves to the cloud. Open Menu to retry.', 'bad'); }
       else this.toast(`Shared world "${opts.world}". Others join with the same name and PIN.`, 'good');
@@ -127,13 +127,14 @@ BC.Game = class Game {
   }
   requestSync() { if (this.syncRequested) return; this.syncRequested = true; this.syncBuffer = []; this.net.send('need_sync', {}); clearTimeout(this.syncTimer); this.syncTimer = setTimeout(() => { if (this.syncRequested) { this.syncRequested = false; this.replaySync(); } }, 20000); }
   onLiveChange() { this.ui.updateShared(); if (this.mode !== 'shared' || !this.running) return; if (this.net.live && this.liveWasDown) { this.liveWasDown = false; this.toast('Live session connected.', 'good'); } else if (!this.net.live && this.net.lastError) { this.liveWasDown = true; } }
-  async reconnectLive() { if (this.mode !== 'shared') return; this.toast('Reconnecting…', ''); try { await this.net.leave(); this.peers.forEach(pe => this.scene.remove(pe.group)); this.peers.clear(); this.firstSyncDone = false; await this.net.join(this.net.creds.world, this.net.creds.player); this.toast('Live session connected.', 'good'); } catch (e) { this.toast(this.net.friendly(e), 'bad'); } this.ui.updateShared(); }
-  onPeerJoined(key, name) { const g = this.buildAvatar(name); g.position.copy(this.player.pos); this.scene.add(g); this.peers.set(key, { name, group: g, target: this.player.pos.clone(), yaw: 0 }); if (this.running) this.toast(`${name} joined the world.`, 'good'); this.net.send('hello', { x: this.player.pos.x, y: this.player.pos.y, z: this.player.pos.z }); this.ui.updateShared(); }
+  async reconnectLive() { if (this.mode !== 'shared') return; this.toast('Reconnecting…', ''); try { await this.net.leave(); this.peers.forEach(pe => this.scene.remove(pe.group)); this.peers.clear(); this.firstSyncDone = false; await this.net.join(this.net.creds.world, this.net.creds.player, this.myColor); this.toast('Live session connected.', 'good'); } catch (e) { this.toast(this.net.friendly(e), 'bad'); } this.ui.updateShared(); }
+  onPeerJoined(key, name, color) { color = color || BC.PLAYER_COLORS[BC.util.hashStr(name) % BC.PLAYER_COLORS.length]; const g = this.buildAvatar(name, color); g.position.copy(this.player.pos); this.scene.add(g); this.peers.set(key, { name, color, group: g, target: this.player.pos.clone(), yaw: 0 }); if (this.running) this.toast(`${name} joined the world.`, 'good'); this.net.send('hello', { x: this.player.pos.x, y: this.player.pos.y, z: this.player.pos.z }); this.ui.updateShared(); }
   onPeerLeft(key) { const pe = this.peers.get(key); if (pe) { this.scene.remove(pe.group); this.toast(`${pe.name} left the world.`, ''); this.peers.delete(key); } this.ui.updateShared(); }
   onPresence(list, isHost, wasHost) { if (!isHost && list.length > 1 && !this.firstSyncDone) { this.firstSyncDone = true; this.requestSync(); } if (isHost && !wasHost && this.running && list.length > 1) this.toast('You are now hosting the simulation for this world.', ''); if (isHost) this.firstSyncDone = true; this.ui.updateShared(); }
+  goToPeer(key) { const pe = this.peers.get(key); if (!pe) return; const w = this.world; const px = Math.floor(pe.group.position.x), pz = Math.floor(pe.group.position.z); for (const [dx, dz] of [[2, 0], [-2, 0], [0, 2], [0, -2], [2, 2], [-2, -2], [1, 0], [0, 1]]) { const x = px + dx, z = pz + dz; if (x < 1 || z < 1 || x >= w.W - 1 || z >= w.D - 1) continue; const t = w.top(x, z); if (w.get(x, t + 1, z) === 0 && w.get(x, t + 2, z) === 0) { this.player.pos.set(x + 0.5, t + 1.01, z + 0.5); this.player.vel.set(0, 0, 0); this.player.yaw = Math.atan2(-(pe.group.position.x - this.player.pos.x), -(pe.group.position.z - this.player.pos.z)); this.toast(`You are now next to ${pe.name}.`, 'good'); return; } } this.toast(`Could not find solid ground next to ${pe.name}.`, 'bad'); }
   peerPositions() { const out = []; this.peers.forEach(pe => out.push(pe.group.position)); return out; }
-  buildAvatar(name) {
-    const g = new THREE.Group(); const h = BC.util.hashStr(name); const shirt = new THREE.Color().setHSL((h % 360) / 360, 0.55, 0.45), skin = new THREE.Color(0xe8b890), pants = new THREE.Color(0x3a4a6a);
+  buildAvatar(name, color) {
+    const g = new THREE.Group(); const shirt = new THREE.Color(color), skin = new THREE.Color(0xe8b890), pants = new THREE.Color(0x3a4a6a);
     const box = (w, hh, d, x, y, z, c) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, hh, d), new THREE.MeshLambertMaterial({ color: c })); m.position.set(x, y, z); g.add(m); };
     box(0.5, 0.65, 0.3, 0, 1.0, 0, shirt); box(0.45, 0.45, 0.45, 0, 1.55, 0, skin); box(0.18, 0.7, 0.22, -0.16, 0.35, 0, pants); box(0.18, 0.7, 0.22, 0.16, 0.35, 0, pants); box(0.14, 0.6, 0.2, -0.33, 1.0, 0, shirt); box(0.14, 0.6, 0.2, 0.33, 1.0, 0, shirt);
     const c = document.createElement('canvas'); c.width = 256; c.height = 64; const x = c.getContext('2d'); x.fillStyle = 'rgba(20,28,18,0.7)'; x.fillRect(0, 0, 256, 64); x.fillStyle = '#f3efe2'; x.font = 'bold 34px Nunito, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(name.slice(0, 14), 128, 32);
@@ -158,7 +159,7 @@ BC.Game = class Game {
     this.time.t += dt; this.time.dayFrac = (this.time.t / this.DAY) % 1; this.time.day = Math.floor(this.time.t / this.DAY) + 1;
     if (this.ffTimer > 0) { this.ffTimer -= dt; if (this.ffTimer <= 0) { this.growthMult = 1; this.toast('Fast-forward finished.', ''); } }
     this.simAcc += dt; if (this.simAcc >= 0.5) { if (auth) { BC.Sim.tick(this, this.simAcc); this.updateWeather(this.simAcc); } this.simAcc = 0; }
-    if (this.mode === 'shared' && this.net.live) { this.netTick(dt); this.updatePeers(dt); }
+    if (this.mode === 'shared' && this.net.live) { this.netTick(dt); this.updatePeers(dt); this.ui.updateCompass(); }
     this.questAcc += dt; if (this.questAcc >= 1) { this.questAcc = 0; this.checkQuests(); this.checkBiome(); }
     this.saveAcc += dt; if (this.saveAcc >= 30) { this.saveAcc = 0; this.save(); }
     this.hudAcc += dt; if (this.hudAcc >= 0.25) { this.hudAcc = 0; this.ui.updateHUD(); }

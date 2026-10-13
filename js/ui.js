@@ -52,6 +52,18 @@ BC.UI = class UI {
     if (!q) { el.innerHTML = '<b>All quests complete!</b><span>Keep exploring and planting.</span>'; return; }
     const p = Math.round(q.check(g.stats) * 100); el.innerHTML = `<small>Quest ${BC.QUESTS.indexOf(q) + 1} of ${BC.QUESTS.length}</small><b>${this.esc(q.title)}</b><span>${this.esc(q.goal)}</span><div class="bar"><i style="width:${p}%"></i></div>`;
   }
+  updateCompass() {
+    const g = this.game; const el = this.$('compass'); if (g.mode !== 'shared' || !g.peers.size) { if (!el.hidden) el.hidden = true; return; }
+    el.hidden = false; const p = g.player.pos; let i = 0;
+    g.peers.forEach((pe, key) => {
+      let row = el.children[i]; if (!row) { row = document.createElement('div'); row.className = 'peer'; row.innerHTML = '<i><span>➜</span></i><div><b></b> <small></small></div>'; el.appendChild(row); }
+      const dx = pe.group.position.x - p.x, dz = pe.group.position.z - p.z; const dist = Math.hypot(dx, dz);
+      const ang = Math.atan2(dx, -dz) - (-g.player.yaw); // bearing relative to view
+      row.querySelector('i').style.background = pe.color || '#ffd23b'; row.querySelector('span').style.transform = `rotate(${(ang - Math.PI / 2) * 180 / Math.PI}deg)`;
+      row.querySelector('b').textContent = pe.name; row.querySelector('small').textContent = dist < 3 ? 'right here' : Math.round(dist) + ' blocks'; i++;
+    });
+    while (el.children.length > i) el.lastChild.remove();
+  }
   // ---------- cards ----------
   reqTable(def) {
     const soils = def.soils.map(s => BC.SOILS[s] ? BC.SOILS[s].name : 'Tree bark').join(', ');
@@ -131,11 +143,11 @@ BC.UI = class UI {
     for (let z = 0; z < w.D; z++) for (let x = 0; x < w.W; x++) { const h = w.height[x + z * w.W]; ctx.fillStyle = h < w.WL ? '#3a7ac8' : cols[BC.BIOME_LIST[w.biome[x + z * w.W]]]; if (h >= w.WL) { const k = 0.85 + (h - 12) * 0.03; ctx.globalAlpha = BC.util.clamp(k, 0.6, 1); } ctx.fillRect(x * S, z * S, S, S); ctx.globalAlpha = 1; }
     // markers for planted crops
     ctx.fillStyle = '#fff'; w.plants.forEach(p => { if (!p.wild) ctx.fillRect(p.x * S - 1, p.z * S - 1, S + 2, S + 2); });
-    g.peers.forEach(pe => { ctx.fillStyle = '#ffd23b'; ctx.beginPath(); ctx.arc(pe.group.position.x * S, pe.group.position.z * S, 5, 0, 6.283); ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke(); ctx.fillStyle = '#fff'; ctx.font = 'bold 12px Nunito, sans-serif'; ctx.textAlign = 'center'; ctx.fillText(pe.name, pe.group.position.x * S, pe.group.position.z * S - 9); });
-    const px = g.player.pos.x * S, pz = g.player.pos.z * S; ctx.fillStyle = '#ff3b30'; ctx.beginPath(); ctx.arc(px, pz, 5, 0, 6.283); ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+    g.peers.forEach(pe => { ctx.fillStyle = pe.color || '#ffd23b'; ctx.beginPath(); ctx.arc(pe.group.position.x * S, pe.group.position.z * S, 5, 0, 6.283); ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke(); ctx.fillStyle = '#fff'; ctx.font = 'bold 12px Nunito, sans-serif'; ctx.textAlign = 'center'; ctx.fillText(pe.name, pe.group.position.x * S, pe.group.position.z * S - 9); });
+    const px = g.player.pos.x * S, pz = g.player.pos.z * S; ctx.fillStyle = g.mode === 'shared' ? (g.myColor || '#ff3b30') : '#ff3b30'; ctx.beginPath(); ctx.arc(px, pz, 5, 0, 6.283); ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
     ctx.strokeStyle = '#ff3b30'; ctx.beginPath(); ctx.moveTo(px, pz); ctx.lineTo(px - Math.sin(g.player.yaw) * 14, pz - Math.cos(g.player.yaw) * 14); ctx.stroke();
     const legend = BC.BIOME_LIST.map(b => `<li><i style="background:${cols[b]}"></i>${BC.BIOMES[b].short}${g.stats.biomesVisited.has(b) ? '' : ' <small>(not yet visited)</small>'}</li>`).join('');
-    this.openModal(`<button class="close" aria-label="Close">×</button><div class="eyebrow">World map · north is up · cold north, hot south · dry west, wet east</div><h2>Where am I?</h2><div class="mapwrap"></div><ul class="legend">${legend}<li><i style="background:#3a7ac8"></i>Water</li><li><i style="background:#fff;border:1px solid #888"></i>Plantings</li>${g.mode === 'shared' ? '<li><i style="background:#ffd23b"></i>Other players</li>' : ''}</ul><p class="teach">Real Earth works the same way at a larger scale: temperature falls toward the poles and with altitude, and rainfall depends on winds, mountains and distance from the sea. Together they decide the biome, and the biome builds the soil.</p>`, 'journal');
+    this.openModal(`<button class="close" aria-label="Close">×</button><div class="eyebrow">World map · north is up · cold north, hot south · dry west, wet east</div><h2>Where am I?</h2><div class="mapwrap"></div><ul class="legend">${legend}<li><i style="background:${g.mode === 'shared' ? this.esc(g.myColor || '#ff3b30') : '#ff3b30'}"></i>You</li><li><i style="background:#3a7ac8"></i>Water</li><li><i style="background:#fff;border:1px solid #888"></i>Plantings</li>${g.mode === 'shared' ? Array.from(g.peers.values()).map(pe => `<li><i style="background:${this.esc(pe.color || '#ffd23b')}"></i>${this.esc(pe.name)}</li>`).join('') : ''}</ul><p class="teach">Real Earth works the same way at a larger scale: temperature falls toward the poles and with altitude, and rainfall depends on winds, mountains and distance from the sea. Together they decide the biome, and the biome builds the soil.</p>`, 'journal');
     this.modalCard.querySelector('.mapwrap').appendChild(c);
   }
   showMenu() {
@@ -144,7 +156,7 @@ BC.UI = class UI {
     const info = shared ? `<p class="teach">Shared world <b>${this.esc(g.net.creds.world)}</b>. Online now: ${this.esc(names || 'just you')}. Anyone with the world name and PIN can join from any device.${g.net.isHost ? ' You are hosting: plants grow and animals move on your device and everyone else sees them.' : ''}</p>` : '';
     this.openModal(`<button class="close" aria-label="Close">×</button><h2>Botany Craft</h2>${info}<div class="menu"><button id="m-exit" class="primary">Save and exit game</button><button id="m-ff" ${shared && !g.net.isHost ? 'disabled' : ''}>${g.growthMult > 1 ? 'Stop fast-forward' : 'Fast-forward growth (×5 for 2 min)' + (shared && !g.net.isHost ? ' (host only)' : '')}</button><button id="m-save">Save game</button><button id="m-help">Controls & how to play</button>${shared ? '<button id="m-leave">Leave shared world</button>' : ''}<button id="m-new" class="danger">${shared ? 'Forget this shared world on this device' : 'Start a new world'}</button></div><p class="small">${shared ? 'Progress saves to the cloud every 30 seconds. Your journal and inventory are yours; the land and plants are shared.' : 'Progress saves automatically every 30 seconds in this browser.'}</p>`, 'journal');
     this.$('m-exit').onclick = () => this.confirmExit(); this.$('m-ff').onclick = () => { g.toggleFastForward(); this.closeModal(); }; this.$('m-save').onclick = () => { Promise.resolve(g.save()).then(() => this.toast('Game saved.', 'good')); this.closeModal(); };
-    if (shared) { this.$('m-leave').onclick = () => g.leaveShared(); const rc = document.createElement('button'); rc.textContent = g.net.live ? 'Live session: connected (reconnect)' : 'Reconnect live session' + (g.net.lastError ? ' (' + g.net.lastError + ')' : ''); rc.onclick = () => { this.closeModal(); g.reconnectLive(); }; this.modalCard.querySelector('.menu').insertBefore(rc, this.$('m-leave')); }
+    if (shared) { this.$('m-leave').onclick = () => g.leaveShared(); g.peers.forEach((pe, key) => { const b = document.createElement('button'); b.innerHTML = `<i class="dot" style="background:${this.esc(pe.color || '#ffd23b')}"></i> Go to ${this.esc(pe.name)}`; b.onclick = () => { this.closeModal(); g.goToPeer(key); }; this.modalCard.querySelector('.menu').insertBefore(b, this.$('m-ff')); }); const rc = document.createElement('button'); rc.textContent = g.net.live ? 'Live session: connected (reconnect)' : 'Reconnect live session' + (g.net.lastError ? ' (' + g.net.lastError + ')' : ''); rc.onclick = () => { this.closeModal(); g.reconnectLive(); }; this.modalCard.querySelector('.menu').insertBefore(rc, this.$('m-leave')); }
     this.$('m-help').onclick = () => this.showHelp(); this.$('m-new').onclick = () => { this.openModal(`<h2>Start a new world?</h2><p class="teach">Your current world and journal will be erased.</p><div class="menu"><button id="m-yes" class="danger">Yes, erase and start over</button><button id="m-no">Keep playing</button></div>`, 'journal'); this.$('m-yes').onclick = () => { g.reset(); }; if (shared) { this.modalCard.querySelector('.teach').textContent = 'The shared world stays in the cloud for everyone else. This device just forgets the name and PIN.'; } this.$('m-no').onclick = () => this.closeModal(); };
   }
   confirmExit() {
@@ -169,9 +181,12 @@ BC.UI = class UI {
     // shared worlds
     this.$('sh-region').innerHTML = BC.BIOME_LIST.map(b => `<option value="${b}">${this.esc(BC.BIOMES[b].name)}</option>`).join('');
     const sh = o.shared; const rw = this.$('rejoin-wrap'); rw.hidden = !sh;
-    if (sh) { this.$('btn-rejoin').textContent = `Rejoin "${sh.world}" as ${sh.player}`; this.$('btn-rejoin').onclick = () => { this.sharedBusy(true); o.onShared({ action: 'join', world: sh.world, pin: sh.pin, player: sh.player }); }; this.$('sh-name').value = sh.player; }
-    const read = action => ({ action, player: this.$('sh-name').value, world: this.$('sh-world').value.trim(), pin: this.$('sh-pin').value, region: this.$('sh-region').value });
+    if (sh) { this.$('btn-rejoin').textContent = `Rejoin "${sh.world}" as ${sh.player}`; this.$('btn-rejoin').onclick = () => { this.sharedBusy(true); o.onShared({ action: 'join', world: sh.world, pin: sh.pin, player: sh.player, color: this.shColor }); }; this.$('sh-name').value = sh.player; }
+    const read = action => ({ action, player: this.$('sh-name').value, world: this.$('sh-world').value.trim(), pin: this.$('sh-pin').value, region: this.$('sh-region').value, color: this.shColor });
     const go = action => { const v = read(action); this.$('sh-error').hidden = true; if (!v.world) return this.sharedError('Give the world a name.'); if (v.pin.length < 4) return this.sharedError('PIN needs at least 4 characters.'); this.sharedBusy(true); o.onShared(v); };
+    const sw = this.$('sh-colors'); this.shColor = (sh && sh.color) || BC.PLAYER_COLORS[Math.floor(Math.random() * BC.PLAYER_COLORS.length)];
+    sw.innerHTML = BC.PLAYER_COLORS.map(c => `<button type="button" data-c="${c}" style="background:${c}" aria-label="colour ${c}" class="${c === this.shColor ? 'on' : ''}"></button>`).join('');
+    sw.querySelectorAll('button').forEach(b => b.onclick = () => { this.shColor = b.dataset.c; sw.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); });
     this.$('sh-create').onclick = () => go('create'); this.$('sh-join').onclick = () => go('join');
     this.$('sh-form').addEventListener('submit', e => e.preventDefault());
   }
@@ -180,8 +195,8 @@ BC.UI = class UI {
   sharedError(m) { this.sharedBusy(false); this.$('start').hidden = false; this.$('hud').hidden = true; const el = this.$('sh-error'); el.hidden = false; el.textContent = m; el.scrollIntoView({ block: 'nearest' }); }
   updateShared() {
     const g = this.game; const el = this.$('shared-pill'); if (g.mode !== 'shared') { el.hidden = true; return; } el.hidden = false;
-    const n = g.net; const names = (n.online || []).map(p => p.name + (p.key === n.hostKey ? ' (host)' : ''));
-    let line; if (n.live) line = names.length ? `Live · ${this.esc(names.join(', '))}` : 'Live · waiting for presence…'; else if (n.status === 'connecting') line = 'Connecting to live session…'; else line = `Not live (cloud save only) · ${this.esc(n.lastError || 'offline')}`;
+    const n = g.net; const names = (n.online || []).map(p => `<i style="background:${this.esc(p.color || '#888')}"></i>${this.esc(p.name)}${p.key === n.hostKey ? ' (host)' : ''}`);
+    let line; if (n.live) line = names.length ? `Live · ${names.join(', ')}` : 'Live · waiting for presence…'; else if (n.status === 'connecting') line = 'Connecting to live session…'; else line = `Not live (cloud save only) · ${this.esc(n.lastError || 'offline')}`;
     el.className = 'pill ' + (n.live ? 'live' : n.status === 'connecting' ? 'wait' : 'down'); el.innerHTML = `<b>Shared: ${this.esc(n.creds.world)}</b><span>${line}</span>`;
   }
   hideStart() { this.$('start').hidden = true; this.$('hud').hidden = false; document.body.classList.toggle('touch', this.game.player.touch); }
