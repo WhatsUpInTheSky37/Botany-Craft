@@ -15,3 +15,19 @@ BC.util = {
   esc: s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])),
 };
 BC.PLAYER_COLORS = ['#4f7a3a', '#e3a62b', '#d8405a', '#3a7ac8', '#8a4ac8', '#e8702a', '#2fb5a0', '#f0e0a0'];
+
+// Crafting recipes. `match` picks an inventory item; `n` is how many are consumed.
+BC.RECIPES = [
+  { id: 'planks', name: 'Planks', out: { type: 'block', id: 19, count: 4 }, ins: [{ label: 'any log', n: 1, match: it => it.type === 'block' && BC.BLOCKS[it.id] && BC.BLOCKS[it.id].log && BC.BLOCKS[it.id].log !== 'cactus' }],
+    note: 'One log splits into four planks. Build walls, floors and raised beds with them.' },
+  { id: 'fence', name: 'Fence posts', out: { type: 'block', id: 18, count: 2 }, ins: [{ label: 'planks', n: 2, match: it => it.type === 'block' && it.id === 19 }],
+    note: 'Fences keep deer, hares and rabbits off your crops. Fence all four sides.' },
+  { id: 'rope', name: 'Rope', out: { type: 'material', id: 'rope', count: 1 }, ins: [{ label: 'plant fibre', n: 3, match: it => it.type === 'material' && it.id === 'fibre' }],
+    note: 'Twisted plant fibre. People have made cordage from cattail, agave (sisal), nettle and bark for 30,000 years. Use it to lead large animals.' },
+  { id: 'compost', name: 'Compost', out: { type: 'compost', count: 1 }, ins: [{ label: 'plant fibre', n: 4, match: it => it.type === 'material' && it.id === 'fibre' }],
+    note: 'Dry plant matter rots down into compost. Slower than the harvest route, but it uses anything green.' },
+];
+BC.FIBRE_PLANTS = { big_bluestem: 2, cattail: 2, wild_rice: 1, agave: 3, sphagnum: 1, fireweed: 1, pineapple: 1 };
+BC.MATERIALS = { fibre: { name: 'Plant fibre', desc: 'Stringy leaves and stems. Craft 3 into rope.' }, rope: { name: 'Rope', desc: 'Tap a large animal to lead it; tap again to let go.' } };
+BC.isSmallAnimal = d => !!(d.flies || (d.scale && d.scale <= 0.6));
+BC.HAND = { type: 'tool', id: 'hand' };

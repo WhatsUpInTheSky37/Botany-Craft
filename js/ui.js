@@ -5,7 +5,7 @@ BC.UI = class UI {
     this.game = game; this.$ = id => document.getElementById(id);
     this.modal = this.$('modal'); this.modalCard = this.$('modal-card'); this.toasts = this.$('toasts');
     this.modal.addEventListener('click', e => { if (e.target === this.modal) this.closeModal(); });
-    this.$('btn-exit').onclick = () => this.confirmExit(); this.$('btn-journal').onclick = () => this.showJournal(); this.$('btn-quests').onclick = () => this.showQuests(); this.$('btn-map').onclick = () => this.showMap(); this.$('btn-menu').onclick = () => this.showMenu();
+    this.$('btn-exit').onclick = () => this.confirmExit(); this.$('btn-bag').onclick = () => this.showInventory(); this.$('btn-journal').onclick = () => this.showJournal(); this.$('btn-quests').onclick = () => this.showQuests(); this.$('btn-map').onclick = () => this.showMap(); this.$('btn-menu').onclick = () => this.showMenu();
     this.$('btn-jump').addEventListener('touchstart', e => { e.preventDefault(); game.player.jumpQueued = true; }, { passive: false });
     this.$('btn-sprint').addEventListener('touchstart', e => { e.preventDefault(); game.player.sprint = !game.player.sprint; this.$('btn-sprint').classList.toggle('on', game.player.sprint); }, { passive: false });
     this.onClose = null; this.lastToast = { msg: '', t: 0 };
@@ -35,17 +35,37 @@ BC.UI = class UI {
   setTarget(t) {
     const el = this.$('target'); if (!t) { el.hidden = true; return; } el.hidden = false; el.innerHTML = `<b>${this.esc(t.name)}</b>${t.sub ? `<i>${this.esc(t.sub)}</i>` : ''}${t.hint ? `<span>${this.esc(t.hint)}</span>` : ''}`;
   }
+  slotEl(it, i, selected, keyLabel) {
+    const d = document.createElement('div'); d.className = 'slot' + (selected ? ' sel' : '') + (it ? '' : ' empty'); d.title = this.game.itemName(it);
+    const ic = it ? this.game.itemIcon(it, 40) : null; if (ic) d.appendChild(ic); if (it && it.count !== undefined) { const c = document.createElement('span'); c.className = 'count'; c.textContent = it.count; d.appendChild(c); }
+    if (keyLabel !== undefined) { const k = document.createElement('span'); k.className = 'key'; k.textContent = keyLabel; d.appendChild(k); }
+    return d;
+  }
   renderHotbar() {
     const g = this.game; const bar = this.$('hotbar'); bar.innerHTML = '';
-    g.inventory.forEach((it, i) => {
-      const d = document.createElement('div'); d.className = 'slot' + (i === g.selected ? ' sel' : ''); d.title = g.itemName(it);
-      d.appendChild(g.itemIcon(it, 40)); if (it.count !== undefined) { const c = document.createElement('span'); c.className = 'count'; c.textContent = it.count; d.appendChild(c); }
-      if (i < 9) { const k = document.createElement('span'); k.className = 'key'; k.textContent = i + 1; d.appendChild(k); }
-      d.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); g.select(i); });
-      bar.appendChild(d);
-    });
-    const sel = bar.children[g.selected]; if (sel) sel.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+    for (let i = 0; i < 9; i++) { const d = this.slotEl(g.inventory[i], i, i === g.selected, i + 1); d.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); g.select(i); }); bar.appendChild(d); }
     this.$('item-name').textContent = g.itemName(g.inventory[g.selected]);
+    const bag = g.bagItems().length; const bb = this.$('btn-bag'); bb.innerHTML = `Bag ${bag ? `<em>${bag}</em>` : ''}<small>E</small>`;
+  }
+  showInventory(tab) {
+    const g = this.game; tab = tab || this.invTab || 'items'; this.invTab = tab;
+    const nav = `<nav class="tabs"><button class="${tab === 'items' ? 'on' : ''}" data-tab="items">Items</button><button class="${tab === 'craft' ? 'on' : ''}" data-tab="craft">Craft</button></nav>`;
+    let body = '';
+    if (tab === 'items') {
+      const bag = g.bagItems();
+      body = `<h3>Hotbar</h3><div class="inv-row" id="inv-hotbar"></div><p class="small">Tap a hotbar slot to select it. Tap an item in the bag to move it into the selected slot (the slot's item goes to the bag).</p><h3>Bag <small>${bag.length} item${bag.length === 1 ? '' : 's'}</small></h3><div class="inv-grid" id="inv-bag">${bag.length ? '' : '<div class="small">Your bag is empty. Items beyond the nine hotbar slots land here.</div>'}</div><h3>Selected</h3><p class="small" id="inv-desc">${this.esc(g.itemName(g.inventory[g.selected]))}</p>`;
+    } else {
+      body = `<div class="recipes">${BC.RECIPES.map(r => { const ok = g.canCraft(r); const need = r.ins.map(i => `${i.n} ${i.label} <small>(have ${g.count(i.match)})</small>`).join(', '); return `<div class="recipe ${ok ? '' : 'no'}"><div class="ico" data-r="${r.id}"></div><div class="txt"><b>${r.out.count} × ${this.esc(g.itemName(r.out).split(':')[0])}</b><span>Needs ${need}</span><em>${this.esc(r.note)}</em></div><button class="primary make" data-r="${r.id}" ${ok ? '' : 'disabled'}>Make</button></div>`; }).join('')}</div><p class="small">Get logs by chopping tree trunks with the trowel. Plant fibre comes from cattail, big bluestem, wild rice, agave, sphagnum, fireweed and pineapple.</p>`;
+    }
+    this.openModal(`<button class="close" aria-label="Close">×</button><h2>Bag & crafting</h2>${nav}${body}`, 'journal');
+    this.modalCard.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => this.showInventory(b.dataset.tab));
+    if (tab === 'items') {
+      const hb = this.$('inv-hotbar'); for (let i = 0; i < 9; i++) { const d = this.slotEl(g.inventory[i], i, i === g.selected, i + 1); d.onclick = () => { g.select(i); this.showInventory('items'); }; d.oncontextmenu = e => { e.preventDefault(); g.moveToBag(i); this.showInventory('items'); }; hb.appendChild(d); }
+      const bg = this.$('inv-bag'); g.bagItems().forEach(({ it, i }) => { const d = this.slotEl(it, i, false); d.onclick = () => { g.moveToHotbar(i); this.showInventory('items'); }; bg.appendChild(d); });
+    } else {
+      this.modalCard.querySelectorAll('.recipe .ico').forEach(el => { const r = BC.RECIPES.find(x => x.id === el.dataset.r); const ic = g.itemIcon(r.out, 48); if (ic) el.appendChild(ic); });
+      this.modalCard.querySelectorAll('.make').forEach(b => b.onclick = () => { const r = BC.RECIPES.find(x => x.id === b.dataset.r); if (g.craft(r)) this.showInventory('craft'); });
+    }
   }
   updateQuestTracker() {
     const g = this.game; const q = g.currentQuest(); const el = this.$('quest-tracker');
@@ -97,7 +117,7 @@ BC.UI = class UI {
     const g = this.game; const w = g.world; const m = w.moisture[x + z * w.W]; const light = w.lightAt(x, y + 1, z); const biome = BC.BIOMES[w.biomeAt(x, z)];
     const horizons = soil.horizons.map(h => `<li class="${h[0] === block.horizon || (block.horizon || '').startsWith(h[0]) ? 'here' : ''}"><b>${h[0]}</b><span><strong>${this.esc(h[1])}</strong> ${this.esc(h[2])}</span></li>`).join('');
     let fit = '';
-    const it = g.inventory[g.selected];
+    const it = g.cur();
     if (it && it.type === 'seed') { const def = BC.Sim.defFor({ id: it.id }); const fake = { id: it.id, x, y: y + 1, z, wild: false, progress: 0, health: 1 }; const ev = BC.Sim.evaluate(w, fake); fit = `<div class="fit"><b>Your ${this.esc(def.name)} here:</b><ul class="diag">${ev.factors.map(f => `<li class="${f.score > 0.7 ? 'ok' : f.score > 0.4 ? 'warn' : 'no'}"><b>${f.label}</b> ${this.esc(f.msg)}</li>`).join('')}</ul><p>${ev.score > 0.7 ? 'Good match. Plant it!' : ev.score > 0.4 ? 'It will grow slowly here.' : 'Poor match. It will probably wither.'}</p></div>`; }
     const phPos = Math.round((soil.ph / 14) * 100);
     return `<button class="close" aria-label="Close">×</button>${isNew ? '<div class="eyebrow">New field note · soil</div>' : ''}<div class="head">${this.wrapImg(this.imgFor('soil', soil))}<div><h2>${this.esc(block.name)}</h2><p class="sci">${this.esc(soil.name)} · ${this.esc(soil.order)} · horizon ${this.esc(block.horizon || '')}</p></div></div>
@@ -168,8 +188,8 @@ BC.UI = class UI {
     const touch = this.game.player.touch;
     this.openModal(`<button class="close" aria-label="Close">×</button><h2>How to play</h2>
     <h3>Goal</h3><p class="teach">Explore six real-world regions, gather seeds from wild plants, and grow them in the right soil. Everything you meet goes into your Field Journal. Quests teach the science step by step.</p>
-    <h3>Controls</h3>${touch ? `<ul class="facts"><li><b>Move</b>: drag on the left side of the screen (virtual joystick).</li><li><b>Look</b>: drag on the right side.</li><li><b>Use / harvest</b>: tap on the right side with the crosshair on something.</li><li><b>Inspect</b>: press and hold.</li><li><b>Jump</b> and <b>Run</b>: buttons at bottom right.</li><li><b>Tools and seeds</b>: tap a slot in the bottom bar.</li></ul>` : `<ul class="facts"><li><b>Move</b>: W A S D, <b>jump</b>: Space, <b>run</b>: hold Shift.</li><li><b>Look</b>: mouse (click the world to capture the mouse, Esc to release).</li><li><b>Use / harvest</b>: left click. <b>Inspect</b>: right click.</li><li><b>Tools and seeds</b>: keys 1 to 9 or the mouse wheel.</li><li><b>J</b> journal, <b>Q</b> quests, <b>M</b> map, <b>Esc</b> menu.</li></ul>`}
-    <h3>Tools</h3><ul class="facts"><li><b>Hand</b>: collect seeds from mature wild plants, harvest your crops, inspect anything.</li><li><b>Trowel</b>: dig soil to see the horizons underneath, chop logs for fence posts, shake tree leaves for tree seeds.</li><li><b>Watering can</b>: soak the soil in one spot.</li><li><b>Seeds</b>: select them, then tap the top of a soil block. Aquatic plants go in shallow water; bromeliads and vanilla go on the side of a tree trunk.</li><li><b>Compost</b>: made from every 3 crops you harvest. Use it on a soil block to improve it.</li><li><b>Fence posts</b>: place them around crops to keep deer, hares and rabbits out.</li></ul>`, 'journal');
+    <h3>Controls</h3>${touch ? `<ul class="facts"><li><b>Move</b>: drag on the left side of the screen (virtual joystick).</li><li><b>Look</b>: drag on the right side.</li><li><b>Use / harvest</b>: tap on the right side with the crosshair on something.</li><li><b>Inspect</b>: press and hold.</li><li><b>Jump</b> and <b>Run</b>: buttons at bottom right.</li><li><b>Tools and seeds</b>: tap a slot in the bottom bar. The Bag button opens everything else and crafting.</li></ul>` : `<ul class="facts"><li><b>Move</b>: W A S D, <b>jump</b>: Space, <b>run</b>: hold Shift.</li><li><b>Look</b>: mouse (click the world to capture the mouse, Esc to release).</li><li><b>Use / harvest</b>: left click. <b>Inspect</b>: right click.</li><li><b>Tools and seeds</b>: keys 1 to 9 or the mouse wheel.</li><li><b>E</b> bag and crafting, <b>J</b> journal, <b>Q</b> quests, <b>M</b> map, <b>Esc</b> menu.</li></ul>`}
+    <h3>Tools</h3><ul class="facts"><li><b>Hand</b>: collect seeds from mature wild plants, harvest your crops, inspect anything.</li><li><b>Trowel</b>: dig soil and stone to see the horizons underneath, chop logs, shake tree leaves for tree seeds.</li><li><b>Watering can</b>: soak the soil in one spot.</li><li><b>Seeds</b>: select them, then tap the top of a soil block. Aquatic plants go in shallow water; bromeliads and vanilla go on the side of a tree trunk.</li><li><b>Compost</b>: made from every 3 crops you harvest. Use it on a soil block to improve it.</li><li><b>Building</b>: chop logs, then open the Bag (E) and craft planks and fence posts. Logs, planks, fences, stone and soil blocks can all be placed, so build a house, a shed or raised beds. Fence crops on all four sides to keep deer, hares and rabbits out.</li><li><b>Bag</b>: nine hotbar slots are what you can hold; everything else sits in the bag. Open it with E or the Bag button and tap an item to bring it into the selected slot.</li><li><b>Animals</b>: tap a small animal (bee, butterfly, frog, lizard, hummingbird, dragonfly) with your hand to catch it, then tap the ground to release it, for example bees beside your flowering crops. Big animals need a rope: craft one from 3 plant fibre, tap the animal to lead it, tap again to let go.</li></ul>`, 'journal');
   }
   showStart(o) {
     const s = this.$('start'); s.hidden = false; this.$('hud').hidden = true;

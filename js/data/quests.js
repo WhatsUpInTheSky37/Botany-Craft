@@ -67,7 +67,7 @@ BC.QUESTS = [
     check: s => Math.min(1, (Math.min(3, s.compostMade) / 3) * 0.6 + (s.compostUsed ? 0.4 : 0)), points: 25,
     quiz: { q: 'Compost improves which of the following?', options: ['Water holding, nutrient supply and soil structure', 'Only pH', 'Only drainage', 'Nothing measurable'], answer: 0,
       explain: 'Humus is a sponge for water and nutrients, glues soil crumbs together, and feeds the microbes that feed the plant. Compost cannot make peat alkaline or sand into loam, though.' } },
-  { id: 'fence', title: 'Browse Protection', goal: 'Build fences (from logs) around a planted crop on all four sides.',
+  { id: 'fence', title: 'Browse Protection', goal: 'Chop a log, craft planks and fence posts in your Bag (E), and fence a planted crop on all four sides.',
     lesson: 'Herbivores like deer, hares and rabbits nibble young plants. A fence is the oldest gardening tool.',
     check: s => s.fenced ? 1 : 0, points: 20,
     quiz: { q: 'Ragged, torn leaf edges on your plants at head height point to:', options: ['Deer (no upper front teeth, they tear)', 'Rabbits (clean 45° cuts)', 'Caterpillars (holes)', 'Frost'], answer: 0,

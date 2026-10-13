@@ -21,11 +21,24 @@ BC.Animals = class Animals {
     if (def.id === 'dart_frog' || def.id === 'lizard' || def.id === 'frog') box(bw * 0.9, bh * 0.4, bl * 0.4, 0, legH + bh * 0.9, -bl * 0.1, c.accent);
     const merged = BC.mergeGeometries(geos); merged.scale(s, s, s); const m = new THREE.Mesh(merged, this.mat); m.castShadow = false; return m;
   }
-  spawn(id, x, z) {
-    const def = BC.ANIMAL_BY_ID[id]; const w = this.game.world; const y = w.top(x | 0, z | 0) + 1;
+  spawn(id, x, z, uid) {
+    const def = BC.ANIMAL_BY_ID[id]; if (!def) return null; const w = this.game.world; const y = w.top(x | 0, z | 0) + 1;
     const mesh = this.buildMesh(def); mesh.position.set(x, y, z); this.game.scene.add(mesh);
-    const e = { def, mesh, x, y, z, yaw: Math.random() * 6.28, state: 'idle', timer: Math.random() * 3, target: null, cool: 0, bob: Math.random() * 10, fly: def.flies ? 1.5 + Math.random() : 0, home: [x, z] };
+    const e = { uid: uid || Math.random().toString(36).slice(2, 9), def, mesh, x, y, z, yaw: Math.random() * 6.28, state: 'idle', timer: Math.random() * 3, target: null, cool: 0, bob: Math.random() * 10, fly: def.flies ? 1.5 + Math.random() : 0, home: [x, z], leash: null };
     this.list.push(e); return e;
+  }
+  byUid(uid) { return this.list.find(e => e.uid === uid); }
+  remove(e) { const i = this.list.indexOf(e); if (i < 0) return; this.list.splice(i, 1); this.game.scene.remove(e.mesh); if (e.line) { this.game.scene.remove(e.line); e.line = null; } }
+  // Position of the player holding a leash (host resolves by name).
+  leaderPos(name) { const g = this.game; if (name === g.playerName) return g.player.pos; let out = null; g.peers.forEach(pe => { if (pe.name.toLowerCase() === name) out = pe.group.position; }); return out; }
+  updateLeashLines() {
+    const g = this.game;
+    for (const e of this.list) {
+      const lp = e.leash ? this.leaderPos(e.leash) : null;
+      if (!lp) { if (e.line) { g.scene.remove(e.line); e.line = null; } continue; }
+      if (!e.line) { const geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]); e.line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: 0xc8a060 })); g.scene.add(e.line); }
+      const a = e.line.geometry.attributes.position; a.setXYZ(0, lp.x, lp.y + 1.0, lp.z); a.setXYZ(1, e.mesh.position.x, e.mesh.position.y + 0.5 * (e.def.scale || 1), e.mesh.position.z); a.needsUpdate = true; e.line.geometry.computeBoundingSphere();
+    }
   }
   nearestPlant(e, pred, range) {
     let best = null, bd = range * range; this.game.world.plants.forEach(p => { if (!pred(p)) return; const d = (p.x + 0.5 - e.x) ** 2 + (p.z + 0.5 - e.z) ** 2; if (d < bd) { bd = d; best = p; } }); return best;
@@ -37,8 +50,10 @@ BC.Animals = class Animals {
       const d = e.def; e.timer -= dt; e.cool -= dt; e.bob += dt;
       let far = (e.x - pl.x) ** 2 + (e.z - pl.z) ** 2; for (const o of others) far = Math.min(far, (e.x - o.x) ** 2 + (e.z - o.z) ** 2); if (far > 70 * 70) continue; // sleep far away
       const nearPlayer = (e.x - pl.x) ** 2 + (e.z - pl.z) ** 2 < 3.2 * 3.2; if (nearPlayer && !stats.journal.has('animal:' + d.id)) this.game.discover('animal:' + d.id, 'seen');
+      // on a rope: follow the leader, nothing else
+      if (e.leash) { const lp = this.leaderPos(e.leash); if (!lp) e.leash = null; else { const dx = lp.x - e.x, dz = lp.z - e.z; const dist = Math.hypot(dx, dz); e.state = 'idle'; e.timer = 1; e.plant = null; if (dist > 2.2) { e.target = [lp.x - dx / dist * 1.8, lp.z - dz / dist * 1.8]; } else e.target = null; if (dist > 24) { e.x = lp.x - dx / dist * 2; e.z = lp.z - dz / dist * 2; e.target = null; } } }
       // behaviour selection
-      if (e.state === 'idle' || e.state === 'wander') {
+      if (!e.leash && (e.state === 'idle' || e.state === 'wander')) {
         if (e.timer <= 0) {
           if (e.state === 'idle') { // choose: forage, pollinate or wander
             let p = null;
@@ -61,7 +76,7 @@ BC.Animals = class Animals {
           } else { e.state = 'idle'; e.timer = 1 + Math.random() * 3; }
           e.target = null;
         } else {
-          const sp = d.speed * (e.state === 'seek' ? 1.2 : 0.7); const nx = e.x + dx / dist * sp * dt, nz = e.z + dz / dist * sp * dt;
+          const sp = d.speed * (e.leash ? 1.5 : e.state === 'seek' ? 1.2 : 0.7); const nx = e.x + dx / dist * sp * dt, nz = e.z + dz / dist * sp * dt;
           if (this.walkable(e, nx, nz)) { e.x = nx; e.z = nz; const ty = Math.atan2(dx, dz); let da = ty - e.yaw; da = Math.atan2(Math.sin(da), Math.cos(da)); e.yaw += da * Math.min(1, 6 * dt); }
           else { e.target = null; e.state = 'idle'; e.timer = 0.5; if (e.plant && d.role === 'herbivore') { e.cool = 30; } }
         }
@@ -73,21 +88,23 @@ BC.Animals = class Animals {
       e.mesh.position.set(e.x, e.y + hop, e.z); e.mesh.rotation.y = e.yaw; e.mesh.rotation.z = d.flies ? Math.sin(e.bob * 3) * 0.1 : 0;
       if (d.wings) e.mesh.rotation.x = Math.sin(e.bob * 20) * 0.15;
     }
+    this.updateLeashLines();
   }
   // Host -> guests: compact positions. Guests interpolate toward them.
-  snapshot() { const out = []; this.list.forEach((e, i) => { out.push(i, Math.round(e.x * 20) / 20, Math.round(e.y * 20) / 20, Math.round(e.z * 20) / 20, Math.round(e.yaw * 100) / 100); }); return out; }
-  applyRemote(list) { for (let i = 0; i < list.length; i += 5) { const e = this.list[list[i]]; if (!e) continue; e.rx = list[i + 1]; e.ry = list[i + 2]; e.rz = list[i + 3]; e.ryaw = list[i + 4]; if (e.rx === undefined || e.first === undefined) { e.x = e.rx; e.y = e.ry; e.z = e.rz; e.yaw = e.ryaw; e.first = 1; } } }
+  snapshot() { const out = []; this.list.forEach(e => { out.push(e.uid, Math.round(e.x * 20) / 20, Math.round(e.y * 20) / 20, Math.round(e.z * 20) / 20, Math.round(e.yaw * 100) / 100); }); return out; }
+  applyRemote(list) { const m = new Map(this.list.map(e => [e.uid, e])); for (let i = 0; i < list.length; i += 5) { const e = m.get(list[i]); if (!e) continue; e.rx = list[i + 1]; e.ry = list[i + 2]; e.rz = list[i + 3]; e.ryaw = list[i + 4]; if (e.rx === undefined || e.first === undefined) { e.x = e.rx; e.y = e.ry; e.z = e.rz; e.yaw = e.ryaw; e.first = 1; } } }
   updateGuest(dt) {
     const pl = this.game.player.pos; const stats = this.game.stats;
     for (const e of this.list) { e.bob += dt; if (e.rx !== undefined) { const k = Math.min(1, dt * 6); const dx = e.rx - e.x, dz = e.rz - e.z; const moving = Math.hypot(dx, dz) > 0.05; e.x += dx * k; e.y += (e.ry - e.y) * k; e.z += dz * k; let da = e.ryaw - e.yaw; da = Math.atan2(Math.sin(da), Math.cos(da)); e.yaw += da * k; e.moving = moving; }
       const d = e.def; if ((e.x - pl.x) ** 2 + (e.z - pl.z) ** 2 < 3.2 * 3.2 && !stats.journal.has('animal:' + d.id)) this.game.discover('animal:' + d.id, 'seen');
       const hop = (d.id === 'cottontail' || d.id === 'hare' || d.id === 'frog' || d.id === 'dart_frog') && e.moving ? Math.abs(Math.sin(e.bob * 8)) * 0.25 : 0;
       e.mesh.position.set(e.x, e.y + hop, e.z); e.mesh.rotation.y = e.yaw; e.mesh.rotation.z = d.flies ? Math.sin(e.bob * 3) * 0.1 : 0; if (d.wings) e.mesh.rotation.x = Math.sin(e.bob * 20) * 0.15; }
+    this.updateLeashLines();
   }
   raycast(origin, dir, maxD) {
     let best = null, bd = maxD; for (const e of this.list) { const c = this.tmp.set(e.x, e.y + 0.5 * (e.def.scale || 1), e.z); const oc = c.clone().sub(origin); const t = oc.dot(dir); if (t < 0 || t > bd) continue; const r = Math.max(0.5, Math.max(e.def.body[1], e.def.body[2]) * (e.def.scale || 1) * 0.8); const d2 = oc.lengthSq() - t * t; if (d2 < r * r) { bd = t; best = e; } } return best ? { entity: best, dist: bd } : null;
   }
-  serialize() { return this.list.map(e => ({ id: e.def.id, x: e.x, z: e.z })); }
+  serialize() { return this.list.map(e => ({ id: e.def.id, x: e.x, z: e.z, uid: e.uid })); }
 };
 // Minimal geometry merge (positions, normals, colors) so we don't need the examples bundle.
 BC.mergeGeometries = function (geos) {

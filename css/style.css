@@ -174,3 +174,12 @@ body.touch #compass { top: calc(104px + env(safe-area-inset-top, 0px)); } @media
 .world-card .forget { background: transparent; color: inherit; border: 0; opacity: 0.6; font-size: 18px; padding: 4px 6px; } .world-card .forget:hover { opacity: 1; }
 .world-card i.dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
 .world-list .empty { font-size: 13px; opacity: 0.7; }
+
+/* ---------- Bag & crafting ---------- */
+.slot.empty { background: rgba(0,0,0,0.12); border-style: dashed; }
+#btn-bag em { font-style: normal; background: var(--sun); color: #2b2a22; border-radius: 10px; padding: 0 6px; font-size: 11px; font-weight: 700; margin-left: 4px; }
+.inv-row, .inv-grid { display: flex; flex-wrap: wrap; gap: 6px; } .inv-row .slot, .inv-grid .slot { background: var(--paper-2); border-color: var(--rule); color: var(--ink); } .inv-row .slot.sel { border-color: var(--sun); background: #f6e2b8; } .inv-row .slot .count, .inv-grid .slot .count { text-shadow: 0 1px 2px #fff; color: var(--ink); } .inv-row .slot .key { color: var(--ink-soft); opacity: 1; }
+.recipes { display: grid; gap: 8px; } .recipe { display: grid; grid-template-columns: 56px 1fr auto; gap: 12px; align-items: center; padding: 10px 12px; border: 1px solid var(--rule); border-radius: 10px; } .recipe.no { opacity: 0.7; }
+.recipe .ico { width: 56px; height: 56px; border-radius: 10px; background: var(--paper-2); display: grid; place-items: center; } .recipe .ico canvas { width: 48px; height: 48px; image-rendering: pixelated; }
+.recipe .txt { min-width: 0; } .recipe b { display: block; font-family: var(--font-display); font-size: 16px; } .recipe span { display: block; font-size: 13px; color: var(--ink-soft); } .recipe em { display: block; font-size: 13px; margin-top: 4px; }
+.recipe .make { padding: 9px 14px; } .recipe .make:disabled { opacity: 0.45; cursor: default; }

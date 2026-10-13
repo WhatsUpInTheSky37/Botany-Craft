@@ -20,7 +20,7 @@ BC.Game = class Game {
   }
   resetStats() {
     this.stats = { inspected: new Set(), seedSpecies: new Set(), maxDig: 0, plantedGood: 0, watered: 0, matured: 0, legumesPlanted: 0, threeSisters: false, pollinated: false, blueberryAcid: false, cactusInSand: false, compostMade: 0, compostUsed: false, biomesVisited: new Set(), treeGrown: false, fenced: false, invasiveRemoved: 0, journal: new Set(), questsDone: new Set(), harvests: 0, compostMaterial: 0, planted: 0 };
-    this.inventory = [{ type: 'tool', id: 'hand' }, { type: 'tool', id: 'trowel' }, { type: 'tool', id: 'can' }]; this.selected = 0; this.points = 0;
+    this.inventory = [{ type: 'tool', id: 'hand' }, { type: 'tool', id: 'trowel' }, { type: 'tool', id: 'can' }, null, null, null, null, null, null]; this.selected = 0; this.points = 0;
   }
   setupScene() {
     const atlas = BC.Atlas.build(); this.atlas = atlas.texture;
@@ -38,6 +38,7 @@ BC.Game = class Game {
     const rg = new THREE.BufferGeometry(); rg.setAttribute('position', new THREE.BufferAttribute(rp, 3)); this.rain = new THREE.Points(rg, new THREE.PointsMaterial({ color: 0xbfd8ff, size: 0.12, transparent: true, opacity: 0.7 })); this.rain.visible = false; this.scene.add(this.rain);
   }
   resize() { const w = window.innerWidth, h = window.innerHeight; this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, this.player.touch ? 1.5 : 2)); this.renderer.setSize(w, h, false); this.camera.aspect = w / h; this.camera.updateProjectionMatrix(); }
+  cur() { return this.inventory[this.selected] || BC.HAND; }
   isAuthority() { return this.mode === 'solo' || !this.net.live || this.net.isHost; }
   // ---------- lifecycle ----------
   newGame(region) {
@@ -105,7 +106,7 @@ BC.Game = class Game {
   sharedState() { return { world: this.world.serialize(), time: this.time, weather: this.weather, animals: this.animals.list.length ? this.animals.serialize() : (this.world.spawnAnimals || []) }; }
   applySharedState(state) { if (!state || !state.world) return; this.world.restore(state.world); if (state.time) this.time = state.time; if (state.weather) { this.weather = state.weather; this.rain.visible = !!this.weather.raining; } this.sharedAnimals = state.animals; }
   playerState() { const st = this.stats; const S = o => Array.from(o); return { inventory: this.inventory, selected: this.selected, points: this.points, pos: { x: this.player.pos.x, y: this.player.pos.y, z: this.player.pos.z, yaw: this.player.yaw, pitch: this.player.pitch }, stats: Object.assign({}, st, { inspected: S(st.inspected), seedSpecies: S(st.seedSpecies), biomesVisited: S(st.biomesVisited), journal: S(st.journal), questsDone: S(st.questsDone) }) }; }
-  applyPlayerState(ps) { const st = ps.stats; this.stats = Object.assign(this.stats, st, { inspected: new Set(st.inspected), seedSpecies: new Set(st.seedSpecies), biomesVisited: new Set(st.biomesVisited), journal: new Set(st.journal), questsDone: new Set(st.questsDone) }); this.inventory = ps.inventory; this.selected = Math.min(ps.selected || 0, this.inventory.length - 1); this.points = ps.points || 0; if (ps.pos) { this.player.pos.set(ps.pos.x, ps.pos.y, ps.pos.z); this.player.yaw = ps.pos.yaw; this.player.pitch = ps.pos.pitch; } }
+  applyPlayerState(ps) { const st = ps.stats; this.stats = Object.assign(this.stats, st, { inspected: new Set(st.inspected), seedSpecies: new Set(st.seedSpecies), biomesVisited: new Set(st.biomesVisited), journal: new Set(st.journal), questsDone: new Set(st.questsDone) }); this.inventory = ps.inventory || []; while (this.inventory.length < 9) this.inventory.push(null); this.selected = Math.min(ps.selected || 0, 8); this.points = ps.points || 0; if (ps.pos) { this.player.pos.set(ps.pos.x, ps.pos.y, ps.pos.z); this.player.yaw = ps.pos.yaw; this.player.pitch = ps.pos.pitch; } }
   bindNetEvents() {
     const n = this.net, w = () => this.world;
     const remote = fn => { const W = w(); const prev = W.remote; W.remote = true; try { fn(W); } finally { W.remote = prev; } };
@@ -120,6 +121,9 @@ BC.Game = class Game {
     Object.keys(apply).forEach(ev => n.on(ev, m => { if (this.syncBuffer) this.syncBuffer.push([ev, m]); else apply[ev](m); }));
     this.replaySync = () => { const buf = this.syncBuffer || []; this.syncBuffer = null; buf.forEach(([ev, m]) => { try { apply[ev](m); } catch (e) { console.warn(e); } }); };
     n.on('animals', m => { if (!n.isHost) this.animals.applyRemote(m.list); });
+    n.on('animal_rm', m => { const e = this.animals.byUid(m.uid); if (e) this.animals.remove(e); });
+    n.on('animal_add', m => { if (!this.animals.byUid(m.uid)) this.animals.spawn(m.id, m.x, m.z, m.uid); });
+    n.on('leash', m => { const e = this.animals.byUid(m.uid); if (e) e.leash = m.by; });
     n.on('pos', (m, from) => { const pe = this.peers.get(from); if (pe) { pe.target.set(m.x, m.y, m.z); pe.yaw = m.yaw; } });
     n.on('time', m => { if (!n.isHost && Math.abs(m.t - this.time.t) > 3) this.time.t = m.t; });
     n.on('weather', m => { if (!n.isHost) { this.weather = m.w; this.rain.visible = !!m.w.raining; } });
@@ -220,7 +224,7 @@ BC.Game = class Game {
     let x = Math.floor(o.x), y = Math.floor(o.y), z = Math.floor(o.z); const sx = Math.sign(d.x), sy = Math.sign(d.y), sz = Math.sign(d.z);
     const tdx = Math.abs(1 / (d.x || 1e-9)), tdy = Math.abs(1 / (d.y || 1e-9)), tdz = Math.abs(1 / (d.z || 1e-9));
     let tmx = (sx > 0 ? (x + 1 - o.x) : (o.x - x)) * tdx, tmy = (sy > 0 ? (y + 1 - o.y) : (o.y - y)) * tdy, tmz = (sz > 0 ? (z + 1 - o.z) : (o.z - z)) * tdz;
-    let n = [0, 0, 0], dist = 0; const it = this.inventory[this.selected]; const wantsWater = it && it.type === 'seed' && BC.Sim.defFor({ id: it.id }).water === 'aquatic';
+    let n = [0, 0, 0], dist = 0; const it = this.cur(); const wantsWater = it && it.type === 'seed' && BC.Sim.defFor({ id: it.id }).water === 'aquatic';
     let hit = null;
     for (let i = 0; i < 40 && dist <= maxD; i++) {
       const p = w.plantAt(x, y, z); if (p && dist > 0.2) { hit = { type: 'plant', plant: p, x, y, z, dist }; break; }
@@ -233,48 +237,62 @@ BC.Game = class Game {
     return hit;
   }
   updateTarget() {
-    const h = this.raycast(); let info = null; const it = this.inventory[this.selected];
+    const h = this.raycast(); let info = null; const it = this.cur();
     if (h) {
       if (h.type === 'plant') { const def = BC.Sim.defFor(h.plant); const p = h.plant; const mine = !p.wild && (this.mode !== 'shared' || !p.owner || p.owner === this.playerName); const whose = p.wild ? '' : (mine ? 'Your crop' : `${p.owner}'s crop`); const st = p.withered ? 'Withered' : p.wild ? (p.progress >= 1 ? 'Wild, mature' : 'Wild, regrowing') : p.progress >= 1 ? `${whose}: ready to harvest` : `${whose}: ${Math.round(p.progress * 100)}% grown`; info = { name: def.name, sub: def.sci + ' · ' + st, hint: it.type === 'tool' && it.id === 'hand' ? (p.wild ? (p.progress >= 1 ? (def.invasive ? 'Tap to pull it out' : 'Tap to collect seeds') : 'Regrowing: come back soon') : p.progress >= 1 ? 'Tap to harvest' : 'Tap to check its health') : 'Inspect: right-click or long-press' }; }
       else if (h.type === 'block') { const b = BC.BLOCKS[h.id]; const tree = (b.log || b.leaves) ? BC.TREE_BY_ID[this.world.treeAt.get(this.world.idx(h.x, h.y, h.z))] : null; const soil = b.soil ? BC.SOILS[b.soil] : null; info = { name: tree ? tree.name : b.name, sub: tree ? tree.sci + (b.leaves ? ' · leaves' : ' · trunk') : soil ? `${soil.name} (${soil.order}) · pH ${soil.ph}` : '', hint: this.hintFor(it, b, tree, h) }; }
       else if (h.type === 'water') info = { name: 'Shallow water', sub: 'Tap to plant here', hint: '' };
-      else if (h.type === 'animal') { const d = h.entity.def; info = { name: d.name, sub: d.sci, hint: 'Tap to add to your journal' }; }
+      else if (h.type === 'animal') { const d = h.entity.def; const e = h.entity; const small = BC.isSmallAnimal(d); const rope = it.type === 'material' && it.id === 'rope'; info = { name: d.name, sub: d.sci + (e.leash ? ` · on ${e.leash}'s rope` : ''), hint: rope ? (small ? 'Small enough to catch by hand' : e.leash ? 'Tap to let go' : 'Tap to lead it with the rope') : small ? 'Tap to catch · hold to read about it' : 'Hold to read about it · craft a rope to lead it' }; }
     }
     const s = JSON.stringify(info); if (s !== this.lastTargetStr) { this.lastTargetStr = s; this.ui.setTarget(info); }
   }
   hintFor(it, b, tree, h) {
     if (it.type === 'tool') { if (it.id === 'trowel') return b.unbreakable ? 'Bedrock cannot be dug' : b.log ? 'Tap to chop: fence posts' : b.leaves ? 'Tap to shake out seeds' : 'Tap to dig'; if (it.id === 'can') return b.soil ? 'Tap to water this spot' : ''; return b.soil ? 'Tap to read the soil' : tree ? 'Tap to read about this tree' : ''; }
     if (it.type === 'seed') { const def = BC.Sim.defFor({ id: it.id }); if (def.epiphyte) return b.log ? 'Tap the trunk side to attach it' : 'Epiphytes need a tree trunk'; return h.normal[1] === 1 && b.soil ? 'Tap to plant here' : 'Aim at the top of a soil block'; }
-    if (it.type === 'compost') return b.soil ? 'Tap to amend this soil' : ''; if (it.type === 'block') return 'Tap to place'; return '';
+    if (it.type === 'compost') return b.soil ? 'Tap to amend this soil' : ''; if (it.type === 'block') return 'Tap to place'; if (it.type === 'animal') return 'Tap to release it here'; return '';
   }
   // ---------- actions ----------
   applyWater(x, z, local) { const w = this.world; for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) { const xx = x + dx, zz = z + dz; if (xx >= 0 && zz >= 0 && xx < w.W && zz < w.D) w.moisture[xx + zz * w.W] = Math.min(1, w.moisture[xx + zz * w.W] + (dx === 0 && dz === 0 ? 1 : 0.5)); } w.markDirty(x, z); if (local && this.mode === 'shared') this.net.send('water', { x, z }); }
   primary() {
-    if (this.ui.modalOpen()) return; const h = this.raycast(); if (!h) return; const it = this.inventory[this.selected]; const w = this.world; const st = this.stats;
-    if (h.type === 'animal') return this.inspect(h);
+    if (this.ui.modalOpen()) return; const h = this.raycast(); if (!h) return; const it = this.cur(); const w = this.world; const st = this.stats;
+    if (h.type === 'animal') return this.animalAction(h.entity, it);
     if (it.type === 'tool' && it.id === 'hand') {
       if (h.type === 'plant') return this.handOnPlant(h.plant);
       return this.inspect(h);
     }
     if (it.type === 'tool' && it.id === 'trowel') {
       if (h.type === 'plant') { w.removePlant(h.plant); this.toast('Plant removed.', ''); return; }
-      if (h.type !== 'block') return; const b = BC.BLOCKS[h.id]; if (b.unbreakable) { this.toast('Bedrock. Soil ends here: the R horizon.', ''); return this.inspect(h); }
+      if (h.type !== 'block') return; const b = BC.BLOCKS[h.id]; if (b.unbreakable || (b.id === BC.BLOCK.STONE && h.y <= 1)) { this.toast('Bedrock. The world ends here.', ''); return this.inspect(h); }
       const above = w.plantAt(h.x, h.y + 1, h.z); if (above) w.removePlant(above);
       w.set(h.x, h.y, h.z, 0);
-      if (b.log) { this.give({ type: 'block', id: BC.BLOCK.FENCE, count: 2 }); const tid = w.treeAt.get(w.idx(h.x, h.y, h.z)); if (tid) { this.lastInspect = null; this.discover('tree:' + tid, 'chopped'); } this.toast('Chopped a log: 2 fence posts.', 'good'); }
+      if (b.log) { this.give({ type: 'block', id: h.id, count: 1 }); const tid = w.treeAt.get(w.idx(h.x, h.y, h.z)); if (tid) { this.lastInspect = null; this.discover('tree:' + tid, 'chopped'); } this.toast(`Chopped: 1 ${b.name.toLowerCase()}. Craft it into planks in your Bag (E).`, 'good'); }
       else if (b.leaves) { const tid = w.treeAt.get(w.idx(h.x, h.y, h.z)); if (tid && Math.random() < 0.4) { this.give({ type: 'seed', id: 'tree:' + tid, count: 1 }); this.toast(`Found ${BC.TREE_BY_ID[tid].seed}!`, 'good'); st.seedSpecies.add('tree:' + tid); } else this.toast('Just leaves. Shake another branch for seeds.', ''); if (tid) this.discover('tree:' + tid, 'leaves'); }
       else if (b.soil) {
         this.give({ type: 'block', id: h.id, count: 1 }); const depth = Math.max(1, w.height[h.x + h.z * w.W] - h.y + 1); if (h.y <= w.height[h.x + h.z * w.W]) st.maxDig = Math.max(st.maxDig, depth);
         this.lastInspect = { x: h.x, y: h.y, z: h.z };
         if (!this.discover('soil:' + b.soil, 'dug')) { const below = BC.BLOCKS[w.get(h.x, h.y - 1, h.z)]; if (below && below.soil && below.soil !== b.soil) this.toast(`Dug through ${b.name.toLowerCase()} (${b.horizon} horizon). Below: ${below.name.toLowerCase()}.`, ''); }
         if (b.soil !== 'stone' && Math.random() < 0.12 && ['alfisol', 'mollisol', 'histosol', 'compost'].includes(b.soil)) { this.discover('animal:earthworm', 'dug'); }
-      } else if (b.fence || b.id === BC.BLOCK.PLANKS) this.give({ type: 'block', id: h.id, count: 1 });
+      } else this.give({ type: 'block', id: h.id, count: 1 });
       return;
     }
     if (it.type === 'tool' && it.id === 'can') { if (h.type !== 'block' && h.type !== 'plant') return; this.applyWater(h.x, h.z, true); st.watered++; this.toast(`Watered. Moisture here is now ${Math.round(w.moisture[h.x + h.z * w.W] * 100)}%.`, 'good'); return; }
     if (it.type === 'seed') return this.plantSeed(it, h);
     if (it.type === 'compost') { if (h.type !== 'block' || !BC.BLOCKS[h.id].soil) return this.toast('Compost goes on soil.', ''); const b = BC.BLOCKS[h.id]; if (b.soil === 'stone') return this.toast('Rock is not soil. Nothing to amend.', ''); w.set(h.x, h.y, h.z, BC.BLOCK.COMPOST); this.take(it); st.compostUsed = true; this.toast('Soil amended with compost: pH buffered to 6.5, more humus, better water holding.', 'good'); this.lastInspect = { x: h.x, y: h.y, z: h.z }; this.discover('soil:compost', 'made'); return; }
+    if (it.type === 'animal') { if (h.type !== 'block') return; const [nx, ny, nz] = h.normal; const x = h.x + nx, z = h.z + nz; const t = w.top(x, z); if (w.get(x, t + 1, z) !== 0) return this.toast('No room to release it there.', ''); const e = this.animals.spawn(it.id, x + 0.5, z + 0.5); if (!e) return; if (this.mode === 'shared') this.net.send('animal_add', { uid: e.uid, id: it.id, x: e.x, z: e.z }); this.take(it); this.toast(`Released the ${e.def.name.toLowerCase()}.` + (e.def.role === 'pollinator' ? ' Pollinators released near flowering crops will visit them.' : ''), 'good'); return; }
     if (it.type === 'block') { if (h.type !== 'block') return; const [nx, ny, nz] = h.normal; const x = h.x + nx, y = h.y + ny, z = h.z + nz; const cur = w.get(x, y, z); if (cur !== 0 && cur !== 15) return; if (w.plantAt(x, y, z)) return this.toast('A plant is in the way.', ''); const p = this.player.pos; if (x + 1 > p.x - 0.3 && x < p.x + 0.3 && z + 1 > p.z - 0.3 && z < p.z + 0.3 && y + 1 > p.y && y < p.y + 1.8) return; w.set(x, y, z, it.id); this.take(it); if (it.id === BC.BLOCK.FENCE) this.checkFences(); return; }
+  }
+  animalAction(e, it) {
+    const d = e.def; const small = BC.isSmallAnimal(d); const rope = it.type === 'material' && it.id === 'rope';
+    if (rope) {
+      if (small) return this.toast(`A ${d.name.toLowerCase()} is small enough to catch by hand.`, '');
+      if (e.leash && e.leash !== this.playerName) return this.toast(`${e.leash} is already leading that ${d.name.toLowerCase()}.`, '');
+      e.leash = e.leash ? null : this.playerName; if (this.mode === 'shared') this.net.send('leash', { uid: e.uid, by: e.leash }); this.stats.inspected.add('animal:' + d.id); this.discover('animal:' + d.id, 'inspected');
+      this.toast(e.leash ? `The ${d.name.toLowerCase()} is on your rope and will follow you. Tap it again to let go.` : `You let the ${d.name.toLowerCase()} go.`, 'good'); return;
+    }
+    if (!small) { this.toast(`Too big to pick up. Craft a rope (3 plant fibre) to lead a ${d.name.toLowerCase()}.`, ''); return this.inspect({ type: 'animal', entity: e }); }
+    this.animals.remove(e); if (this.mode === 'shared') this.net.send('animal_rm', { uid: e.uid }); this.give({ type: 'animal', id: d.id, count: 1 }); this.stats.inspected.add('animal:' + d.id);
+    const note = d.id === 'dart_frog' ? ' You scooped it up with a leaf: never touch a dart frog bare-handed.' : d.id === 'bumblebee' ? ' Gently: a squeezed bee stings.' : d.role === 'pollinator' ? ' Release it next to your flowering crops.' : '';
+    if (!this.discover('animal:' + d.id, 'inspected')) this.toast(`Caught a ${d.name.toLowerCase()}. It is in your bag.${note}`, 'good'); else this.toast(`Caught a ${d.name.toLowerCase()}.${note}`, 'good');
   }
   secondary() { if (this.ui.modalOpen()) return; const h = this.raycast(); if (h) this.inspect(h); }
   inspect(h) {
@@ -290,12 +308,12 @@ BC.Game = class Game {
       if (p.progress < 1) { this.toast(`This ${def.name.toLowerCase()} is regrowing. It will set seed again soon.`, ''); return; }
       if (def.invasive) { w.removePlant(p); st.invasiveRemoved++; this.points += 4; this.toast(`Pulled up ${def.name}. Roots and all: it would resprout otherwise.`, 'good'); this.lastInspect = p; this.discover(key, 'pulled'); return; }
       p.progress = 0.5; w.markDirty(p.x, p.z); this.syncPlant(p); const first = !st.seedSpecies.has(def.id); st.seedSpecies.add(def.id); if (first) this.points += 5;
-      this.give({ type: 'seed', id: def.id, count: 2 }); this.lastInspect = p; if (!this.discover(key, 'collected')) this.toast(`Collected 2 × ${def.seed}.`, 'good'); st.inspected.add(key); return;
+      this.give({ type: 'seed', id: def.id, count: 2 }); const fib = BC.FIBRE_PLANTS[def.id] || 0; if (fib) this.give({ type: 'material', id: 'fibre', count: fib }); this.lastInspect = p; if (!this.discover(key, 'collected')) this.toast(`Collected 2 × ${def.seed}.` + (fib ? ` Also ${fib} plant fibre for rope.` : ''), 'good'); st.inspected.add(key); return;
     }
     if (p.progress < 1) { const ev = BC.Sim.evaluate(w, p); st.inspected.add(key); if (!this.discover(key, 'inspected')) this.ui.showCard(key, false, p, ev); return; }
     // harvest
     const n = p.pollinated ? 4 : 2; this.give({ type: 'seed', id: def.id, count: n }); st.harvests++; this.points += 2; st.compostMaterial++;
-    let msg = `Harvested ${def.name}: ${n} × ${def.seed}${p.pollinated ? ' (pollinated: double seeds)' : ''}.`;
+    let msg = `Harvested ${def.name}: ${n} × ${def.seed}${p.pollinated ? ' (pollinated: double seeds)' : ''}.`; const fib = BC.FIBRE_PLANTS[def.id] || 0; if (fib) { this.give({ type: 'material', id: 'fibre', count: fib }); msg += ` +${fib} plant fibre.`; }
     if (st.compostMaterial >= 3) { st.compostMaterial -= 3; st.compostMade++; this.give({ type: 'compost', count: 1 }); msg += ' Plant waste became 1 compost.'; }
     if (def.life && def.life.startsWith('Annual')) { w.removePlant(p); msg += ' Annuals die after seeding.'; } else { p.progress = 0.45; p.pollinated = false; w.markDirty(p.x, p.z); this.syncPlant(p); }
     this.toast(msg, 'good');
@@ -317,12 +335,22 @@ BC.Game = class Game {
   isFenced(p) { const w = this.world; for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const b = BC.BLOCKS[w.get(p.x + dx, p.y, p.z + dz)]; if (!b || !b.solid) return false; } return true; }
   checkFences() { let any = false; this.world.plants.forEach(p => { if (!p.wild && this.isFenced(p)) { p.protected = true; any = true; } }); if (any && !this.stats.fenced) { this.stats.fenced = true; this.toast('Your crop is fenced on all four sides. Deer and rabbits will go hungry.', 'good'); } }
   // ---------- inventory ----------
-  give(item) { const ex = this.inventory.find(i => i.type === item.type && i.id === item.id); if (ex) ex.count += item.count; else this.inventory.push(item); this.ui.renderHotbar(); }
-  take(item) { item.count--; if (item.count <= 0) { const i = this.inventory.indexOf(item); this.inventory.splice(i, 1); if (this.selected >= this.inventory.length) this.selected = this.inventory.length - 1; } this.ui.renderHotbar(); }
-  select(i) { if (i < 0 || i >= this.inventory.length) return; this.selected = i; this.ui.renderHotbar(); }
-  scrollHotbar(d) { this.select((this.selected + d + this.inventory.length) % this.inventory.length); }
-  itemName(it) { if (!it) return ''; if (it.type === 'tool') return { hand: 'Hand: collect, harvest, inspect', trowel: 'Trowel: dig soil, chop logs, shake leaves', can: 'Watering can' }[it.id]; if (it.type === 'seed') { const d = BC.Sim.defFor({ id: it.id }); return `${d.seed} (${d.name})`; } if (it.type === 'compost') return 'Compost: tap a soil block to amend it'; if (it.type === 'block') { const b = BC.BLOCKS[it.id]; return b.fence ? 'Fence post: place around crops' : b.name + ' (block)'; } return ''; }
+  give(item) { const ex = this.inventory.find(i => i && i.type === item.type && i.id === item.id && i.type !== 'tool'); if (ex) { ex.count += item.count; } else { let slot = -1; for (let i = 0; i < 9; i++) if (!this.inventory[i]) { slot = i; break; } if (slot >= 0) this.inventory[slot] = item; else { this.inventory.push(item); this.toast(`${this.itemName(item)} went into your bag (E).`, ''); } } this.ui.renderHotbar(); }
+  take(item) { item.count--; if (item.count <= 0) { const i = this.inventory.indexOf(item); if (i >= 0 && i < 9) this.inventory[i] = null; else if (i >= 9) this.inventory.splice(i, 1); } this.ui.renderHotbar(); }
+  count(match) { return this.inventory.reduce((a, i) => a + (i && match(i) ? (i.count || 0) : 0), 0); }
+  consume(match, n) { for (const i of this.inventory) { if (n <= 0) break; if (!i || !match(i)) continue; const k = Math.min(n, i.count); i.count -= k; n -= k; } this.inventory = this.inventory.map((i, idx) => (i && i.count !== undefined && i.count <= 0) ? null : i).filter((i, idx) => idx < 9 || i); while (this.inventory.length < 9) this.inventory.push(null); this.ui.renderHotbar(); }
+  canCraft(r) { return r.ins.every(inp => this.count(inp.match) >= inp.n); }
+  craft(r) { if (!this.canCraft(r)) return false; r.ins.forEach(inp => this.consume(inp.match, inp.n)); this.give(Object.assign({}, r.out)); this.toast(`Crafted ${r.out.count} × ${this.itemName(r.out)}.`, 'good'); return true; }
+  bagItems() { return this.inventory.map((it, i) => ({ it, i })).filter(x => x.i >= 9 && x.it); }
+  moveToHotbar(bagIndex) { const it = this.inventory[bagIndex]; if (!it) return; const cur = this.inventory[this.selected]; if (cur && cur.type === 'tool') { this.toast('Pick an empty or non-tool hotbar slot first.', ''); return; } this.inventory[this.selected] = it; if (cur) this.inventory[bagIndex] = cur; else this.inventory.splice(bagIndex, 1); this.ui.renderHotbar(); }
+  moveToBag(slot) { const it = this.inventory[slot]; if (!it || it.type === 'tool') return; this.inventory[slot] = null; this.inventory.push(it); this.ui.renderHotbar(); }
+  select(i) { if (i < 0 || i > 8) return; this.selected = i; this.ui.renderHotbar(); }
+  scrollHotbar(d) { this.select((this.selected + d + 9) % 9); }
+  itemName(it) { if (!it) return 'Empty slot'; if (it.type === 'tool') return { hand: 'Hand: collect, harvest, inspect, catch small animals', trowel: 'Trowel: dig soil and stone, chop logs, shake leaves', can: 'Watering can' }[it.id]; if (it.type === 'seed') { const d = BC.Sim.defFor({ id: it.id }); return `${d.seed} (${d.name})`; } if (it.type === 'compost') return 'Compost: tap a soil block to amend it'; if (it.type === 'block') { const b = BC.BLOCKS[it.id]; return b.fence ? 'Fence post: place around crops' : b.name + ' (block)'; } if (it.type === 'material') { const m = BC.MATERIALS[it.id]; return m ? `${m.name}: ${m.desc}` : it.id; } if (it.type === 'animal') { const d = BC.ANIMAL_BY_ID[it.id]; return d ? `${d.name} (caught): tap the ground to release` : 'Animal'; } return ''; }
   itemIcon(it, size) {
+    if (!it) return null;
+    if (it.type === 'animal') { const d = BC.ANIMAL_BY_ID[it.id]; return d ? this.ui.imgFor('animal', d) : null; }
+    if (it.type === 'material') { const c = document.createElement('canvas'); c.width = c.height = size; const g = c.getContext('2d'); const sz = size / 32; if (it.id === 'fibre') { g.strokeStyle = '#c8b060'; g.lineWidth = 1.5 * sz; for (let i = 0; i < 7; i++) { g.beginPath(); g.moveTo((6 + i * 3) * sz, 28 * sz); g.quadraticCurveTo((4 + i * 4) * sz, 14 * sz, (10 + i * 2.5) * sz, 4 * sz); g.stroke(); } } else { g.strokeStyle = '#b08a4a'; g.lineWidth = 3.5 * sz; g.lineCap = 'round'; g.beginPath(); g.arc(16 * sz, 15 * sz, 9 * sz, 0.6, 5.9); g.stroke(); g.beginPath(); g.moveTo(16 * sz, 24 * sz); g.lineTo(22 * sz, 30 * sz); g.stroke(); g.strokeStyle = '#7a5a2a'; g.lineWidth = 1 * sz; g.beginPath(); g.arc(16 * sz, 15 * sz, 9 * sz, 0.6, 5.9); g.stroke(); } return c; }
     if (it.type === 'seed') { const d = BC.Sim.defFor({ id: it.id }); if (d.shape) { const c = BC.Atlas.tileCanvas(d.leaf ? 'leaves_' + d.id : 'cactus', size); const g = c.getContext('2d'); g.fillStyle = '#5a3a1a'; g.beginPath(); g.ellipse(size * 0.5, size * 0.72, size * 0.16, size * 0.22, 0.3, 0, 6.283); g.fill(); return c; } return BC.Atlas.spriteCanvas(d, 2, size); }
     if (it.type === 'block') { const b = BC.BLOCKS[it.id]; const c = BC.Atlas.tileCanvas(b.tex[1], size); if (b.fence) { const g = c.getContext('2d'); g.clearRect(0, 0, size, size); g.fillStyle = '#9a7a4a'; g.fillRect(size * 0.2, size * 0.1, size * 0.14, size * 0.85); g.fillRect(size * 0.66, size * 0.1, size * 0.14, size * 0.85); g.fillRect(size * 0.1, size * 0.3, size * 0.8, size * 0.1); g.fillRect(size * 0.1, size * 0.6, size * 0.8, size * 0.1); } return c; }
     if (it.type === 'compost') return BC.Atlas.tileCanvas('compost', size);
@@ -337,7 +365,7 @@ BC.Game = class Game {
   onKey(e) {
     if (e.code === 'Escape') { if (!this.ui.modal.hidden) this.ui.closeModal(); else if (document.getElementById('start').hidden) this.ui.showMenu(); return; }
     if (this.ui.modalOpen()) return;
-    if (e.code === 'KeyJ') this.ui.showJournal(); else if (e.code === 'KeyQ') this.ui.showQuests(); else if (e.code === 'KeyM') this.ui.showMap(); else if (e.code === 'KeyF') this.primary(); else if (e.code === 'KeyR') this.secondary();
+    if (e.code === 'KeyE') this.ui.showInventory(); else if (e.code === 'KeyJ') this.ui.showJournal(); else if (e.code === 'KeyQ') this.ui.showQuests(); else if (e.code === 'KeyM') this.ui.showMap(); else if (e.code === 'KeyF') this.primary(); else if (e.code === 'KeyR') this.secondary();
     else if (/^Digit[1-9]$/.test(e.code)) this.select(+e.code.slice(5) - 1);
   }
   // ---------- save / load ----------
