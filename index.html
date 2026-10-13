@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Botany Craft</title>
+<meta name="description" content="A block world that teaches botany: explore six real Earth biomes, read the soil, gather seeds and grow native plants in the right place.">
+<meta name="theme-color" content="#142316">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Nunito:wght@400;600;700&display=swap">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app">
+  <canvas id="gl"></canvas>
+  <div id="hud" hidden>
+    <div id="topbar">
+      <div id="biome-pill" class="pill"><b id="biome-name"></b><span id="biome-places"></span></div>
+      <div id="clock" class="pill"><span id="day"></span><span id="weather"></span></div>
+      <div id="score" class="pill"><span id="level"></span><span id="points"></span></div>
+    </div>
+    <div id="ff" hidden>Fast-forward ×5</div>
+    <div id="quest-tracker"></div>
+    <div id="side-buttons">
+      <button id="btn-journal">Journal <small>J</small></button>
+      <button id="btn-quests">Quests <small>Q</small></button>
+      <button id="btn-map">Map <small>M</small></button>
+      <button id="btn-menu">Menu <small>Esc</small></button>
+    </div>
+    <div id="crosshair"></div>
+    <div id="target" hidden></div>
+    <div id="toasts"></div>
+    <div id="hotbar-wrap"><div id="item-name"></div><div id="hotbar"></div></div>
+    <div id="lock-hint" hidden>Click to look around · WASD to walk · Esc to release</div>
+    <div id="touch-ui">
+      <div id="joystick"><div class="knob"></div></div>
+      <button id="btn-sprint">Run</button>
+      <button id="btn-jump">Jump</button>
+    </div>
+  </div>
+  <div id="start" class="screen">
+    <div class="inner">
+      <h1><small>A world that teaches botany</small>Botany Craft</h1>
+      <p class="lede">Walk out into a block world built from real Earth: cold north, hot south, dry west, wet east. Dig to read the soil, gather seeds from wild plants, and grow them where they belong. Every plant, tree, animal and soil you meet goes in your Field Journal.</p>
+      <div id="continue-wrap" hidden><button id="btn-continue" class="primary">Continue your world</button><span class="small">or start somewhere new below</span></div>
+      <h2>Choose where to begin</h2>
+      <div id="regions"></div>
+      <p class="foot">Runs in any modern browser on Mac, Windows or phone. Desktop: mouse and keyboard. Phone: left thumb moves, right thumb looks and taps. <button id="start-help" class="ghost" style="padding:6px 10px;margin-left:6px">Controls &amp; how to play</button></p>
+      <div id="loading" hidden class="small" style="margin-top:14px;font-size:16px;color:#f6f0e1">Growing your world…</div>
+    </div>
+  </div>
+  <div id="modal" hidden><div id="modal-card" class="card"></div></div>
+  <div id="fatal" hidden class="screen" style="padding:40px;text-align:center"></div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.158.0/three.min.js"></script>
+<script src="js/util.js"></script>
+<script src="js/data/soils.js"></script>
+<script src="js/data/biomes.js"></script>
+<script src="js/data/plants.js"></script>
+<script src="js/data/trees.js"></script>
+<script src="js/data/animals.js"></script>
+<script src="js/data/quests.js"></script>
+<script src="js/blocks.js"></script>
+<script src="js/textures.js"></script>
+<script src="js/world.js"></script>
+<script src="js/mesher.js"></script>
+<script src="js/player.js"></script>
+<script src="js/animals.js"></script>
+<script src="js/sim.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
