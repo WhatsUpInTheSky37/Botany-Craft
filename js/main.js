@@ -10,13 +10,13 @@ BC.Game = class Game {
     this.chunks = new Map(); this.time = { t: 0, day: 1, dayFrac: 0.3 }; this.weather = { raining: false, timer: 90 };
     this.points = 0; this.growthMult = 1; this.ffTimer = 0; this.pending = []; this.running = false; this.simAcc = 0; this.questAcc = 0; this.saveAcc = 0; this.hudAcc = 0;
     this.mode = 'solo'; this.playerName = 'me'; this.peers = new Map(); this.netAcc = { pos: 0, plants: 0, animals: 0, time: 0 }; this.worldVersion = 0; this.syncRequested = false;
-    this.DAY = 600; this.SAVE_KEY = 'botanycraft_save_v1'; this.SHARED_KEY = 'botanycraft_shared_v1';
+    this.DAY = 600; this.SAVE_KEY = 'botanycraft_save_v1'; this.SHARED_KEY = 'botanycraft_shared_v1'; this.WORLDS_KEY = 'botanycraft_worlds_v1';
     this.resetStats();
     this.setupScene(); this.resize(); window.addEventListener('resize', () => this.resize());
     this.player.bindDesktop(this.canvas); if (this.player.touch) this.player.bindTouch(this.canvas, document.getElementById('joystick'));
     window.addEventListener('beforeunload', () => this.running && this.save()); document.addEventListener('visibilitychange', () => { if (document.hidden && this.running) this.save(); });
     let hasSave = false, shared = null; try { hasSave = !!localStorage.getItem(this.SAVE_KEY); shared = JSON.parse(localStorage.getItem(this.SHARED_KEY)); } catch (e) { }
-    this.ui.showStart({ hasSave, shared, onNew: region => this.newGame(region), onContinue: () => this.load() || this.newGame('temperate'), onShared: opts => this.startShared(opts) });
+    this.ui.showStart({ hasSave, shared, known: this.knownWorlds(), onNew: region => this.newGame(region), onContinue: () => this.load() || this.newGame('temperate'), onShared: opts => this.startShared(opts), onForget: id => { this.forgetWorld(id); this.ui.renderKnownWorlds(this.knownWorlds()); } });
   }
   resetStats() {
     this.stats = { inspected: new Set(), seedSpecies: new Set(), maxDig: 0, plantedGood: 0, watered: 0, matured: 0, legumesPlanted: 0, threeSisters: false, pollinated: false, blueberryAcid: false, cactusInSand: false, compostMade: 0, compostUsed: false, biomesVisited: new Set(), treeGrown: false, fenced: false, invasiveRemoved: 0, journal: new Set(), questsDone: new Set(), harvests: 0, compostMaterial: 0, planted: 0 };
@@ -70,6 +70,10 @@ BC.Game = class Game {
   // Save, disconnect and return to the title screen (the world stays available via Continue / Rejoin).
   async exitToTitle() { this.running = false; if (document.exitPointerLock) document.exitPointerLock(); try { await this.save(); } catch (e) { } if (this.mode === 'shared') { try { await this.net.leave(); } catch (e) { } } location.reload(); }
   async leaveShared() { this.running = false; try { await this.save(); } catch (e) { } await this.net.leave(); try { localStorage.removeItem(this.SHARED_KEY); } catch (e) { } location.reload(); }
+  // ---------- shared worlds remembered on this device ----------
+  knownWorlds() { try { return JSON.parse(localStorage.getItem(this.WORLDS_KEY)) || []; } catch (e) { return []; } }
+  rememberWorld(c) { const list = this.knownWorlds().filter(k => !(k.world === c.world && k.player === c.player)); list.unshift({ world: c.world, display: c.display || c.world, pin: c.pin, player: c.player, color: c.color, region: this.region, last: Date.now() }); try { localStorage.setItem(this.WORLDS_KEY, JSON.stringify(list.slice(0, 20))); } catch (e) { } }
+  forgetWorld(id) { const list = this.knownWorlds().filter(k => !(k.world + '|' + k.player === id)); try { localStorage.setItem(this.WORLDS_KEY, JSON.stringify(list)); const last = JSON.parse(localStorage.getItem(this.SHARED_KEY)); if (last && last.world + '|' + last.player === id) localStorage.removeItem(this.SHARED_KEY); } catch (e) { } }
   // ---------- shared worlds ----------
   async startShared(opts) {
     const status = m => this.ui.sharedStatus(m);
@@ -90,12 +94,12 @@ BC.Game = class Game {
       status('Loading your journal…'); this.resetStats(); const ps = await this.net.loadPlayer();
       if (ps && ps.inventory) { this.applyPlayerState(ps); } else { const s = this.world.findSpawn(this.region); this.player.spawn(s[0], s[1], s[2]); this.player.yaw = Math.PI; }
       this.spawnAnimals((this.sharedAnimals && this.sharedAnimals.length) ? this.sharedAnimals : this.world.spawnAnimals);
-      try { localStorage.setItem(this.SHARED_KEY, JSON.stringify(this.net.creds)); } catch (e) { }
+      this.net.creds.display = (data && data.name) || opts.world; try { localStorage.setItem(this.SHARED_KEY, JSON.stringify(this.net.creds)); } catch (e) { } this.rememberWorld(this.net.creds);
       status('Connecting to the live session…'); this.bindNetEvents(); let liveError = null;
       try { await this.net.join(this.net.creds.world, player, this.myColor); } catch (e) { liveError = e; await this.net.leave(); }
       status(''); this.begin(); if (!ps || !ps.inventory) this.welcome(this.region);
       if (liveError) { this.liveWasDown = true; this.toast('Live session failed: ' + this.net.friendly(liveError) + ' You can still play; the world saves to the cloud. Open Menu to retry.', 'bad'); }
-      else this.toast(`Shared world "${opts.world}". Others join with the same name and PIN.`, 'good');
+      else this.toast(`Shared world "${this.net.creds.display}". Others join with the same name and PIN.`, 'good');
     } catch (e) { console.error(e); status(''); this.mode = 'solo'; await this.net.leave(); this.ui.sharedError(this.net.friendly(e)); }
   }
   sharedState() { return { world: this.world.serialize(), time: this.time, weather: this.weather, animals: this.animals.list.length ? this.animals.serialize() : (this.world.spawnAnimals || []) }; }

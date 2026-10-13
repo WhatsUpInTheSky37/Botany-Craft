@@ -163,3 +163,14 @@ body.touch #shared-pill { top: calc(60px + env(safe-area-inset-top, 0px)); max-w
 #compass .peer b { font-family: var(--font-display); }
 body.touch #compass { top: calc(104px + env(safe-area-inset-top, 0px)); } @media (max-height: 460px) { body.touch #compass { top: calc(96px + env(safe-area-inset-top, 0px)); } }
 #shared-pill i, .menu .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
+
+/* ---------- World lists on the title screen ---------- */
+.screen h3 { font-family: var(--font-display); font-size: 16px; margin: 14px 0 8px; font-weight: 600; } .screen h3 small { font-weight: 400; opacity: 0.6; font-size: 12px; margin-left: 6px; }
+.world-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px; }
+.world-card { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; align-items: center; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.14); border-radius: 12px; padding: 10px 12px; min-width: 0; }
+.world-card b { font-family: var(--font-display); font-size: 16px; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .world-card span { display: block; font-size: 12px; opacity: 0.75; grid-column: 1; }
+.world-card .acts { grid-row: 1 / 3; display: flex; gap: 6px; align-items: center; }
+.world-card .join { background: var(--sun); color: #2b2a22; border: 0; border-radius: 8px; padding: 8px 12px; font-weight: 700; } .world-card .join.ghost { background: transparent; color: inherit; border: 1px solid rgba(255,255,255,0.3); }
+.world-card .forget { background: transparent; color: inherit; border: 0; opacity: 0.6; font-size: 18px; padding: 4px 6px; } .world-card .forget:hover { opacity: 1; }
+.world-card i.dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
+.world-list .empty { font-size: 13px; opacity: 0.7; }

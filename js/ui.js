@@ -180,8 +180,8 @@ BC.UI = class UI {
     this.$('start-help').onclick = () => this.showHelp();
     // shared worlds
     this.$('sh-region').innerHTML = BC.BIOME_LIST.map(b => `<option value="${b}">${this.esc(BC.BIOMES[b].name)}</option>`).join('');
-    const sh = o.shared; const rw = this.$('rejoin-wrap'); rw.hidden = !sh;
-    if (sh) { this.$('btn-rejoin').textContent = `Rejoin "${sh.world}" as ${sh.player}`; this.$('btn-rejoin').onclick = () => { this.sharedBusy(true); o.onShared({ action: 'join', world: sh.world, pin: sh.pin, player: sh.player, color: this.shColor }); }; this.$('sh-name').value = sh.player; }
+    const sh = o.shared; if (sh) this.$('sh-name').value = sh.player;
+    this.startOpts = o; this.renderKnownWorlds(o.known || []); this.loadDirectory();
     const read = action => ({ action, player: this.$('sh-name').value, world: this.$('sh-world').value.trim(), pin: this.$('sh-pin').value, region: this.$('sh-region').value, color: this.shColor });
     const go = action => { const v = read(action); this.$('sh-error').hidden = true; if (!v.world) return this.sharedError('Give the world a name.'); if (v.pin.length < 4) return this.sharedError('PIN needs at least 4 characters.'); this.sharedBusy(true); o.onShared(v); };
     const sw = this.$('sh-colors'); this.shColor = (sh && sh.color) || BC.PLAYER_COLORS[Math.floor(Math.random() * BC.PLAYER_COLORS.length)];
@@ -190,7 +190,21 @@ BC.UI = class UI {
     this.$('sh-create').onclick = () => go('create'); this.$('sh-join').onclick = () => go('join');
     this.$('sh-form').addEventListener('submit', e => e.preventDefault());
   }
-  sharedBusy(b) { ['sh-create', 'sh-join', 'btn-rejoin'].forEach(id => this.$(id).disabled = b); }
+  sharedBusy(b) { ['sh-create', 'sh-join'].forEach(id => this.$(id).disabled = b); this.$('start').querySelectorAll('.world-card .join').forEach(x => x.disabled = b); }
+  renderKnownWorlds(list) {
+    const wrap = this.$('known-worlds'), el = this.$('known-list'); wrap.hidden = !list.length; if (!list.length) return;
+    el.innerHTML = list.map(k => { const id = k.world + '|' + k.player; const reg = k.region && BC.BIOMES[k.region] ? BC.BIOMES[k.region].short : ''; return `<div class="world-card"><b><i class="dot" style="background:${this.esc(k.color || '#888')}"></i>${this.esc(k.display || k.world)}</b><span>as ${this.esc(k.player)}${reg ? ' · ' + this.esc(reg) : ''} · last played ${this.esc(this.ago(k.last))}</span><div class="acts"><button class="join" data-id="${this.esc(id)}">Join</button><button class="forget" data-id="${this.esc(id)}" title="Forget on this device" aria-label="Forget">×</button></div></div>`; }).join('');
+    el.querySelectorAll('.join').forEach(b => b.onclick = () => { const k = list.find(x => x.world + '|' + x.player === b.dataset.id); if (!k) return; this.shColor = k.color || this.shColor; this.sharedBusy(true); this.startOpts.onShared({ action: 'join', world: k.world, pin: k.pin, player: k.player, color: k.color }); });
+    el.querySelectorAll('.forget').forEach(b => b.onclick = () => this.startOpts.onForget(b.dataset.id));
+  }
+  ago(t) { if (!t) return 'a while ago'; const m = Math.round((Date.now() - t) / 60000); if (m < 2) return 'just now'; if (m < 60) return m + ' min ago'; const h = Math.round(m / 60); if (h < 48) return h + ' h ago'; return Math.round(h / 24) + ' days ago'; }
+  async loadDirectory() {
+    const st = this.$('dir-status'), el = this.$('dir-list');
+    try { const list = await this.game.net.listWorlds(); st.textContent = list.length ? `${list.length} world${list.length === 1 ? '' : 's'} · tap one, then enter its PIN` : ''; if (!list.length) { el.innerHTML = '<div class="empty">No shared worlds yet. Create the first one below.</div>'; return; }
+      el.innerHTML = list.map(w => `<div class="world-card"><b>${this.esc(w.name)}</b><span>${this.esc(BC.BIOMES[w.region] ? BC.BIOMES[w.region].short : w.region)} · ${w.players} player${w.players === 1 ? '' : 's'} · active ${this.esc(this.ago(Date.parse(w.updated_at)))}</span><div class="acts"><button class="join ghost" data-id="${this.esc(w.id)}" data-name="${this.esc(w.name)}">Select</button></div></div>`).join('');
+      el.querySelectorAll('.join').forEach(b => b.onclick = () => { this.$('sh-world').value = b.dataset.name; this.$('sh-pin').value = ''; this.$('sh-pin').focus(); this.$('sh-form').scrollIntoView({ behavior: 'smooth', block: 'center' }); st.textContent = `"${b.dataset.name}" selected: enter its PIN and press Join`; });
+    } catch (e) { st.textContent = 'could not load the list (' + this.game.net.friendly(e) + ')'; el.innerHTML = ''; }
+  }
   sharedStatus(m) { const el = this.$('sh-status'); el.hidden = !m; el.textContent = m; if (!m) this.sharedBusy(false); }
   sharedError(m) { this.sharedBusy(false); this.$('start').hidden = false; this.$('hud').hidden = true; const el = this.$('sh-error'); el.hidden = false; el.textContent = m; el.scrollIntoView({ block: 'nearest' }); }
   updateShared() {
