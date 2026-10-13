@@ -148,3 +148,4 @@ body.touch #shared-pill { top: calc(60px + env(safe-area-inset-top, 0px)); max-w
 .tagline { font-family: var(--font-display); font-size: 15px; letter-spacing: .14em; text-transform: uppercase; opacity: 0.75; margin: 16px 0 6px; text-align: center; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 @media (orientation: portrait) and (max-width: 600px) { body.touch #hotbar-wrap { bottom: calc(150px + env(safe-area-inset-bottom, 0px)); width: 94vw; } body.touch #toasts { bottom: 250px; width: 92vw; } }
+@media (max-width: 640px) { body.touch #quest-tracker { top: calc(100px + env(safe-area-inset-top, 0px)); } body.touch #side-buttons { top: calc(78px + env(safe-area-inset-top, 0px)); } }
