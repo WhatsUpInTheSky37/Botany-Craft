@@ -15,7 +15,8 @@ BC.Net = class Net {
   saveWorld(state) { return this.rpc('bc_world_save', { p_name: this.creds.world, p_pin: this.creds.pin, p_state: state }); }
   worldVersion() { return this.rpc('bc_world_version', { p_name: this.creds.world, p_pin: this.creds.pin }); }
   loadPlayer() { return this.rpc('bc_player_load', { p_world: this.creds.world, p_pin: this.creds.pin, p_player: this.creds.player }); }
-  savePlayer(state) { return this.rpc('bc_player_save', { p_world: this.creds.world, p_pin: this.creds.pin, p_player: this.creds.player, p_state: state }); }
+  savePlayer(state, online) { return this.rpc('bc_player_save', { p_world: this.creds.world, p_pin: this.creds.pin, p_player: this.creds.player, p_state: state, p_online: online !== false }); }
+  playerOffline() { if (!this.creds) return Promise.resolve(); return this.rpc('bc_player_offline', { p_world: this.creds.world, p_pin: this.creds.pin, p_player: this.creds.player }); }
   listWorlds() { return this.rpc('bc_world_list', {}); }
   listPlayers() { return this.rpc('bc_world_players', { p_world: this.creds.world, p_pin: this.creds.pin }); }
   // ---- realtime ----
