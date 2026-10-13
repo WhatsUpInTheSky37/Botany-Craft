@@ -92,7 +92,7 @@ BC.Game = class Game {
       status('Connecting to the live session…'); this.bindNetEvents(); let liveError = null;
       try { await this.net.join(this.net.creds.world, player); } catch (e) { liveError = e; await this.net.leave(); }
       status(''); this.begin(); if (!ps || !ps.inventory) this.welcome(this.region);
-      if (liveError) this.toast('Live play is unavailable on this network, so you will not see other players move. Your shared world still saves to the cloud; the last save wins.', 'bad');
+      if (liveError) { this.liveWasDown = true; this.toast('Live session failed: ' + this.net.friendly(liveError) + ' You can still play; the world saves to the cloud. Open Menu to retry.', 'bad'); }
       else this.toast(`Shared world "${opts.world}". Others join with the same name and PIN.`, 'good');
     } catch (e) { console.error(e); status(''); this.mode = 'solo'; await this.net.leave(); this.ui.sharedError(this.net.friendly(e)); }
   }
@@ -124,6 +124,8 @@ BC.Game = class Game {
     n.on('hello', (m, from) => { const pe = this.peers.get(from); if (pe) { pe.target.set(m.x, m.y, m.z); pe.group.position.copy(pe.target); } });
   }
   requestSync() { if (this.syncRequested) return; this.syncRequested = true; this.syncBuffer = []; this.net.send('need_sync', {}); clearTimeout(this.syncTimer); this.syncTimer = setTimeout(() => { if (this.syncRequested) { this.syncRequested = false; this.replaySync(); } }, 20000); }
+  onLiveChange() { this.ui.updateShared(); if (this.mode !== 'shared' || !this.running) return; if (this.net.live && this.liveWasDown) { this.liveWasDown = false; this.toast('Live session connected.', 'good'); } else if (!this.net.live && this.net.lastError) { this.liveWasDown = true; } }
+  async reconnectLive() { if (this.mode !== 'shared') return; this.toast('Reconnecting…', ''); try { await this.net.leave(); this.peers.forEach(pe => this.scene.remove(pe.group)); this.peers.clear(); this.firstSyncDone = false; await this.net.join(this.net.creds.world, this.net.creds.player); this.toast('Live session connected.', 'good'); } catch (e) { this.toast(this.net.friendly(e), 'bad'); } this.ui.updateShared(); }
   onPeerJoined(key, name) { const g = this.buildAvatar(name); g.position.copy(this.player.pos); this.scene.add(g); this.peers.set(key, { name, group: g, target: this.player.pos.clone(), yaw: 0 }); if (this.running) this.toast(`${name} joined the world.`, 'good'); this.net.send('hello', { x: this.player.pos.x, y: this.player.pos.y, z: this.player.pos.z }); this.ui.updateShared(); }
   onPeerLeft(key) { const pe = this.peers.get(key); if (pe) { this.scene.remove(pe.group); this.toast(`${pe.name} left the world.`, ''); this.peers.delete(key); } this.ui.updateShared(); }
   onPresence(list, isHost, wasHost) { if (!isHost && list.length > 1 && !this.firstSyncDone) { this.firstSyncDone = true; this.requestSync(); } if (isHost && !wasHost && this.running && list.length > 1) this.toast('You are now hosting the simulation for this world.', ''); if (isHost) this.firstSyncDone = true; this.ui.updateShared(); }

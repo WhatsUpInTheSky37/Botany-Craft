@@ -144,7 +144,7 @@ BC.UI = class UI {
     const info = shared ? `<p class="teach">Shared world <b>${this.esc(g.net.creds.world)}</b>. Online now: ${this.esc(names || 'just you')}. Anyone with the world name and PIN can join from any device.${g.net.isHost ? ' You are hosting: plants grow and animals move on your device and everyone else sees them.' : ''}</p>` : '';
     this.openModal(`<button class="close" aria-label="Close">×</button><h2>Botany Craft</h2>${info}<div class="menu"><button id="m-ff" class="primary" ${shared && !g.net.isHost ? 'disabled' : ''}>${g.growthMult > 1 ? 'Stop fast-forward' : 'Fast-forward growth (×5 for 2 min)' + (shared && !g.net.isHost ? ' (host only)' : '')}</button><button id="m-save">Save game</button><button id="m-help">Controls & how to play</button>${shared ? '<button id="m-leave">Leave shared world</button>' : ''}<button id="m-new" class="danger">${shared ? 'Forget this shared world on this device' : 'Start a new world'}</button></div><p class="small">${shared ? 'Progress saves to the cloud every 30 seconds. Your journal and inventory are yours; the land and plants are shared.' : 'Progress saves automatically every 30 seconds in this browser.'}</p>`, 'journal');
     this.$('m-ff').onclick = () => { g.toggleFastForward(); this.closeModal(); }; this.$('m-save').onclick = () => { Promise.resolve(g.save()).then(() => this.toast('Game saved.', 'good')); this.closeModal(); };
-    if (shared) this.$('m-leave').onclick = () => g.leaveShared();
+    if (shared) { this.$('m-leave').onclick = () => g.leaveShared(); const rc = document.createElement('button'); rc.textContent = g.net.live ? 'Live session: connected (reconnect)' : 'Reconnect live session' + (g.net.lastError ? ' (' + g.net.lastError + ')' : ''); rc.onclick = () => { this.closeModal(); g.reconnectLive(); }; this.modalCard.querySelector('.menu').insertBefore(rc, this.$('m-leave')); }
     this.$('m-help').onclick = () => this.showHelp(); this.$('m-new').onclick = () => { this.openModal(`<h2>Start a new world?</h2><p class="teach">Your current world and journal will be erased.</p><div class="menu"><button id="m-yes" class="danger">Yes, erase and start over</button><button id="m-no">Keep playing</button></div>`, 'journal'); this.$('m-yes').onclick = () => { g.reset(); }; if (shared) { this.modalCard.querySelector('.teach').textContent = 'The shared world stays in the cloud for everyone else. This device just forgets the name and PIN.'; } this.$('m-no').onclick = () => this.closeModal(); };
   }
   showHelp() {
@@ -175,7 +175,9 @@ BC.UI = class UI {
   sharedError(m) { this.sharedBusy(false); this.$('start').hidden = false; this.$('hud').hidden = true; const el = this.$('sh-error'); el.hidden = false; el.textContent = m; el.scrollIntoView({ block: 'nearest' }); }
   updateShared() {
     const g = this.game; const el = this.$('shared-pill'); if (g.mode !== 'shared') { el.hidden = true; return; } el.hidden = false;
-    const names = (g.net.online || []).map(p => p.name + (p.key === g.net.hostKey ? ' (host)' : '')); el.innerHTML = `<b>Shared: ${this.esc(g.net.creds.world)}</b><span>${names.length ? this.esc(names.join(', ')) : 'connecting…'}</span>`;
+    const n = g.net; const names = (n.online || []).map(p => p.name + (p.key === n.hostKey ? ' (host)' : ''));
+    let line; if (n.live) line = names.length ? `Live · ${this.esc(names.join(', '))}` : 'Live · waiting for presence…'; else if (n.status === 'connecting') line = 'Connecting to live session…'; else line = `Not live (cloud save only) · ${this.esc(n.lastError || 'offline')}`;
+    el.className = 'pill ' + (n.live ? 'live' : n.status === 'connecting' ? 'wait' : 'down'); el.innerHTML = `<b>Shared: ${this.esc(n.creds.world)}</b><span>${line}</span>`;
   }
   hideStart() { this.$('start').hidden = true; this.$('hud').hidden = false; document.body.classList.toggle('touch', this.game.player.touch); }
 };

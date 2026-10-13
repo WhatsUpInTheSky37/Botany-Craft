@@ -149,3 +149,4 @@ body.touch #shared-pill { top: calc(60px + env(safe-area-inset-top, 0px)); max-w
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 @media (orientation: portrait) and (max-width: 600px) { body.touch #hotbar-wrap { bottom: calc(150px + env(safe-area-inset-bottom, 0px)); width: 94vw; } body.touch #toasts { bottom: 250px; width: 92vw; } }
 @media (max-width: 640px) { body.touch #quest-tracker { top: calc(100px + env(safe-area-inset-top, 0px)); } body.touch #side-buttons { top: calc(78px + env(safe-area-inset-top, 0px)); } }
+#shared-pill.live span { color: #9fe39a; } #shared-pill.down span { color: #ffb3a3; white-space: normal; } #shared-pill.wait span { color: #f0d08a; }

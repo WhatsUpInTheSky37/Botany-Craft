@@ -3,7 +3,7 @@ window.BC = window.BC || {};
 BC.Net = class Net {
   constructor(game) {
     this.game = game; this.sb = null; this.creds = null; this.channel = null; this.peers = new Map(); this.me = null; this.isHost = false; this.hostKey = null;
-    this.myKey = Math.random().toString(36).slice(2, 10); this.handlers = {}; this.joinedAt = 0; this.outbox = 0; this.live = false;
+    this.myKey = Math.random().toString(36).slice(2, 10); this.handlers = {}; this.joinedAt = 0; this.outbox = 0; this.live = false; this.status = 'off'; this.lastError = null;
   }
   client() { if (!this.sb) { if (!window.supabase) throw new Error('Multiplayer library did not load. Check your internet connection.'); this.sb = window.supabase.createClient(BC.CONFIG.supabaseUrl, BC.CONFIG.supabaseKey, { realtime: { params: { eventsPerSecond: 40 } }, auth: { persistSession: false } }); } return this.sb; }
   static slug(p) { return String(p || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''); }
@@ -21,15 +21,20 @@ BC.Net = class Net {
   on(event, fn) { this.handlers[event] = fn; }
   join(worldId, playerName) {
     return new Promise((resolve, reject) => {
-      const sb = this.client(); this.joinedAt = Date.now(); this.me = playerName;
+      const sb = this.client(); this.joinedAt = Date.now(); this.me = playerName; this.lastError = null; this.status = 'connecting'; let settled = false;
       const ch = sb.channel('bc:' + worldId, { config: { presence: { key: this.myKey }, broadcast: { self: false, ack: false } } });
       this.channel = ch;
       ch.on('presence', { event: 'sync' }, () => this.syncPresence());
+      ch.on('presence', { event: 'join' }, () => this.syncPresence());
+      ch.on('presence', { event: 'leave' }, () => this.syncPresence());
       ch.on('broadcast', { event: '*' }, msg => { const h = this.handlers[msg.event]; if (h && msg.payload && msg.payload.from !== this.myKey) h(msg.payload, msg.payload.from); });
-      const timer = setTimeout(() => reject(new Error('Timed out connecting to the shared world.')), 15000);
-      ch.subscribe(async status => {
-        if (status === 'SUBSCRIBED') { await ch.track({ name: playerName, joined: this.joinedAt }); this.live = true; clearTimeout(timer); resolve(); }
-        else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') { clearTimeout(timer); reject(new Error('Could not connect to the live session (' + status + ').')); }
+      const fail = msg => { this.lastError = msg; this.status = 'failed'; this.live = false; if (!settled) { settled = true; clearTimeout(timer); reject(new Error(msg)); } this.game.onLiveChange(); };
+      const timer = setTimeout(() => fail('Timed out connecting to the live session (no reply from the server in 20 s).'), 20000);
+      ch.subscribe(async (status, err) => {
+        if (status === 'SUBSCRIBED') { try { await ch.track({ name: playerName, joined: this.joinedAt }); } catch (e) { } this.live = true; this.status = 'live'; this.lastError = null; this.game.onLiveChange(); if (!settled) { settled = true; clearTimeout(timer); resolve(); } }
+        else if (status === 'CHANNEL_ERROR') fail('Live session refused: ' + (err && err.message ? err.message : 'channel error'));
+        else if (status === 'TIMED_OUT') fail('Live session timed out.');
+        else if (status === 'CLOSED') { if (settled) { this.live = false; this.status = 'closed'; this.lastError = 'Live connection closed.'; this.game.onLiveChange(); } }
       });
     });
   }
@@ -46,5 +51,5 @@ BC.Net = class Net {
     this.online = list; this.game.onPresence(list, this.isHost, wasHost);
   }
   send(event, payload) { if (!this.channel) return; payload = payload || {}; payload.from = this.myKey; this.outbox++; this.channel.send({ type: 'broadcast', event, payload }).catch(() => { }); }
-  async leave() { this.live = false; if (this.channel) { try { await this.channel.untrack(); await this.client().removeChannel(this.channel); } catch (e) { } this.channel = null; } this.peers.clear(); this.isHost = false; }
+  async leave() { this.live = false; this.status = 'off'; if (this.channel) { try { await this.channel.untrack(); await this.client().removeChannel(this.channel); } catch (e) { } this.channel = null; } this.peers.clear(); this.isHost = false; }
 };
