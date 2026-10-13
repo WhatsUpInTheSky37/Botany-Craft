@@ -56,7 +56,7 @@ BC.Game = class Game {
     w.onPlant = (p, removed) => { if (this.mode === 'shared') this.net.send('plant', removed ? { key: p.key, rm: true } : { key: p.key, p: this.packPlant(p) }); };
   }
   packPlant(p) { return { id: p.id, x: p.x, y: p.y, z: p.z, wild: p.wild, progress: p.progress, health: p.health, pollinated: p.pollinated, withered: p.withered, onBark: p.onBark, owner: p.owner }; }
-  begin() { this.ui.hideStart(); this.ui.renderHotbar(); this.ui.updateQuestTracker(); this.ui.setLockHint(true); this.ui.updateShared(); this.running = true; this.last = performance.now(); if (!this.loopStarted) { this.loopStarted = true; requestAnimationFrame(t => this.loop(t)); } }
+  begin() { this.ui.hideStart(); this.ui.renderHotbar(); this.ui.updateQuestTracker(); this.ui.setLockHint(true); this.ui.updateShared(); this.ui.updateHUD(); this.running = true; this.last = performance.now(); if (!this.loopStarted) { this.loopStarted = true; requestAnimationFrame(t => this.loop(t)); } }
   clearChunks() { this.chunks.forEach(c => ['solid', 'water', 'plants'].forEach(k => { if (c[k]) { this.scene.remove(c[k]); c[k].geometry.dispose(); } })); this.chunks.clear(); this.animals.list.forEach(e => this.scene.remove(e.mesh)); this.animals.list = []; }
   buildAllChunks() { for (let cz = 0; cz < this.world.CZ; cz++) for (let cx = 0; cx < this.world.CX; cx++) this.rebuildChunk(cx + cz * this.world.CX); this.world.dirty.clear(); }
   rebuildChunk(ci) {

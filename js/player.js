@@ -24,14 +24,14 @@ BC.Player = class Player {
     const onStart = e => {
       if (this.game.ui.modalOpen()) return;
       for (const t of e.changedTouches) {
-        if (t.clientX < window.innerWidth * 0.42 && t.clientY > window.innerHeight * 0.35 && joyId === null) { joyId = t.identifier; joyOrigin = [t.clientX, t.clientY]; joyEl.style.left = (t.clientX - 60) + 'px'; joyEl.style.top = (t.clientY - 60) + 'px'; joyEl.classList.add('active'); }
+        if (t.clientX < window.innerWidth * 0.42 && t.clientY > window.innerHeight * 0.35 && joyId === null) { joyId = t.identifier; joyOrigin = [t.clientX, t.clientY]; joyEl.classList.add('active'); }
         else if (lookId === null) { lookId = t.identifier; lookLast = [t.clientX, t.clientY]; lookStart = [t.clientX, t.clientY]; lookMoved = 0; lookTime = performance.now(); clearTimeout(longTimer); longTimer = setTimeout(() => { if (lookMoved < 12) { this.game.secondary(); lookId = null; } }, 550); }
       }
       e.preventDefault();
     };
     const onMove = e => {
       for (const t of e.changedTouches) {
-        if (t.identifier === joyId) { let dx = t.clientX - joyOrigin[0], dy = t.clientY - joyOrigin[1]; const l = Math.hypot(dx, dy); const m = 50; if (l > m) { dx *= m / l; dy *= m / l; } knob.style.transform = `translate(${dx}px,${dy}px)`; this.joy.x = dx / m; this.joy.y = -dy / m; }
+        if (t.identifier === joyId) { let dx = t.clientX - joyOrigin[0], dy = t.clientY - joyOrigin[1]; const l = Math.hypot(dx, dy); const m = 40; if (l > m) { dx *= m / l; dy *= m / l; } knob.style.transform = `translate(${dx}px,${dy}px)`; this.joy.x = dx / m; this.joy.y = -dy / m; }
         else if (t.identifier === lookId) { const dx = t.clientX - lookLast[0], dy = t.clientY - lookLast[1]; lookMoved += Math.abs(dx) + Math.abs(dy); this.yaw -= dx * 0.005; this.pitch = BC.util.clamp(this.pitch - dy * 0.005, -1.5, 1.5); lookLast = [t.clientX, t.clientY]; }
       }
       e.preventDefault();
