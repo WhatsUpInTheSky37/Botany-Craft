@@ -6,6 +6,8 @@
 <title>Botany Craft</title>
 <meta name="description" content="A block world that teaches botany: explore six real Earth biomes, read the soil, gather seeds and grow native plants in the right place.">
 <meta name="theme-color" content="#142316">
+<link rel="icon" type="image/png" href="assets/favicon.png">
+<link rel="apple-touch-icon" href="assets/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Nunito:wght@400;600;700&display=swap">
 <link rel="stylesheet" href="css/style.css">
@@ -19,6 +21,7 @@
       <div id="clock" class="pill"><span id="day"></span><span id="weather"></span></div>
       <div id="score" class="pill"><span id="level"></span><span id="points"></span></div>
     </div>
+    <div id="shared-pill" class="pill" hidden></div>
     <div id="ff" hidden>Fast-forward ×5</div>
     <div id="quest-tracker"></div>
     <div id="side-buttons">
@@ -40,11 +43,25 @@
   </div>
   <div id="start" class="screen">
     <div class="inner">
-      <h1><small>A world that teaches botany</small>Botany Craft</h1>
+      <img class="hero" src="assets/botany-craft-hero.jpg" alt="Botany Craft" width="1400" height="788">
+      <h1 class="visually-hidden">Botany Craft</h1>
+      <p class="tagline">A world that teaches botany</p>
       <p class="lede">Walk out into a block world built from real Earth: cold north, hot south, dry west, wet east. Dig to read the soil, gather seeds from wild plants, and grow them where they belong. Every plant, tree, animal and soil you meet goes in your Field Journal.</p>
       <div id="continue-wrap" hidden><button id="btn-continue" class="primary">Continue your world</button><span class="small">or start somewhere new below</span></div>
-      <h2>Choose where to begin</h2>
+      <div id="rejoin-wrap" hidden><button id="btn-rejoin" class="primary">Rejoin shared world</button></div>
+      <h2>Play alone: choose where to begin</h2>
       <div id="regions"></div>
+      <h2>Play together: a shared world</h2>
+      <p class="lede small-lede">One world in the cloud that two or more people share from any device. The land and plants are shared; each player keeps their own journal, quests and inventory. Everyone online at once sees each other walking around.</p>
+      <form id="sh-form" class="shared-form" autocomplete="off">
+        <label>Your name<input id="sh-name" maxlength="16" placeholder="e.g. Will"></label>
+        <label>World name<input id="sh-world" maxlength="32" placeholder="e.g. Farrar Garden"></label>
+        <label>PIN<input id="sh-pin" type="password" inputmode="numeric" maxlength="12" placeholder="4+ digits"></label>
+        <label>Region (new worlds)<select id="sh-region"></select></label>
+        <div class="row"><button type="button" id="sh-create" class="primary">Create shared world</button><button type="button" id="sh-join" class="ghost">Join existing world</button></div>
+        <div id="sh-status" class="status-line" hidden></div>
+        <div id="sh-error" class="error-line" hidden></div>
+      </form>
       <p class="foot">Runs in any modern browser on Mac, Windows or phone. Desktop: mouse and keyboard. Phone: left thumb moves, right thumb looks and taps. <button id="start-help" class="ghost" style="padding:6px 10px;margin-left:6px">Controls &amp; how to play</button></p>
       <div id="loading" hidden class="small" style="margin-top:14px;font-size:16px;color:#f6f0e1">Growing your world…</div>
     </div>
@@ -53,7 +70,10 @@
   <div id="fatal" hidden class="screen" style="padding:40px;text-align:center"></div>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.158.0/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="js/util.js"></script>
+<script src="js/config.js"></script>
+<script src="js/net.js"></script>
 <script src="js/data/soils.js"></script>
 <script src="js/data/biomes.js"></script>
 <script src="js/data/plants.js"></script>

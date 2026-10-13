@@ -30,6 +30,7 @@ BC.UI = class UI {
     this.$('weather').textContent = g.weather.raining ? 'Rain' : (t > 0.78 || t < 0.22 ? 'Night' : 'Clear'); this.$('weather').className = g.weather.raining ? 'rain' : '';
     this.$('points').textContent = `${g.points} pts`; this.$('level').textContent = g.levelName();
     if (g.growthMult > 1) this.$('ff').hidden = false; else this.$('ff').hidden = true;
+    if (g.mode === 'shared' && (this.sharedTick = (this.sharedTick || 0) + 1) % 8 === 0) this.updateShared();
   }
   setTarget(t) {
     const el = this.$('target'); if (!t) { el.hidden = true; return; } el.hidden = false; el.innerHTML = `<b>${this.esc(t.name)}</b>${t.sub ? `<i>${this.esc(t.sub)}</i>` : ''}${t.hint ? `<span>${this.esc(t.hint)}</span>` : ''}`;
@@ -130,17 +131,21 @@ BC.UI = class UI {
     for (let z = 0; z < w.D; z++) for (let x = 0; x < w.W; x++) { const h = w.height[x + z * w.W]; ctx.fillStyle = h < w.WL ? '#3a7ac8' : cols[BC.BIOME_LIST[w.biome[x + z * w.W]]]; if (h >= w.WL) { const k = 0.85 + (h - 12) * 0.03; ctx.globalAlpha = BC.util.clamp(k, 0.6, 1); } ctx.fillRect(x * S, z * S, S, S); ctx.globalAlpha = 1; }
     // markers for planted crops
     ctx.fillStyle = '#fff'; w.plants.forEach(p => { if (!p.wild) ctx.fillRect(p.x * S - 1, p.z * S - 1, S + 2, S + 2); });
+    g.peers.forEach(pe => { ctx.fillStyle = '#ffd23b'; ctx.beginPath(); ctx.arc(pe.group.position.x * S, pe.group.position.z * S, 5, 0, 6.283); ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke(); ctx.fillStyle = '#fff'; ctx.font = 'bold 12px Nunito, sans-serif'; ctx.textAlign = 'center'; ctx.fillText(pe.name, pe.group.position.x * S, pe.group.position.z * S - 9); });
     const px = g.player.pos.x * S, pz = g.player.pos.z * S; ctx.fillStyle = '#ff3b30'; ctx.beginPath(); ctx.arc(px, pz, 5, 0, 6.283); ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
     ctx.strokeStyle = '#ff3b30'; ctx.beginPath(); ctx.moveTo(px, pz); ctx.lineTo(px - Math.sin(g.player.yaw) * 14, pz - Math.cos(g.player.yaw) * 14); ctx.stroke();
     const legend = BC.BIOME_LIST.map(b => `<li><i style="background:${cols[b]}"></i>${BC.BIOMES[b].short}${g.stats.biomesVisited.has(b) ? '' : ' <small>(not yet visited)</small>'}</li>`).join('');
-    this.openModal(`<button class="close" aria-label="Close">×</button><div class="eyebrow">World map · north is up · cold north, hot south · dry west, wet east</div><h2>Where am I?</h2><div class="mapwrap"></div><ul class="legend">${legend}<li><i style="background:#3a7ac8"></i>Water</li><li><i style="background:#fff;border:1px solid #888"></i>Your plantings</li></ul><p class="teach">Real Earth works the same way at a larger scale: temperature falls toward the poles and with altitude, and rainfall depends on winds, mountains and distance from the sea. Together they decide the biome, and the biome builds the soil.</p>`, 'journal');
+    this.openModal(`<button class="close" aria-label="Close">×</button><div class="eyebrow">World map · north is up · cold north, hot south · dry west, wet east</div><h2>Where am I?</h2><div class="mapwrap"></div><ul class="legend">${legend}<li><i style="background:#3a7ac8"></i>Water</li><li><i style="background:#fff;border:1px solid #888"></i>Plantings</li>${g.mode === 'shared' ? '<li><i style="background:#ffd23b"></i>Other players</li>' : ''}</ul><p class="teach">Real Earth works the same way at a larger scale: temperature falls toward the poles and with altitude, and rainfall depends on winds, mountains and distance from the sea. Together they decide the biome, and the biome builds the soil.</p>`, 'journal');
     this.modalCard.querySelector('.mapwrap').appendChild(c);
   }
   showMenu() {
     const g = this.game;
-    this.openModal(`<button class="close" aria-label="Close">×</button><h2>Botany Craft</h2><div class="menu"><button id="m-ff" class="primary">${g.growthMult > 1 ? 'Stop fast-forward' : 'Fast-forward growth (×5 for 2 min)'}</button><button id="m-save">Save game</button><button id="m-help">Controls & how to play</button><button id="m-new" class="danger">Start a new world</button></div><p class="small">Progress saves automatically every 30 seconds in this browser.</p>`, 'journal');
-    this.$('m-ff').onclick = () => { g.toggleFastForward(); this.closeModal(); }; this.$('m-save').onclick = () => { g.save(); this.toast('Game saved.', 'good'); this.closeModal(); };
-    this.$('m-help').onclick = () => this.showHelp(); this.$('m-new').onclick = () => { this.openModal(`<h2>Start a new world?</h2><p class="teach">Your current world and journal will be erased.</p><div class="menu"><button id="m-yes" class="danger">Yes, erase and start over</button><button id="m-no">Keep playing</button></div>`, 'journal'); this.$('m-yes').onclick = () => { g.reset(); }; this.$('m-no').onclick = () => this.closeModal(); };
+    const shared = g.mode === 'shared'; const names = shared ? (g.net.online || []).map(p => p.name + (p.key === g.net.hostKey ? ' (host)' : '')).join(', ') : '';
+    const info = shared ? `<p class="teach">Shared world <b>${this.esc(g.net.creds.world)}</b>. Online now: ${this.esc(names || 'just you')}. Anyone with the world name and PIN can join from any device.${g.net.isHost ? ' You are hosting: plants grow and animals move on your device and everyone else sees them.' : ''}</p>` : '';
+    this.openModal(`<button class="close" aria-label="Close">×</button><h2>Botany Craft</h2>${info}<div class="menu"><button id="m-ff" class="primary" ${shared && !g.net.isHost ? 'disabled' : ''}>${g.growthMult > 1 ? 'Stop fast-forward' : 'Fast-forward growth (×5 for 2 min)' + (shared && !g.net.isHost ? ' (host only)' : '')}</button><button id="m-save">Save game</button><button id="m-help">Controls & how to play</button>${shared ? '<button id="m-leave">Leave shared world</button>' : ''}<button id="m-new" class="danger">${shared ? 'Forget this shared world on this device' : 'Start a new world'}</button></div><p class="small">${shared ? 'Progress saves to the cloud every 30 seconds. Your journal and inventory are yours; the land and plants are shared.' : 'Progress saves automatically every 30 seconds in this browser.'}</p>`, 'journal');
+    this.$('m-ff').onclick = () => { g.toggleFastForward(); this.closeModal(); }; this.$('m-save').onclick = () => { Promise.resolve(g.save()).then(() => this.toast('Game saved.', 'good')); this.closeModal(); };
+    if (shared) this.$('m-leave').onclick = () => g.leaveShared();
+    this.$('m-help').onclick = () => this.showHelp(); this.$('m-new').onclick = () => { this.openModal(`<h2>Start a new world?</h2><p class="teach">Your current world and journal will be erased.</p><div class="menu"><button id="m-yes" class="danger">Yes, erase and start over</button><button id="m-no">Keep playing</button></div>`, 'journal'); this.$('m-yes').onclick = () => { g.reset(); }; if (shared) { this.modalCard.querySelector('.teach').textContent = 'The shared world stays in the cloud for everyone else. This device just forgets the name and PIN.'; } this.$('m-no').onclick = () => this.closeModal(); };
   }
   showHelp() {
     const touch = this.game.player.touch;
@@ -149,13 +154,28 @@ BC.UI = class UI {
     <h3>Controls</h3>${touch ? `<ul class="facts"><li><b>Move</b>: drag on the left side of the screen (virtual joystick).</li><li><b>Look</b>: drag on the right side.</li><li><b>Use / harvest</b>: tap on the right side with the crosshair on something.</li><li><b>Inspect</b>: press and hold.</li><li><b>Jump</b> and <b>Run</b>: buttons at bottom right.</li><li><b>Tools and seeds</b>: tap a slot in the bottom bar.</li></ul>` : `<ul class="facts"><li><b>Move</b>: W A S D, <b>jump</b>: Space, <b>run</b>: hold Shift.</li><li><b>Look</b>: mouse (click the world to capture the mouse, Esc to release).</li><li><b>Use / harvest</b>: left click. <b>Inspect</b>: right click.</li><li><b>Tools and seeds</b>: keys 1 to 9 or the mouse wheel.</li><li><b>J</b> journal, <b>Q</b> quests, <b>M</b> map, <b>Esc</b> menu.</li></ul>`}
     <h3>Tools</h3><ul class="facts"><li><b>Hand</b>: collect seeds from mature wild plants, harvest your crops, inspect anything.</li><li><b>Trowel</b>: dig soil to see the horizons underneath, chop logs for fence posts, shake tree leaves for tree seeds.</li><li><b>Watering can</b>: soak the soil in one spot.</li><li><b>Seeds</b>: select them, then tap the top of a soil block. Aquatic plants go in shallow water; bromeliads and vanilla go on the side of a tree trunk.</li><li><b>Compost</b>: made from every 3 crops you harvest. Use it on a soil block to improve it.</li><li><b>Fence posts</b>: place them around crops to keep deer, hares and rabbits out.</li></ul>`, 'journal');
   }
-  showStart(hasSave, onNew, onContinue) {
+  showStart(o) {
     const s = this.$('start'); s.hidden = false; this.$('hud').hidden = true;
     const cards = BC.BIOME_LIST.map(b => { const bm = BC.BIOMES[b]; return `<button class="region" data-b="${b}"><div class="swatch" style="background:${bm.sky}"><i style="background:#${bm.grass[0].toString(16)}"></i></div><b>${this.esc(bm.name)}</b><span>${this.esc(bm.places)}</span></button>`; }).join('');
-    this.$('regions').innerHTML = cards; this.$('continue-wrap').hidden = !hasSave;
-    s.querySelectorAll('.region').forEach(b => b.onclick = () => { s.hidden = true; onNew(b.dataset.b); });
-    this.$('btn-continue').onclick = () => { s.hidden = true; onContinue(); };
+    this.$('regions').innerHTML = cards; this.$('continue-wrap').hidden = !o.hasSave;
+    s.querySelectorAll('.region').forEach(b => b.onclick = () => { s.hidden = true; o.onNew(b.dataset.b); });
+    this.$('btn-continue').onclick = () => { s.hidden = true; o.onContinue(); };
     this.$('start-help').onclick = () => this.showHelp();
+    // shared worlds
+    this.$('sh-region').innerHTML = BC.BIOME_LIST.map(b => `<option value="${b}">${this.esc(BC.BIOMES[b].name)}</option>`).join('');
+    const sh = o.shared; const rw = this.$('rejoin-wrap'); rw.hidden = !sh;
+    if (sh) { this.$('btn-rejoin').textContent = `Rejoin "${sh.world}" as ${sh.player}`; this.$('btn-rejoin').onclick = () => { this.sharedBusy(true); o.onShared({ action: 'join', world: sh.world, pin: sh.pin, player: sh.player }); }; this.$('sh-name').value = sh.player; }
+    const read = action => ({ action, player: this.$('sh-name').value, world: this.$('sh-world').value.trim(), pin: this.$('sh-pin').value, region: this.$('sh-region').value });
+    const go = action => { const v = read(action); this.$('sh-error').hidden = true; if (!v.world) return this.sharedError('Give the world a name.'); if (v.pin.length < 4) return this.sharedError('PIN needs at least 4 characters.'); this.sharedBusy(true); o.onShared(v); };
+    this.$('sh-create').onclick = () => go('create'); this.$('sh-join').onclick = () => go('join');
+    this.$('sh-form').addEventListener('submit', e => e.preventDefault());
+  }
+  sharedBusy(b) { ['sh-create', 'sh-join', 'btn-rejoin'].forEach(id => this.$(id).disabled = b); }
+  sharedStatus(m) { const el = this.$('sh-status'); el.hidden = !m; el.textContent = m; if (!m) this.sharedBusy(false); }
+  sharedError(m) { this.sharedBusy(false); this.$('start').hidden = false; this.$('hud').hidden = true; const el = this.$('sh-error'); el.hidden = false; el.textContent = m; el.scrollIntoView({ block: 'nearest' }); }
+  updateShared() {
+    const g = this.game; const el = this.$('shared-pill'); if (g.mode !== 'shared') { el.hidden = true; return; } el.hidden = false;
+    const names = (g.net.online || []).map(p => p.name + (p.key === g.net.hostKey ? ' (host)' : '')); el.innerHTML = `<b>Shared: ${this.esc(g.net.creds.world)}</b><span>${names.length ? this.esc(names.join(', ')) : 'connecting…'}</span>`;
   }
   hideStart() { this.$('start').hidden = true; this.$('hud').hidden = false; document.body.classList.toggle('touch', this.game.player.touch); }
 };

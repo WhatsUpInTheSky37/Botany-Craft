@@ -21,6 +21,7 @@ BC.World = class World {
     if (!this.inBounds(x, y, z)) return;
     const i = this.idx(x, y, z); if (this.blocks[i] === id) return;
     this.blocks[i] = id; if (!silent) this.diffs.set(i, id);
+    if (this.onBlock && !this.remote) this.onBlock(x, y, z, id);
     this.markDirty(x, z); if ((x & 15) === 0) this.markDirty(x - 1, z); if ((x & 15) === 15) this.markDirty(x + 1, z); if ((z & 15) === 0) this.markDirty(x, z - 1); if ((z & 15) === 15) this.markDirty(x, z + 1);
   }
   markDirty(x, z) { if (x < 0 || z < 0 || x >= this.W || z >= this.D) return; this.dirty.add((x >> 4) + (z >> 4) * this.CX); }
@@ -30,13 +31,14 @@ BC.World = class World {
   soilAt(x, y, z) { const b = BC.BLOCKS[this.get(x, y, z)]; return b && b.soil ? BC.SOILS[b.soil] : null; }
   plantKey(x, y, z) { return this.idx(x, y, z); }
   plantAt(x, y, z) { return this.plants.get(this.idx(x, y, z)); }
-  addPlant(p) { p.key = this.idx(p.x, p.y, p.z); this.plants.set(p.key, p); this.markDirty(p.x, p.z); return p; }
-  removePlant(p) { this.plants.delete(p.key); this.markDirty(p.x, p.z); }
+  addPlant(p) { p.key = this.idx(p.x, p.y, p.z); this.plants.set(p.key, p); this.markDirty(p.x, p.z); if (this.onPlant && !this.remote && !this.generating) this.onPlant(p, false); return p; }
+  removePlant(p) { this.plants.delete(p.key); this.markDirty(p.x, p.z); if (this.onPlant && !this.remote && !this.generating) this.onPlant(p, true); }
   // light reaching a cell: 1 = open sky, lower under leaves.
   lightAt(x, y, z) { let l = 1; for (let yy = y + 1; yy < this.H; yy++) { const b = BC.BLOCKS[this.get(x, yy, z)]; if (!b || b.id === 0 || b.liquid) continue; if (b.leaves) l *= 0.55; else if (b.fence) l *= 0.9; else l *= 0.25; if (l < 0.05) break; } return l; }
 
   // ---------- generation ----------
   generate() {
+    this.generating = true;
     const { W, D, H, WL } = this; const n = this.noise;
     const smooth = t => t * t * (3 - 2 * t);
     for (let z = 0; z < D; z++) for (let x = 0; x < W; x++) {
@@ -57,7 +59,7 @@ BC.World = class World {
       this.fillColumn(x, z, h, biome);
     }
     this.placeTrees(); this.placePlants(); this.pickAnimals();
-    this.diffs.clear();
+    this.diffs.clear(); this.generating = false;
   }
   fillColumn(x, z, h, biome) {
     const B = BC.BLOCK, WL = this.WL; const under = h < WL;
@@ -98,7 +100,8 @@ BC.World = class World {
     const R = this.rand; const log = BC.LOG_IDS[t.log]; const leaf = t.leaf ? BC.leafIdFor(t) : null;
     const hgt = t.height[0] + Math.floor(R() * (t.height[1] - t.height[0] + 1));
     if (y0 + hgt + 3 >= this.H) return false;
-    const put = (xx, yy, zz, id, force) => { if (!this.inBounds(xx, yy, zz)) return; const cur = this.blocks[this.idx(xx, yy, zz)]; if (cur !== 0 && cur !== 15 && !force) return; if (gen) this.blocks[this.idx(xx, yy, zz)] = id; else this.set(xx, yy, zz, id); this.treeAt.set(this.idx(xx, yy, zz), t.id); };
+    const placed = []; const prevRemote = this.remote; if (!gen) this.remote = true;
+    const put = (xx, yy, zz, id, force) => { if (!this.inBounds(xx, yy, zz)) return; const cur = this.blocks[this.idx(xx, yy, zz)]; if (cur !== 0 && cur !== 15 && !force) return; if (gen) this.blocks[this.idx(xx, yy, zz)] = id; else { this.set(xx, yy, zz, id); placed.push([xx, yy, zz, id]); } this.treeAt.set(this.idx(xx, yy, zz), t.id); };
     const trunk = (h, from) => { for (let y = from || 0; y < h; y++) put(x, y0 + y, z, log, true); };
     const sparse = t.shape === 'spreading' ? 0.5 : 0.25;
     const blob = (cx, cy, cz, r, flat) => { for (let dy = -r; dy <= r; dy++) for (let dz = -r; dz <= r; dz++) for (let dx = -r; dx <= r; dx++) { const d = Math.sqrt(dx * dx + (flat ? dy * dy * 2.5 : dy * dy) + dz * dz); if (d <= r + 0.3 - (R() < sparse ? 0.9 : 0)) put(cx + dx, cy + dy, cz + dz, leaf); } };
@@ -112,6 +115,7 @@ BC.World = class World {
       case 'cypress': trunk(hgt); for (let a = 0; a < 4; a++) { const dx = [1, -1, 0, 0][a], dz = [0, 0, 1, -1][a]; if (R() < 0.7) put(x + dx, y0, z + dz, log); if (R() < 0.5) put(x + dx * 2, y0 - 1, z + dz, log); } blob(x, y0 + hgt - 1, z, 2); blob(x, y0 + hgt + 1, z, 1); put(x, y0 + hgt + 2, z, leaf); break;
       case 'willow': trunk(hgt - 2); blob(x, y0 + hgt - 1, z, 3, true); for (let dz = -3; dz <= 3; dz++) for (let dx = -3; dx <= 3; dx++) if (Math.abs(dx) + Math.abs(dz) >= 3 && Math.abs(dx) + Math.abs(dz) <= 4 && R() < 0.7) for (let k = 0; k < 2 + Math.floor(R() * 3); k++) put(x + dx, y0 + hgt - 2 - k, z + dz, leaf); break;
     }
+    if (!gen) { this.remote = prevRemote; if (this.onBlocks && !prevRemote) this.onBlocks(placed, t.id); }
     return true;
   }
   placePlants() {
@@ -146,6 +150,14 @@ BC.World = class World {
     return best || [this.W / 2 | 0, this.top(this.W / 2 | 0, this.D / 2 | 0), this.D / 2 | 0];
   }
   // save / load
-  serialize() { const diffs = []; this.diffs.forEach((v, k) => diffs.push(k, v)); const plants = []; this.plants.forEach(p => plants.push({ id: p.id, x: p.x, y: p.y, z: p.z, wild: p.wild, progress: p.progress, health: p.health, pollinated: p.pollinated, withered: p.withered, onBark: p.onBark, cooldown: p.cooldown })); const trees = []; this.treeAt.forEach((v, k) => trees.push(k, v)); const moist = Array.from(this.moisture, m => Math.round(m * 100)); return { diffs, plants, trees, moist }; }
-  restore(s) { for (let i = 0; i < s.diffs.length; i += 2) { this.blocks[s.diffs[i]] = s.diffs[i + 1]; this.diffs.set(s.diffs[i], s.diffs[i + 1]); } this.plants.clear(); s.plants.forEach(p => this.addPlant(p)); this.treeAt.clear(); for (let i = 0; i < s.trees.length; i += 2) this.treeAt.set(s.trees[i], s.trees[i + 1]); if (s.moist) for (let i = 0; i < s.moist.length; i++) this.moisture[i] = s.moist[i] / 100; }
+  serialize() { const diffs = []; this.diffs.forEach((v, k) => diffs.push(k, v)); const plants = []; this.plants.forEach(p => plants.push({ id: p.id, x: p.x, y: p.y, z: p.z, wild: p.wild, progress: p.progress, health: p.health, pollinated: p.pollinated, withered: p.withered, onBark: p.onBark, owner: p.owner })); const trees = []; this.treeAt.forEach((v, k) => trees.push(k, v)); const moist = Array.from(this.moisture, m => Math.round(m * 100)); return { diffs, plants, trees, moist }; }
+  coords(i) { const y = Math.floor(i / (this.W * this.D)); const r = i % (this.W * this.D); return [r % this.W, y, Math.floor(r / this.W)]; }
+  restore(s) {
+    const prev = this.remote; this.remote = true;
+    for (let i = 0; i < s.diffs.length; i += 2) { const k = s.diffs[i], v = s.diffs[i + 1]; if (this.blocks[k] !== v) { this.blocks[k] = v; const c = this.coords(k); this.markDirty(c[0], c[2]); } this.diffs.set(k, v); }
+    this.plants.forEach(p => this.markDirty(p.x, p.z)); this.plants.clear(); s.plants.forEach(p => this.addPlant(p));
+    this.treeAt.clear(); for (let i = 0; i < s.trees.length; i += 2) this.treeAt.set(s.trees[i], s.trees[i + 1]);
+    if (s.moist) for (let i = 0; i < s.moist.length; i++) this.moisture[i] = s.moist[i] / 100;
+    this.remote = prev;
+  }
 };

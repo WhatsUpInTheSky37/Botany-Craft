@@ -32,11 +32,11 @@ BC.Animals = class Animals {
   }
   walkable(e, x, z) { const w = this.game.world; if (x < 1 || z < 1 || x >= w.W - 1 || z >= w.D - 1) return false; const t = w.top(x | 0, z | 0); const under = w.get(x | 0, t, z | 0); const above = w.get(x | 0, t + 1, z | 0); if (above === 15 && !(e.def.id === 'moose' || e.def.id === 'frog' || e.def.id === 'heron' || e.def.flies)) return false; if (above === 15 && w.get(x | 0, t + 2, z | 0) === 15) return false; if (BC.BLOCKS[under] && BC.BLOCKS[under].fence) return false; if (Math.abs(t + 1 - e.y) > 1.6 && !e.def.flies) return false; return true; }
   update(dt) {
-    const w = this.game.world; const pl = this.game.player.pos; const stats = this.game.stats;
+    const w = this.game.world; const pl = this.game.player.pos; const stats = this.game.stats; const others = this.game.peerPositions();
     for (const e of this.list) {
       const d = e.def; e.timer -= dt; e.cool -= dt; e.bob += dt;
-      const far = (e.x - pl.x) ** 2 + (e.z - pl.z) ** 2; if (far > 70 * 70) continue; // sleep far away
-      const nearPlayer = far < 3.2 * 3.2; if (nearPlayer && !stats.journal.has('animal:' + d.id)) this.game.discover('animal:' + d.id, 'seen');
+      let far = (e.x - pl.x) ** 2 + (e.z - pl.z) ** 2; for (const o of others) far = Math.min(far, (e.x - o.x) ** 2 + (e.z - o.z) ** 2); if (far > 70 * 70) continue; // sleep far away
+      const nearPlayer = (e.x - pl.x) ** 2 + (e.z - pl.z) ** 2 < 3.2 * 3.2; if (nearPlayer && !stats.journal.has('animal:' + d.id)) this.game.discover('animal:' + d.id, 'seen');
       // behaviour selection
       if (e.state === 'idle' || e.state === 'wander') {
         if (e.timer <= 0) {
@@ -55,8 +55,8 @@ BC.Animals = class Animals {
         const dx = e.target[0] - e.x, dz = e.target[1] - e.z; const dist = Math.hypot(dx, dz);
         if (dist < (e.state === 'seek' ? 0.9 : 0.4)) {
           if (e.state === 'seek' && e.plant) {
-            if (d.role === 'herbivore') { if (this.game.isFenced(e.plant)) { e.plant.protected = true; this.game.toast(`${d.name} could not get past your fence.`, 'good'); stats.fenced = true; } else { e.plant.progress = Math.max(0, e.plant.progress - 0.35); if (e.plant.progress < 0.05 && Math.random() < 0.5) { w.removePlant(e.plant); this.game.toast(`A ${d.name.toLowerCase()} ate your ${this.game.plantName(e.plant)}. Build a fence from logs to protect crops.`, 'bad'); } else { w.markDirty(e.plant.x, e.plant.z); this.game.toast(`A ${d.name.toLowerCase()} nibbled your ${this.game.plantName(e.plant)}.`, 'bad'); } } e.cool = 40; }
-            else if (d.role === 'pollinator') { if (!e.plant.wild && !e.plant.pollinated) { e.plant.pollinated = true; stats.pollinated = true; this.game.toast(`A ${d.name.toLowerCase()} pollinated your ${this.game.plantName(e.plant)}. More seeds at harvest!`, 'good'); } e.cool = 15; }
+            if (d.role === 'herbivore') { const o = e.plant.owner; if (this.game.isFenced(e.plant)) { e.plant.protected = true; this.game.notify(o, `${d.name} could not get past your fence.`, 'good'); this.game.credit(o, 'fenced', true, true); } else { e.plant.progress = Math.max(0, e.plant.progress - 0.35); if (e.plant.progress < 0.05 && Math.random() < 0.5) { w.removePlant(e.plant); this.game.notify(o, `A ${d.name.toLowerCase()} ate your ${this.game.plantName(e.plant)}. Build a fence from logs to protect crops.`, 'bad'); } else { w.markDirty(e.plant.x, e.plant.z); this.game.notify(o, `A ${d.name.toLowerCase()} nibbled your ${this.game.plantName(e.plant)}.`, 'bad'); } } e.cool = 40; }
+            else if (d.role === 'pollinator') { if (!e.plant.wild && !e.plant.pollinated) { e.plant.pollinated = true; this.game.credit(e.plant.owner, 'pollinated', true, true); this.game.notify(e.plant.owner, `A ${d.name.toLowerCase()} pollinated your ${this.game.plantName(e.plant)}. More seeds at harvest!`, 'good'); } e.cool = 15; }
             e.state = 'idle'; e.timer = 2; e.plant = null;
           } else { e.state = 'idle'; e.timer = 1 + Math.random() * 3; }
           e.target = null;
@@ -73,6 +73,16 @@ BC.Animals = class Animals {
       e.mesh.position.set(e.x, e.y + hop, e.z); e.mesh.rotation.y = e.yaw; e.mesh.rotation.z = d.flies ? Math.sin(e.bob * 3) * 0.1 : 0;
       if (d.wings) e.mesh.rotation.x = Math.sin(e.bob * 20) * 0.15;
     }
+  }
+  // Host -> guests: compact positions. Guests interpolate toward them.
+  snapshot() { const out = []; this.list.forEach((e, i) => { out.push(i, Math.round(e.x * 20) / 20, Math.round(e.y * 20) / 20, Math.round(e.z * 20) / 20, Math.round(e.yaw * 100) / 100); }); return out; }
+  applyRemote(list) { for (let i = 0; i < list.length; i += 5) { const e = this.list[list[i]]; if (!e) continue; e.rx = list[i + 1]; e.ry = list[i + 2]; e.rz = list[i + 3]; e.ryaw = list[i + 4]; if (e.rx === undefined || e.first === undefined) { e.x = e.rx; e.y = e.ry; e.z = e.rz; e.yaw = e.ryaw; e.first = 1; } } }
+  updateGuest(dt) {
+    const pl = this.game.player.pos; const stats = this.game.stats;
+    for (const e of this.list) { e.bob += dt; if (e.rx !== undefined) { const k = Math.min(1, dt * 6); const dx = e.rx - e.x, dz = e.rz - e.z; const moving = Math.hypot(dx, dz) > 0.05; e.x += dx * k; e.y += (e.ry - e.y) * k; e.z += dz * k; let da = e.ryaw - e.yaw; da = Math.atan2(Math.sin(da), Math.cos(da)); e.yaw += da * k; e.moving = moving; }
+      const d = e.def; if ((e.x - pl.x) ** 2 + (e.z - pl.z) ** 2 < 3.2 * 3.2 && !stats.journal.has('animal:' + d.id)) this.game.discover('animal:' + d.id, 'seen');
+      const hop = (d.id === 'cottontail' || d.id === 'hare' || d.id === 'frog' || d.id === 'dart_frog') && e.moving ? Math.abs(Math.sin(e.bob * 8)) * 0.25 : 0;
+      e.mesh.position.set(e.x, e.y + hop, e.z); e.mesh.rotation.y = e.yaw; e.mesh.rotation.z = d.flies ? Math.sin(e.bob * 3) * 0.1 : 0; if (d.wings) e.mesh.rotation.x = Math.sin(e.bob * 20) * 0.15; }
   }
   raycast(origin, dir, maxD) {
     let best = null, bd = maxD; for (const e of this.list) { const c = this.tmp.set(e.x, e.y + 0.5 * (e.def.scale || 1), e.z); const oc = c.clone().sub(origin); const t = oc.dot(dir); if (t < 0 || t > bd) continue; const r = Math.max(0.5, Math.max(e.def.body[1], e.def.body[2]) * (e.def.scale || 1) * 0.8); const d2 = oc.lengthSq() - t * t; if (d2 < r * r) { bd = t; best = e; } } return best ? { entity: best, dist: bd } : null;

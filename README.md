@@ -1,5 +1,7 @@
 # Botany Craft
 
+![Botany Craft](assets/botany-craft-hero.jpg)
+
 A block-world game that teaches botany. Explore six real Earth biomes laid out on a climate map (cold north, hot south, dry west, wet east), dig into the soil to read its horizons, gather seeds from wild plants, and grow them where they belong. Everything you meet goes into a Field Journal, and 17 quests with quiz questions walk you through the science.
 
 Runs in any modern browser on Mac, Windows, Linux, iPhone and Android. No install, no build step.
@@ -8,6 +10,12 @@ Runs in any modern browser on Mac, Windows, Linux, iPhone and Android. No instal
 
 * **Hosted:** enable GitHub Pages for this repository (Settings → Pages → Source: *GitHub Actions*). The included workflow publishes the site on every push to `master`.
 * **Locally:** open `index.html` in a browser, or serve the folder (`npx http-server .`) and visit the printed URL.
+
+## Playing together
+
+The start screen has a *Play together* form. One person creates a shared world with a name and a PIN; everyone else joins with the same name and PIN from any device. The land, soil and plants are shared and saved to the cloud (Supabase). Each player keeps their own journal, quests and inventory. Players online at the same time see each other as avatars, and the first player in the room hosts the simulation (growth, animals, weather) for everyone. If the host leaves, the next player takes over automatically.
+
+The backend is a Supabase project: two tables (`bc_worlds`, `bc_players`) behind PIN-checked database functions, plus Realtime broadcast channels for live play. The public key in `js/config.js` only grants access through those functions.
 
 ## What it teaches
 

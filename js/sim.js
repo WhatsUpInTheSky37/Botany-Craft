@@ -50,7 +50,7 @@ BC.Sim = (function () {
     return { score, factors, def, soil, moisture: m, light, biome };
   }
   function tick(game, dt) {
-    const w = game.world; const stats = game.stats;
+    const w = game.world;
     // moisture relaxes toward biome base; rain raises it
     const rain = game.weather.raining; const n = w.moisture.length;
     for (let i = 0; i < n; i += 1) { const base = BC.BIOMES[BC.BIOME_LIST[w.biome[i]]].baseMoisture; let m = w.moisture[i]; if (rain) m += dt * 0.03 * (BC.BIOMES[BC.BIOME_LIST[w.biome[i]]].rainChance + 0.1); m += (base - m) * Math.min(1, dt * 0.01); w.moisture[i] = BC.util.clamp(m, 0, 1); }
@@ -61,15 +61,15 @@ BC.Sim = (function () {
       if (p.withered) return;
       const ev = evaluate(w, p); p.lastScore = ev.score;
       const before = BC.Mesher.plantTile(p);
-      if (ev.score < 0.3) { p.health -= dt / 60; if (p.health <= 0) { p.withered = true; w.markDirty(p.x, p.z); game.toast(`Your ${game.plantName(p)} withered. Inspect it to learn why.`, 'bad'); return; } }
+      if (ev.score < 0.3) { p.health -= dt / 60; if (p.health <= 0) { p.withered = true; w.markDirty(p.x, p.z); game.notify(p.owner, `Your ${game.plantName(p)} withered. Inspect it to learn why.`, 'bad'); return; } }
       else if (p.health < 1) p.health = Math.min(1, p.health + dt / 120);
       if (p.progress < 1) {
         const stage0 = p.progress; p.progress = Math.min(1, p.progress + dt * ev.score * game.growthMult / def.grow);
         if (p.progress >= 1 && stage0 < 1) {
-          if (p.id.startsWith('tree:')) { const t = def; w.removePlant(p); if (w.buildTree(t, p.x, p.y, p.z, false)) { stats.treeGrown = true; game.toast(`Your ${t.name} sapling grew into a tree!`, 'good'); game.discover('tree:' + t.id, 'grown'); } return; }
-          stats.matured++; game.toast(`Your ${def.name} is mature. Harvest it with your hand.`, 'good');
-          if (def.id === 'blueberry' && ev.soil && ev.soil.ph < 5.3 && ev.score > 0.7) stats.blueberryAcid = true;
-          if (def.id === 'prickly_pear' && ev.soil && ev.soil.id === 'aridisol') stats.cactusInSand = true;
+          if (p.id.startsWith('tree:')) { const t = def; w.removePlant(p); if (w.buildTree(t, p.x, p.y, p.z, false)) { game.credit(p.owner, 'treeGrown', true, true); game.notify(p.owner, `Your ${t.name} sapling grew into a tree!`, 'good'); game.credit(p.owner, 'journal', 'tree:' + t.id); } return; }
+          game.credit(p.owner, 'matured', 1); game.notify(p.owner, `Your ${def.name} is mature. Harvest it with your hand.`, 'good');
+          if (def.id === 'blueberry' && ev.soil && ev.soil.ph < 5.3 && ev.score > 0.7) game.credit(p.owner, 'blueberryAcid', true, true);
+          if (def.id === 'prickly_pear' && ev.soil && ev.soil.id === 'aridisol') game.credit(p.owner, 'cactusInSand', true, true);
         }
       }
       if (BC.Mesher.plantTile(p) !== before) w.markDirty(p.x, p.z);
