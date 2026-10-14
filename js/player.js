@@ -64,13 +64,15 @@ BC.Player = class Player {
     const accel = this.onGround ? 14 : 5; this.vel.x += (vx - this.vel.x) * Math.min(1, accel * dt); this.vel.z += (vz - this.vel.z) * Math.min(1, accel * dt);
     const onLadder = (BC.BLOCKS[feet] && BC.BLOCKS[feet].climb) || (BC.BLOCKS[head] && BC.BLOCKS[head].climb);
     if (onLadder) { const up = this.jumpQueued || k.Space || mz > 0.3; const down = k.ShiftLeft || mz < -0.3; this.vel.y = up ? 3 : down ? -3 : -0.6; this.vel.x *= 0.5; this.vel.z *= 0.5; }
-    else if (this.inWater) { const up = this.jumpQueued || k.Space; const down = k.ShiftLeft && !this.sprint; const want = this.headInWater ? (up ? 2.6 : down ? -2.6 : -0.7) : (up ? 3.4 : -0.5); this.vel.y += (want - this.vel.y) * Math.min(1, 4 * dt); } else { this.vel.y -= 22 * dt; if (this.jumpQueued && this.onGround) { this.vel.y = 7.6; this.onGround = false; } }
+    else if (this.inWater) { const up = this.jumpQueued || k.Space || (this.touch && this.joy.y > 0.85); const down = k.ShiftLeft && !this.sprint; const want = this.headInWater ? (up ? 4.2 : down ? -2.8 : 0.9) : (up ? 4.6 : -0.4); this.vel.y += (want - this.vel.y) * Math.min(1, 5 * dt);
+      // climbing out: moving toward a bank that is one or two blocks above the water line lifts you onto it
+      if (mx || mz) { const ax = this.pos.x + (vx / speed) * 0.55, az = this.pos.z + (vz / speed) * 0.55; if (this.solidAt(ax, this.pos.y + 0.4, az) && !this.solidAt(ax, this.pos.y + 1.45, az) && !this.solidAt(ax, this.pos.y + 2.3, az)) this.vel.y = Math.max(this.vel.y, 5.2); else if (up && this.solidAt(ax, this.pos.y + 1.45, az) && !this.solidAt(ax, this.pos.y + 2.4, az) && !this.solidAt(ax, this.pos.y + 3.2, az) && !this.headInWater) this.vel.y = Math.max(this.vel.y, 7.4); } } else { this.vel.y -= 22 * dt; if (this.jumpQueued && this.onGround) { this.vel.y = 7.6; this.onGround = false; } }
     this.jumpQueued = false; if (this.vel.y < -40) this.vel.y = -40;
     // move per axis with collision
     const step = (axis, d) => {
       const p = this.pos.clone(); p[axis] += d;
       if (!this.collides(p.x, p.y, p.z)) { this.pos.copy(p); return true; }
-      if (axis !== 'y' && (this.onGround || this.inWater)) { const up = p.clone(); up.y += 1.05; if (!this.collides(up.x, up.y, up.z) && !this.collides(this.pos.x, this.pos.y + 1.05, this.pos.z)) { this.pos.copy(up); return true; } }
+      if (axis !== 'y' && (this.onGround || this.inWater)) { const up = p.clone(); up.y += this.inWater ? 1.35 : 1.05; if (!this.collides(up.x, up.y, up.z) && !this.collides(this.pos.x, this.pos.y + 1.05, this.pos.z)) { this.pos.copy(up); return true; } }
       return false;
     };
     let steps = Math.ceil(Math.abs(this.vel.y * dt) / 0.4) || 1;

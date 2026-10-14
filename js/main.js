@@ -211,7 +211,9 @@ BC.Game = class Game {
     const biome = BC.BIOMES[this.world.biomeAt(this.player.pos.x, this.player.pos.z)]; const skyDay = new THREE.Color(biome.sky), dusk = new THREE.Color(0xe8955a), night = new THREE.Color(0x0b1026);
     const col = elev > 0.15 ? skyDay.clone().lerp(dusk, BC.util.clamp(1 - (elev - 0.15) / 0.25, 0, 1) * 0.6) : night.clone().lerp(dusk, BC.util.clamp((elev + 0.15) / 0.3, 0, 1));
     if (this.weather.raining) col.lerp(new THREE.Color(0x6a7a86), 0.6);
-    this.scene.background.copy(col); this.scene.fog.color.copy(col); this.scene.fog.near = this.weather.raining ? 20 : 40; this.scene.fog.far = this.weather.raining ? 80 : 104;
+    const under = this.player.headInWater; if (under) { col.set(0x1e5c9a).lerp(new THREE.Color(0x3a86c8), day * 0.6); }
+    this.scene.background.copy(col); this.scene.fog.color.copy(col); this.scene.fog.near = under ? 1 : this.weather.raining ? 20 : 40; this.scene.fog.far = under ? 22 : this.weather.raining ? 80 : 104;
+    { const ov = this.ui.$('underwater'); const show = under || (this.player.inWater && this.camera.position.y < this.world.waterSurface(Math.floor(this.player.pos.x), Math.floor(this.player.pos.z)) + 1); if (ov.hidden === show) ov.hidden = !show; }
     this.sun.intensity = 0.25 + day * (this.weather.raining ? 0.6 : 1.1); this.hemi.intensity = 0.4 + day * 0.75;
     const p = this.player.pos; const sx = Math.cos(ang) * 120, sy = Math.sin(ang) * 120; this.sun.position.set(p.x + sx, p.y + Math.max(sy, 10), p.z + 40); this.sun.target.position.set(p.x, p.y, p.z);
     this.sunMesh.position.set(p.x + sx * 1.6, p.y + sy * 1.6, p.z + 60); this.moonMesh.position.set(p.x - sx * 1.6, p.y - sy * 1.6, p.z - 60); this.sunMesh.visible = elev > -0.1; this.moonMesh.visible = elev < 0.1;
