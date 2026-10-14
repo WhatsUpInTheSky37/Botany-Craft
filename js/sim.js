@@ -61,7 +61,7 @@ BC.Sim = (function () {
     return { score, factors, def, soil, soilBlock, moisture: m, light, biome, chem };
   }
   function tick(game, dt) {
-    const w = game.world;
+    const w = game.world; game._pestCensus = null;
     // moisture relaxes toward biome base; rain raises it
     const rain = game.weather.raining; const n = w.moisture.length;
     for (let i = 0; i < n; i += 1) { const base = Math.min(1, BC.BIOMES[BC.BIOME_LIST[w.biome[i]]].baseMoisture + w.wetBonus[i]); let m = w.moisture[i]; if (rain) m += dt * 0.03 * (BC.BIOMES[BC.BIOME_LIST[w.biome[i]]].rainChance + 0.1); const tb = BC.BLOCKS[w.get(i % w.W, w.height[i], (i / w.W) | 0)]; const rate = m > base ? 0.01 * (1 - 0.6 * w.mulch[i]) * (tb && tb.tilled ? 0.7 : 1) : 0.01; m += (base - m) * Math.min(1, dt * rate); w.moisture[i] = BC.util.clamp(m, 0, 1); }

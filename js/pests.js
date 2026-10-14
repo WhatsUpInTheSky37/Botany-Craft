@@ -12,24 +12,27 @@ BC.Pests = (function () {
   function tick(game, p, def, ev, dt) {
     const w = game.world;
     if (!p.pest) {
-      if (p.covered || p.progress < 0.15) return;
+      if (p.covered || p.progress < 0.3) return;
+      // garden-wide pressure: at most one new outbreak every 4 minutes, and never more than a quarter of the crops at once
+      const now = game.time.t; const who = p.owner || ''; if (!game._pestCensus) { const m = new Map(); w.plants.forEach(q => { if (q.wild) return; const o = q.owner || ''; const c = m.get(o) || { n: 0, inf: 0 }; c.n++; if (q.pest) c.inf++; m.set(o, c); }); game._pestCensus = m; }
+      const cz = game._pestCensus.get(who) || { n: 1, inf: 0 }; game.lastPestT = game.lastPestT || {}; if (now - (game.lastPestT[who] || -1e9) < 240 / (game.growthMult > 1 ? game.growthMult : 1) || cz.inf >= Math.max(1, Math.floor(cz.n / 4))) return;
       const biome = w.biomeAt(p.x, p.z); const cands = candidates(def, biome); if (!cands.length) return;
       const mono = nearby(w, p, 3, q => q.id === p.id); const comp = companionsNear(w, p); const hab = habitatNear(w, p);
-      let rate = (1 / 600) * (1 + mono * 0.25) * Math.max(0.25, 1 - comp * 0.25) * Math.max(0.4, 1 - hab * 0.15);
-      if (ev.chem && ev.chem.n > 0.95) rate *= 1.5; if (ev.score < 0.5) rate *= 1.6; rate *= game.growthMult > 1 ? game.growthMult : 1;
+      let rate = (1 / 2400) * (1 + mono * 0.2) * Math.max(0.25, 1 - comp * 0.25) * Math.max(0.4, 1 - hab * 0.15);
+      if (ev.chem && ev.chem.n > 0.95) rate *= 1.3; if (ev.score < 0.5) rate *= 1.3; rate *= game.growthMult > 1 ? game.growthMult : 1;
       if (Math.random() < rate * dt) {
         const weighted = []; cands.forEach(c => { const wgt = c.hosts.includes('*') ? 1 : 3; for (let i = 0; i < wgt; i++) weighted.push(c); });
-        const ps = weighted[Math.floor(Math.random() * weighted.length)]; p.pest = { id: ps.id, level: 0.15, t: 0 }; w.markDirty(p.x, p.z);
+        const ps = weighted[Math.floor(Math.random() * weighted.length)]; p.pest = { id: ps.id, level: 0.1, t: 0 }; game.lastPestT[who] = now; cz.inf++; w.markDirty(p.x, p.z);
         game.notify(p.owner, `${ps.name} on your ${game.plantName(p)}! Inspect it to learn the signs and what works.`, 'bad'); game.credit(p.owner, 'journal', 'insect:' + ps.id); game.credit(p.owner, 'pestsSeen', 1);
       }
       return;
     }
     const ps = BC.INSECT_BY_ID[p.pest.id]; if (!ps) { p.pest = null; return; }
     const ben = beneficialsNear(game, p, ps.id) + predatorsNear(game, p, ps.id); const comp = companionsNear(w, p);
-    let d = 0.02 * (1 - comp * 0.15) - ben * 0.03; if (p.covered) d = -0.05;
+    let d = 0.006 * (1 - comp * 0.15) - ben * 0.03; if (p.covered) d = -0.05;
     p.pest.level = BC.util.clamp(p.pest.level + d * dt * (game.growthMult > 1 ? game.growthMult : 1), 0, 1); p.pest.t += dt;
     if (ben > 0 && !p.pest.benCredited) { p.pest.benCredited = true; game.credit(p.owner, 'beneficialWin', 1); game.notify(p.owner, `Predators are working on the ${ps.name.toLowerCase()} in your ${game.plantName(p)}.`, 'good'); }
-    p.health = Math.max(0, p.health - dt * 0.004 * p.pest.level * ps.severity * (game.growthMult > 1 ? game.growthMult : 1));
+    p.health = Math.max(0, p.health - dt * 0.0015 * p.pest.level * ps.severity * (game.growthMult > 1 ? game.growthMult : 1));
     if (p.pest.level <= 0.01) { p.pest = null; w.markDirty(p.x, p.z); game.notify(p.owner, `The pests on your ${game.plantName(p)} are gone.`, 'good'); }
   }
   // Treat a plant with an ingredient or practice. Returns a message; applies the effect.
