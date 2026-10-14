@@ -23,6 +23,7 @@ BC.World = class World {
     if (!this.inBounds(x, y, z)) return;
     const i = this.idx(x, y, z); if (this.blocks[i] === id) return;
     const was = this.blocks[i]; this.blocks[i] = id; if (!silent) this.diffs.set(i, id);
+    if (id === 0 && !this.generating) { const above = this.plantAt(x, y + 1, z); if (above && !above.onBark) { const d = BC.PLANT_BY_ID[above.id]; if (!(d && d.water === 'aquatic' && this.get(x, y + 1, z) === 15)) this.removePlant(above); } }
     if (this.onBlock && !this.remote) this.onBlock(x, y, z, id);
     if (id === 0 || id === 15 || was === 15) this.onWaterChange(x, y, z, id, was);
     this.markDirty(x, z); if ((x & 15) === 0) this.markDirty(x - 1, z); if ((x & 15) === 15) this.markDirty(x + 1, z); if ((z & 15) === 0) this.markDirty(x, z - 1); if ((z & 15) === 15) this.markDirty(x, z + 1);
@@ -62,12 +63,13 @@ BC.World = class World {
       if (biome !== 'desert' && h >= WL - 1 && h <= WL + 1.2 && moist > 0.38 && temp > 0.2) biome = 'wetland';
       if (biome === 'wetland') h = Math.min(h, WL + 1);
       this.hf[ci] = h; h = BC.util.clamp(Math.round(h), 3, H - 12);
+      if (h < WL) h = Math.max(3, WL - 1 - Math.round((WL - h) * 2.2 + 1)); // lakes drop away from the shore: deep enough to swim and dive
       this.biome[ci] = BC.BIOME_LIST.indexOf(biome); this.height[ci] = h;
       this.moisture[ci] = BC.BIOMES[biome].baseMoisture; const nb = BC.SOIL_NUTR[BC.BIOMES[biome].soil]; this.nutr[ci * 3] = nb[0]; this.nutr[ci * 3 + 1] = nb[1]; this.nutr[ci * 3 + 2] = nb[2];
       this.fillColumn(x, z, h, biome);
     }
     this.computeFlow(); this.carveStreams(); this.placeTrees(); this.placePlants(); this.placeVillages(); this.computeWetness(); this.pickAnimals();
-    this.diffs.clear(); this.generating = false;
+    this.pruneFloating(); this.diffs.clear(); this.generating = false;
     this.genPlantKeys = new Set(this.plants.keys()); this.genTreeKeys = new Set(this.treeAt.keys());
   }
   fillColumn(x, z, h, biome) {
@@ -104,6 +106,7 @@ BC.World = class World {
       if (this.buildTree(t, x, h + 1, z, true)) occupied.add(x + ',' + z);
     }
   }
+  pruneFloating() { const dead = []; this.plants.forEach(p => { if (p.onBark) return; const d = BC.PLANT_BY_ID[p.id]; if (d && d.water === 'aquatic') return; const below = BC.BLOCKS[this.get(p.x, p.y - 1, p.z)]; if (!below || !below.solid || this.get(p.x, p.y, p.z) !== 0) dead.push(p); }); dead.forEach(p => this.plants.delete(p.key)); return dead.length; }
   // ---------- hydrology ----------
   // D8 flow: every column drains to its lowest neighbour; accumulation counts how many columns drain through each cell (a proxy for stream size).
   computeFlow() {
@@ -195,7 +198,7 @@ BC.World = class World {
     const localPlants = BC.PLANTS.filter(p => p.biomes.includes(biome) && !p.invasive && p.water !== 'aquatic' && !p.epiphyte);
     const crops = localPlants.filter(p => ['tomato', 'potato', 'cabbage', 'cucumber', 'chili', 'corn', 'bean', 'squash', 'basil', 'marigold', 'chives', 'dill', 'nasturtium', 'yarrow', 'sunflower', 'buckwheat', 'alfalfa', 'mustard', 'comfrey', 'coffee', 'banana', 'pineapple', 'blueberry', 'cloudberry', 'prickly_pear', 'agave', 'cacao'].includes(p.id));
     const pool = crops.length >= 4 ? crops : localPlants; const pick = arr => arr[Math.floor(R() * arr.length)];
-    const sow = (x, z, def) => { const wx = ox + x, wz = oz + z; if (!def) return; const key = this.idx(wx, y0, wz); if (this.plants.has(key)) return; const p = { id: def.id, x: wx, y: y0, z: wz, wild: true, progress: 1, health: 1, village: true }; p.key = key; this.plants.set(key, p); };
+    const sow = (x, z, def) => { const wx = ox + x, wz = oz + z; if (!def) return; const key = this.idx(wx, y0, wz); if (this.plants.has(key) || this.blocks[key] !== 0 || !BC.BLOCKS[this.blocks[this.idx(wx, hy, wz)]] || !BC.BLOCKS[this.blocks[this.idx(wx, hy, wz)]].solid) return; const p = { id: def.id, x: wx, y: y0, z: wz, wild: true, progress: 1, health: 1, village: true }; p.key = key; this.plants.set(key, p); };
     // paths: gravel cross, boardwalk in the wet
     const pathId = biome === 'wetland' ? 68 : 16;
     for (let x = 0; x < SZ; x++) for (let z = 13; z <= 14; z++) { if (pathId === 68) put(x, y0, z, 68); else ground(x, z, pathId); }
@@ -225,7 +228,7 @@ BC.World = class World {
       return { doorX, doorZ, front };
     };
     const store = house(1, 1, 11, 9, 2, 'store');
-    const cotA = house(17, 1, 7, 6, 2, 'cottage'); const cotB = house(17, 20, 7, 6, 0, 'cottage'); const cotC = house(2, 20, 7, 6, 0, 'cottage');
+    const cotA = house(17, 1, 7, 6, 2, 'cottage'); const cotB = house(17, 20, 7, 6, 3, 'cottage'); const cotC = house(2, 20, 7, 6, 0, 'cottage');
     // nursery beds in front of the store: raised beds with local seedlings and saplings
     for (let x = 1; x <= 11; x++) for (const z of [11, 12]) { if (x === 6) { ground(x, z, pathId === 68 ? 16 : pathId); continue; } put(x, y0, z, 76); }
     const trees = BC.TREES.filter(t => t.biomes.includes(biome));
@@ -244,9 +247,11 @@ BC.World = class World {
     const flowers = localPlants.filter(p => p.pollinator); for (let x = 0; x < SZ; x += 3) { if (x >= 12 && x <= 15) continue; sow(x, 12, pick(flowers.length ? flowers : pool)); sow(x, 15, pick(flowers.length ? flowers : pool)); }
     // choose the folk: nursery owner always; four others, rotating so every kind appears somewhere
     const types = BC.NPC_TYPES.filter(t => t.id !== 'nursery'); const picked = [BC.NPC_BY_ID.nursery]; for (let k = 0; k < 4; k++) picked.push(types[(vi * 4 + k) % types.length]);
-    const spots = [[6, 10], [cotA.doorX, cotA.doorZ + 1], [cotB.doorX, cotB.doorZ - 1], [cotC.doorX, cotC.doorZ - 1], [21, 12]];
+    const spots = [[6, 5], [cotA.doorX, cotA.doorZ + 1], [cotB.doorX - 1, cotB.doorZ], [cotC.doorX, cotC.doorZ - 1], [21, 9]]; const spotY = [y0, y0, y0, y0, y0 + 1];
     const name = BC.VILLAGE_NAMES[biome][vi % BC.VILLAGE_NAMES[biome].length];
-    const npcs = picked.map((t, i) => ({ type: t.id, name: t.names[(vi + i) % t.names.length], x: ox + spots[i][0] + 0.5, z: oz + spots[i][1] + 0.5, uid: 'v' + vi + 'n' + i }));
+    const npcs = picked.map((t, i) => ({ type: t.id, name: t.names[(vi + i) % t.names.length], x: ox + spots[i][0] + 0.5, y: spotY[i], z: oz + spots[i][1] + 0.5, uid: 'v' + vi + 'n' + i, indoors: i === 0 }));
+    // keep the shopkeeper's spot clear of furniture
+    put(6, y0, 5, 0); put(6, y0 + 1, 5, 0);
     this.villages.push({ id: vi, name, biome, x: ox, z: oz, cx: ox + 14, cz: oz + 14, y: hy, npcs });
   }
   // Build a tree from blocks. Returns false if blocked.
