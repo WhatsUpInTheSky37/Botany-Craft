@@ -64,7 +64,7 @@ BC.World = class World {
       this.moisture[ci] = BC.BIOMES[biome].baseMoisture; const nb = BC.SOIL_NUTR[BC.BIOMES[biome].soil]; this.nutr[ci * 3] = nb[0]; this.nutr[ci * 3 + 1] = nb[1]; this.nutr[ci * 3 + 2] = nb[2];
       this.fillColumn(x, z, h, biome);
     }
-    this.placeTrees(); this.placePlants(); this.pickAnimals();
+    this.placeTrees(); this.placePlants(); this.placeVillages(); this.pickAnimals();
     this.diffs.clear(); this.generating = false;
     this.genPlantKeys = new Set(this.plants.keys()); this.genTreeKeys = new Set(this.treeAt.keys());
   }
@@ -101,6 +101,98 @@ BC.World = class World {
       if (t.biomes[0] !== biome && this.rand() < 0.6) continue;
       if (this.buildTree(t, x, h + 1, z, true)) occupied.add(x + ',' + z);
     }
+  }
+  // ---------- villages ----------
+  // Villages use their own random stream so adding them does not change the rest of the terrain for worlds saved before they existed.
+  placeVillages() {
+    this.villages = []; const R = BC.util.rng((this.seed ^ 0x5151a7) >>> 0); const SZ = 28; const WL = this.WL;
+    const sites = []; const taken = [];
+    const biomes = BC.BIOME_LIST.slice(); for (let i = biomes.length - 1; i > 0; i--) { const j = Math.floor(R() * (i + 1)); [biomes[i], biomes[j]] = [biomes[j], biomes[i]]; }
+    for (const biome of biomes) {
+      let best = null;
+      for (let tries = 0; tries < 900 && !best; tries++) {
+        const ox = 4 + Math.floor(R() * (this.W - SZ - 8)), oz = 4 + Math.floor(R() * (this.D - SZ - 8));
+        if (taken.some(t => Math.abs(t[0] - ox) < SZ + 24 && Math.abs(t[1] - oz) < SZ + 24)) continue;
+        let same = 0, lo = 1e9, hi = -1e9, sum = 0, dry = 0; const n = SZ * SZ; let water = 0;
+        for (let z = 0; z < SZ; z++) for (let x = 0; x < SZ; x++) { const ci = (ox + x) + (oz + z) * this.W; const h = this.height[ci]; if (h <= WL) { water++; continue; } dry++; if (BC.BIOME_LIST[this.biome[ci]] === biome) same++; lo = Math.min(lo, h); hi = Math.max(hi, h); sum += h; }
+        const wet = biome === 'wetland'; const tol = tries < 450 ? 3 : 5; if (water > n * (wet ? 0.45 : 0.08) || same < n * (wet ? 0.4 : 0.75) || hi - lo > tol) continue;
+        best = { ox, oz, hy: Math.max(WL + 1, Math.round(sum / dry)), biome };
+      }
+      if (best) { sites.push(best); taken.push([best.ox, best.oz]); }
+    }
+    sites.forEach((site, vi) => this.buildVillage(site, vi, R));
+  }
+  buildVillage(site, vi, R) {
+    const { ox, oz, hy, biome } = site; const SZ = 28; const B = BC.BIOMES[biome];
+    const soilTop = this.get(ox + 1, this.height[(ox + 1) + (oz + 1) * this.W], oz + 1) || 1; const soilId = BC.BLOCKS[soilTop] && BC.BLOCKS[soilTop].soil ? soilTop : 1;
+    // flatten the footprint, clearing trees and plants
+    for (let z = -1; z <= SZ; z++) for (let x = -1; x <= SZ; x++) {
+      const wx = ox + x, wz = oz + z; if (wx < 0 || wz < 0 || wx >= this.W || wz >= this.D) continue; const ci = wx + wz * this.W; const h = this.height[ci];
+      for (let y = Math.min(h, hy) + 1; y < this.H; y++) { const i = this.idx(wx, y, wz); if (this.blocks[i] !== 0) { this.blocks[i] = 0; this.treeAt.delete(i); } }
+      for (let y = h + 1; y <= hy; y++) this.blocks[this.idx(wx, y, wz)] = y === hy ? soilId : (this.get(wx, h, wz) || soilId);
+      if (h > hy) { this.blocks[this.idx(wx, hy, wz)] = soilId; }
+      this.height[ci] = hy;
+      const keys = []; this.plants.forEach(p => { if (p.x === wx && p.z === wz) keys.push(p); }); keys.forEach(p => this.plants.delete(p.key));
+    }
+    const y0 = hy + 1; const put = (x, y, z, id) => { const wx = ox + x, wz = oz + z; if (this.inBounds(wx, y, wz)) this.blocks[this.idx(wx, y, wz)] = id; };
+    const ground = (x, z, id) => put(x, hy, z, id);
+    const plankOf = { temperate: 19, prairie: 19, desert: 64, rainforest: 62, boreal: 61, wetland: 63 }[biome] || 19; const P = plankOf;
+    const localPlants = BC.PLANTS.filter(p => p.biomes.includes(biome) && !p.invasive && p.water !== 'aquatic' && !p.epiphyte);
+    const crops = localPlants.filter(p => ['tomato', 'potato', 'cabbage', 'cucumber', 'chili', 'corn', 'bean', 'squash', 'basil', 'marigold', 'chives', 'dill', 'nasturtium', 'yarrow', 'sunflower', 'buckwheat', 'alfalfa', 'mustard', 'comfrey', 'coffee', 'banana', 'pineapple', 'blueberry', 'cloudberry', 'prickly_pear', 'agave', 'cacao'].includes(p.id));
+    const pool = crops.length >= 4 ? crops : localPlants; const pick = arr => arr[Math.floor(R() * arr.length)];
+    const sow = (x, z, def) => { const wx = ox + x, wz = oz + z; if (!def) return; const key = this.idx(wx, y0, wz); if (this.plants.has(key)) return; const p = { id: def.id, x: wx, y: y0, z: wz, wild: true, progress: 1, health: 1, village: true }; p.key = key; this.plants.set(key, p); };
+    // paths: gravel cross, boardwalk in the wet
+    const pathId = biome === 'wetland' ? 68 : 16;
+    for (let x = 0; x < SZ; x++) for (let z = 13; z <= 14; z++) { if (pathId === 68) put(x, y0, z, 68); else ground(x, z, pathId); }
+    for (let z = 0; z < SZ; z++) for (let x = 13; x <= 14; x++) { if (pathId === 68) put(x, y0, z, 68); else ground(x, z, pathId); }
+    // lamp posts at the crossing
+    [[12, 12], [15, 12], [12, 15], [15, 15]].forEach(([x, z]) => { put(x, y0, z, 18); put(x, y0 + 1, z, 18); put(x, y0 + 2, z, 81); });
+    // buildings: [x0, z0, w, d, front(0 -z,1 +x,2 +z,3 -x), kind]
+    const house = (x0, z0, w, d, front, kind) => {
+      const hgt = 3; const doorX = front === 0 || front === 2 ? x0 + (w >> 1) : (front === 1 ? x0 + w - 1 : x0); const doorZ = front === 1 || front === 3 ? z0 + (d >> 1) : (front === 2 ? z0 + d - 1 : z0);
+      for (let x = x0; x < x0 + w; x++) for (let z = z0; z < z0 + d; z++) {
+        const edge = x === x0 || x === x0 + w - 1 || z === z0 || z === z0 + d - 1; ground(x, z, edge ? P : 19);
+        if (!edge) continue;
+        const corner = (x === x0 || x === x0 + w - 1) && (z === z0 || z === z0 + d - 1);
+        for (let y = 0; y < hgt; y++) { let id = P; if (!corner && y === 1 && ((x - x0) % 2 === 1 || (z - z0) % 2 === 1) && !(x === doorX && z === doorZ)) id = (z === z0 || z === z0 + d - 1) ? 86 : 87; put(x, y0 + y, z, id); }
+      }
+      put(doorX, y0, doorZ, 118 + front); put(doorX, y0 + 1, doorZ, 0);
+      // roof: shingles with stair eaves
+      for (let x = x0 - 1; x <= x0 + w; x++) for (let z = z0 - 1; z <= z0 + d; z++) { const id = x === x0 - 1 ? 91 : x === x0 + w ? 93 : z === z0 - 1 ? 92 : z === z0 + d ? 90 : 74; put(x, y0 + hgt, z, id); }
+      for (let x = x0 + 1; x < x0 + w - 1; x++) for (let z = z0 + 1; z < z0 + d - 1; z++) put(x, y0 + hgt + 1, z, (x === x0 + 1 || x === x0 + w - 2 || z === z0 + 1 || z === z0 + d - 2) ? 67 : 74);
+      // window boxes under front windows, sign and lantern by the door
+      const fd = BC.FACING_DIR[front]; put(doorX + fd[0] + (fd[0] === 0 ? 1 : 0), y0 + 1, doorZ + fd[1] + (fd[1] === 0 ? 1 : 0), 106 + front);
+      put(doorX + fd[0], y0 + 2, doorZ + fd[1], 80);
+      // interior
+      const ix = x0 + 1, iz = z0 + 1, iw = w - 2, idp = d - 2;
+      if (kind === 'cottage') { put(ix, y0, iz, 134 + 2); put(ix, y0, iz + 1, 138 + 2); put(ix + iw - 1, y0, iz, 69); put(ix + iw - 1, y0, iz + 1, 73); put(ix + (iw >> 1), y0, iz + idp - 1, 78); put(ix + (iw >> 1) + 1, y0, iz + idp - 1, 94 + 3); put(ix + 1, y0 + 2, iz + 1, 80); if (iw > 3) put(ix + 1, y0, iz + idp - 1, 79); }
+      else if (kind === 'store') { for (let x = ix; x < ix + iw; x += 2) { put(x, y0, iz, 78); put(x, y0 + 1, iz, 82); } put(ix + iw - 1, y0, iz + 1, 73); put(ix + iw - 1, y0, iz + 2, 71); put(ix + iw - 1, y0, iz + 3, 70); put(ix, y0, iz + idp - 1, 72); put(ix + 1, y0 + 1, iz + idp - 1, 102 + 0); put(ix + 2, y0 + 1, iz + idp - 1, 102 + 0); put(ix + (iw >> 1), y0 + 2, iz + (idp >> 1), 80); put(ix + (iw >> 1), y0, iz + (idp >> 1), 84); for (let x = ix; x < ix + iw; x++) if (x % 2 === 0) put(x, y0, iz + idp - 2, 78); }
+      return { doorX, doorZ, front };
+    };
+    const store = house(1, 1, 11, 9, 2, 'store');
+    const cotA = house(17, 1, 7, 6, 2, 'cottage'); const cotB = house(17, 20, 7, 6, 0, 'cottage'); const cotC = house(2, 20, 7, 6, 0, 'cottage');
+    // nursery beds in front of the store: raised beds with local seedlings and saplings
+    for (let x = 1; x <= 11; x++) for (const z of [11, 12]) { if (x === 6) { ground(x, z, pathId === 68 ? 16 : pathId); continue; } put(x, y0, z, 76); }
+    const trees = BC.TREES.filter(t => t.biomes.includes(biome));
+    for (let x = 1; x <= 11; x++) for (const z of [11, 12]) { if (x === 6) continue; const wx = ox + x, wz = oz + z; const key = this.idx(wx, y0 + 1, wz); const def = (z === 12 && R() < 0.5 && trees.length) ? pick(trees) : pick(pool); const id = def.shape ? 'tree:' + def.id : def.id; const p = { id, x: wx, y: y0 + 1, z: wz, wild: true, progress: 1, health: 1, village: true }; p.key = key; this.plants.set(key, p); }
+    // market stall east of the crossing
+    for (let x = 17; x <= 26; x++) for (let z = 9; z <= 11; z++) put(x, y0, z, 68);
+    [[18, 10], [20, 10], [22, 10], [24, 10]].forEach(([x, z]) => put(x, y0 + 1, z, 78)); put(19, y0 + 1, 10, 71); put(21, y0 + 1, 10, 70); put(23, y0 + 1, 10, 82); put(25, y0 + 1, 10, 77); put(26, y0 + 1, 9, 18); put(26, y0 + 2, 9, 81); put(17, y0 + 1, 9, 18); put(17, y0 + 2, 9, 81); put(17, y0 + 1, 11, 106 + 3);
+    // community garden south-east: fenced plot with rows, hive, well, compost
+    for (let x = 16; x <= 26; x++) for (let z = 16; z <= 19; z++) { const edge = x === 16 || x === 26 || z === 16 || z === 19; if (edge) put(x, y0, z, x === 21 && z === 16 ? 126 + 0 : 18); else ground(x, z, 17); }
+    for (let x = 17; x <= 25; x++) for (let z = 17; z <= 18; z++) { if (x === 21) continue; sow(x, z, pick(pool)); }
+    put(27, y0, 17, 146); put(27, y0, 19, 70); put(16, y0, 21, 77);
+    // well west of the crossing
+    [[9, 16], [10, 16], [9, 17], [10, 17]].forEach(([x, z]) => put(x, hy, z, 14)); put(9, hy, 16, 15); [[8, 15], [11, 15], [8, 18], [11, 18]].forEach(([x, z]) => { put(x, y0, z, 18); put(x, y0 + 1, z, 18); }); put(9, y0 + 2, 16, 67); put(10, y0 + 2, 16, 67); put(9, y0 + 2, 17, 67); put(10, y0 + 2, 17, 67);
+    // benches and a notice board on the plaza, flowers along the paths
+    put(11, y0, 14 + 1, 98 + 0); put(16, y0, 12, 98 + 2); put(12, y0, 11, 106 + 2);
+    const flowers = localPlants.filter(p => p.pollinator); for (let x = 0; x < SZ; x += 3) { if (x >= 12 && x <= 15) continue; sow(x, 12, pick(flowers.length ? flowers : pool)); sow(x, 15, pick(flowers.length ? flowers : pool)); }
+    // choose the folk: nursery owner always; four others, rotating so every kind appears somewhere
+    const types = BC.NPC_TYPES.filter(t => t.id !== 'nursery'); const picked = [BC.NPC_BY_ID.nursery]; for (let k = 0; k < 4; k++) picked.push(types[(vi * 4 + k) % types.length]);
+    const spots = [[6, 10], [cotA.doorX, cotA.doorZ + 1], [cotB.doorX, cotB.doorZ - 1], [cotC.doorX, cotC.doorZ - 1], [21, 12]];
+    const name = BC.VILLAGE_NAMES[biome][vi % BC.VILLAGE_NAMES[biome].length];
+    const npcs = picked.map((t, i) => ({ type: t.id, name: t.names[(vi + i) % t.names.length], x: ox + spots[i][0] + 0.5, z: oz + spots[i][1] + 0.5, uid: 'v' + vi + 'n' + i }));
+    this.villages.push({ id: vi, name, biome, x: ox, z: oz, cx: ox + 14, cz: oz + 14, y: hy, npcs });
   }
   // Build a tree from blocks. Returns false if blocked.
   buildTree(t, x, y0, z, gen) {
