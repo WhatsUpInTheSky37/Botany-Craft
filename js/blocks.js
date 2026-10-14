@@ -121,6 +121,8 @@ window.BC = window.BC || {};
   def(168, { name: 'Clay olla', solid: false, special: 'olla', shape: [[0.3, 0, 0.3, 0.7, 0.35, 0.7, 'terracotta'], [0.38, 0.35, 0.38, 0.62, 0.5, 0.62, 'terracotta']], tex: ['terracotta', 'terracotta', 'terracotta'], gear: true });
   B[83].special = 'birdhouse'; // the birdhouse now attracts birds too
   B[77].special = 'rain_barrel'; // and rain barrels hold rain for sprinklers and drip lines
+  // how tall a block really is for standing on (slabs, boardwalks, tables are not full cubes)
+  BC.blockTop = id => { const b = B[id]; if (!b || !b.solid) return 0; if (!b.shape) return 1; let t = 0; for (const bx of b.shape) t = Math.max(t, bx[4]); return Math.min(1, t); };
   BC.SPECIAL_IDS = new Set(Object.keys(B).map(Number).filter(id => B[id] && B[id].special));
   BC.FACING_DIR = [[0, -1], [1, 0], [0, 1], [-1, 0]];
   BC.BLOCKS = B;

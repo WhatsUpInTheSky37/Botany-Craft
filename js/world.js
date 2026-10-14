@@ -32,6 +32,8 @@ BC.World = class World {
   }
   markDirty(x, z) { if (x < 0 || z < 0 || x >= this.W || z >= this.D) return; this.dirty.add((x >> 4) + (z >> 4) * this.CX); }
   biomeAt(x, z) { x = BC.util.clamp(x | 0, 0, this.W - 1); z = BC.util.clamp(z | 0, 0, this.D - 1); return BC.BIOME_LIST[this.biome[x + z * this.W]]; }
+  // y of the surface you stand on at a column (top block plus its real height)
+  standY(x, z) { const t = this.top(x, z); return t + BC.blockTop(this.get(x, t, z)); }
   top(x, z) { for (let y = this.H - 1; y >= 0; y--) { const b = this.get(x, y, z); if (b !== 0 && b !== 15) return y; } return 0; }
   surface(x, z) { for (let y = this.H - 1; y >= 0; y--) if (this.get(x, y, z) !== 0) return y; return 0; }
   soilAt(x, y, z) { const b = BC.BLOCKS[this.get(x, y, z)]; return b && b.soil ? BC.SOILS[b.soil] : null; }
@@ -223,7 +225,7 @@ BC.World = class World {
       for (let x = x0 - 1; x <= x0 + w; x++) for (let z = z0 - 1; z <= z0 + d; z++) { const id = x === x0 - 1 ? 91 : x === x0 + w ? 93 : z === z0 - 1 ? 92 : z === z0 + d ? 90 : 74; put(x, y0 + hgt, z, id); }
       for (let x = x0 + 1; x < x0 + w - 1; x++) for (let z = z0 + 1; z < z0 + d - 1; z++) put(x, y0 + hgt + 1, z, (x === x0 + 1 || x === x0 + w - 2 || z === z0 + 1 || z === z0 + d - 2) ? 67 : 74);
       // window boxes under front windows, sign and lantern by the door
-      const fd = BC.FACING_DIR[front]; put(doorX + fd[0] + (fd[0] === 0 ? 1 : 0), y0 + 1, doorZ + fd[1] + (fd[1] === 0 ? 1 : 0), 106 + front);
+      const fd = BC.FACING_DIR[front]; put(doorX + fd[0] + (fd[0] === 0 ? 1 : 0), y0, doorZ + fd[1] + (fd[1] === 0 ? 1 : 0), 106 + front);
       put(doorX + fd[0], y0 + 2, doorZ + fd[1], 80);
       // interior
       const ix = x0 + 1, iz = z0 + 1, iw = w - 2, idp = d - 2;
@@ -238,7 +240,7 @@ BC.World = class World {
     const trees = BC.TREES.filter(t => t.biomes.includes(biome));
     for (let x = 1; x <= 11; x++) for (const z of [11, 12]) { if (x === 6) continue; const wx = ox + x, wz = oz + z; const key = this.idx(wx, y0 + 1, wz); const def = (z === 12 && R() < 0.5 && trees.length) ? pick(trees) : pick(pool); const id = def.shape ? 'tree:' + def.id : def.id; const p = { id, x: wx, y: y0 + 1, z: wz, wild: true, progress: 1, health: 1, village: true }; p.key = key; this.plants.set(key, p); }
     // market stall east of the crossing
-    for (let x = 17; x <= 26; x++) for (let z = 9; z <= 11; z++) put(x, y0, z, 68);
+    for (let x = 17; x <= 26; x++) for (let z = 9; z <= 11; z++) put(x, y0, z, 19);
     [[18, 10], [20, 10], [22, 10], [24, 10]].forEach(([x, z]) => put(x, y0 + 1, z, 78)); put(19, y0 + 1, 10, 71); put(21, y0 + 1, 10, 70); put(23, y0 + 1, 10, 82); put(25, y0 + 1, 10, 77); put(26, y0 + 1, 9, 18); put(26, y0 + 2, 9, 81); put(17, y0 + 1, 9, 18); put(17, y0 + 2, 9, 81); put(17, y0 + 1, 11, 106 + 3);
     // community garden south-east: fenced plot with rows, hive, well, compost
     for (let x = 16; x <= 26; x++) for (let z = 16; z <= 19; z++) { const edge = x === 16 || x === 26 || z === 16 || z === 19; if (edge) put(x, y0, z, x === 21 && z === 16 ? 126 + 0 : 18); else ground(x, z, 17); }

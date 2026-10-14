@@ -85,7 +85,7 @@ BC.Animals = class Animals {
         }
       }
       // ground follow
-      const t = w.top(e.x | 0, e.z | 0); let gy = t + 1; if (w.get(e.x | 0, t + 1, e.z | 0) === 15) gy = d.aquatic ? t + 1.1 : t + 1.6;
+      const t = w.top(e.x | 0, e.z | 0); let gy = w.standY(e.x | 0, e.z | 0); if (w.get(e.x | 0, t + 1, e.z | 0) === 15) gy = d.aquatic ? t + 1.1 : t + 1.6;
       const targetY = gy + (d.flies ? e.fly + Math.sin(e.bob * 2) * 0.2 : 0); e.y += (targetY - e.y) * Math.min(1, 8 * dt);
       const hop = (d.id === 'cottontail' || d.id === 'hare' || d.id === 'frog' || d.id === 'dart_frog') && e.target ? Math.abs(Math.sin(e.bob * 8)) * 0.25 : (e.target && !d.flies ? Math.abs(Math.sin(e.bob * 10)) * 0.04 : 0);
       e.mesh.position.set(e.x, e.y + hop, e.z); e.mesh.rotation.y = e.yaw; e.mesh.rotation.z = d.flies ? Math.sin(e.bob * 3) * 0.1 : 0;

@@ -46,7 +46,7 @@ BC.Player = class Player {
     canvas.addEventListener('touchstart', onStart, { passive: false }); canvas.addEventListener('touchmove', onMove, { passive: false });
     canvas.addEventListener('touchend', onEnd); canvas.addEventListener('touchcancel', onEnd);
   }
-  solidAt(x, y, z) { const b = BC.BLOCKS[this.game.world.get(Math.floor(x), Math.floor(y), Math.floor(z))]; return b && b.solid; }
+  solidAt(x, y, z) { const b = BC.BLOCKS[this.game.world.get(Math.floor(x), Math.floor(y), Math.floor(z))]; if (!b || !b.solid) return false; if (b.shape) return (y - Math.floor(y)) < BC.blockTop(b.id); return true; }
   collides(px, py, pz) {
     const r = this.radius; for (const dx of [-r, r]) for (const dz of [-r, r]) for (const dy of [0, 0.9, this.height - 0.01]) if (this.solidAt(px + dx, py + dy, pz + dz)) return true; return false;
   }

@@ -17,7 +17,7 @@ BC.NPCs = class {
     }));
   }
   // Standing height: the first solid block at or below a reference height, plus one. Ignores roofs overhead.
-  floorAt(x, z, refY) { const w = this.game.world; for (let y = Math.min(w.H - 1, Math.floor(refY)); y >= 0; y--) { const b = BC.BLOCKS[w.get(x, y, z)]; if (b && b.solid && !b.liquid) return y + 1; if (b && b.liquid) return -1; } return -1; }
+  floorAt(x, z, refY) { const w = this.game.world; for (let y = Math.min(w.H - 1, Math.floor(refY)); y >= 0; y--) { const b = BC.BLOCKS[w.get(x, y, z)]; if (b && b.solid && !b.liquid) return y + BC.blockTop(b.id); if (b && b.liquid) return -1; } return -1; }
   walkable(x, z, fromY) { const w = this.game.world; if (x < 1 || z < 1 || x >= w.W - 1 || z >= w.D - 1) return false; const f = this.floorAt(x | 0, z | 0, fromY + 0.5); if (f < 0 || Math.abs(f - fromY) > 1.01) return false; const a1 = BC.BLOCKS[w.get(x | 0, f, z | 0)], a2 = BC.BLOCKS[w.get(x | 0, f + 1, z | 0)]; if ((a1 && a1.solid) || (a2 && a2.solid)) return false; return true; }
   update(dt) {
     const g = this.game; const p = g.player.pos; const w = g.world;
