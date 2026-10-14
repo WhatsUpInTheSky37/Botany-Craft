@@ -141,7 +141,7 @@ BC.UI = class UI {
       }
     }
     const facts = def.facts.map(f => `<li>${this.esc(f)}</li>`).join('');
-    return `<button class="close" aria-label="Close">×</button>${isNew ? '<div class="eyebrow">New field note</div>' : ''}<div class="head">${this.wrapImg(this.imgFor(isTree ? 'tree' : 'plant', def))}<div><h2>${this.esc(def.name)}</h2><p class="sci">${this.esc(def.sci)} · ${this.esc(def.family)}</p>${this.tags(def)}</div></div><p class="teach">${this.esc(def.teach)}</p>${status}${this.reqTable(def)}<h3>Field notes</h3><ul class="facts">${facts}</ul>${def.seed ? `<p class="seedline">Propagule: ${this.esc(def.seed)}${def.grow ? ` · grows in about ${Math.round(def.grow / 60)} min under ideal conditions` : ''}</p>` : ''}`;
+    return `<button class="close" aria-label="Close">×</button>${isNew ? '<div class="eyebrow">New field note</div>' : ''}<div class="head">${this.wrapImg(this.imgFor(isTree ? 'tree' : 'plant', def))}<div><h2>${this.esc(def.name)}</h2><p class="sci">${this.esc(def.sci)} · ${this.esc(def.family)}</p>${this.tags(def)}</div></div><p class="teach">${this.esc(def.teach)}</p>${status}${this.reqTable(def)}<h3>Field notes</h3><ul class="facts">${facts}</ul>${def.fruit ? `<p class="seedline">Fruit: ${this.esc(def.fruit.name)} · shake or snip the leaves to pick · ${def.fruit.price} leaf coins each at a farm stand</p>` : ''}${def.seed ? `<p class="seedline">Propagule: ${this.esc(def.seed)}${def.grow ? ` · grows in about ${Math.round(def.grow / 60)} min under ideal conditions` : ''}</p>` : ''}`;
   }
   soilCard(block, soil, x, y, z, isNew) {
     const g = this.game; const w = g.world; const m = w.moisture[x + z * w.W]; const light = w.lightAt(x, y + 1, z); const biome = BC.BIOMES[w.biomeAt(x, z)];

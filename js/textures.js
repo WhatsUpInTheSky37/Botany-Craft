@@ -24,7 +24,7 @@ BC.Atlas = (function () {
   function cracks(g, color, seed, n) { const r = rng(seed); g.strokeStyle = color; g.lineWidth = 1; for (let i = 0; i < n; i++) { g.beginPath(); let x = r() * TILE, y = r() * TILE; g.moveTo(x, y); for (let k = 0; k < 4; k++) { x += (r() - 0.5) * 10; y += (r() - 0.5) * 10; g.lineTo(x, y); } g.stroke(); } }
   function bark(g, base, dark, seed) { noise(g, base, 0.15, seed, 1); const r = rng(seed + 1); g.fillStyle = dark; for (let i = 0; i < 14; i++) { const x = (r() * TILE) | 0; const y = (r() * TILE) | 0; g.fillRect(x, y, 1, 4 + ((r() * 14) | 0)); } g.fillStyle = shade(base, 1.2); for (let i = 0; i < 8; i++) { const x = (r() * TILE) | 0; g.fillRect(x, (r() * TILE) | 0, 1, 3 + ((r() * 8) | 0)); } }
   function rings(g, base, dark) { noise(g, base, 0.08, 5, 1); g.strokeStyle = dark; g.lineWidth = 1; for (let rr = 3; rr < 15; rr += 3) { g.beginPath(); g.arc(16, 16, rr, 0, Math.PI * 2); g.stroke(); } g.strokeStyle = shade(dark, 0.7); g.strokeRect(0.5, 0.5, 31, 31); }
-  function leaves(g, color, seed) { noise(g, color, 0.3, seed, 2); const r = rng(seed + 9); g.fillStyle = shade(color, 0.68); for (let i = 0; i < 34; i++) g.fillRect((r() * TILE) | 0, (r() * TILE) | 0, 2, 2); g.fillStyle = shade(color, 1.35); for (let i = 0; i < 30; i++) g.fillRect((r() * TILE) | 0, (r() * TILE) | 0, 2, 1); }
+  function leaves(g, color, seed, fruit) { noise(g, color, 0.3, seed, 2); const r = rng(seed + 9); g.fillStyle = shade(color, 0.68); for (let i = 0; i < 34; i++) g.fillRect((r() * TILE) | 0, (r() * TILE) | 0, 2, 2); g.fillStyle = shade(color, 1.35); for (let i = 0; i < 30; i++) g.fillRect((r() * TILE) | 0, (r() * TILE) | 0, 2, 1); if (fruit) { for (let i = 0; i < 7; i++) { const x = 2 + ((r() * 27) | 0), y = 2 + ((r() * 27) | 0); g.fillStyle = fruit; g.beginPath(); g.arc(x, y, 2, 0, 6.283); g.fill(); g.fillStyle = 'rgba(255,255,255,0.45)'; g.fillRect(x - 1, y - 1, 1, 1); } } }
   function planks(g, base, seam) { base = base || '#b08a52'; noise(g, base, 0.12, 44, 1); g.fillStyle = seam || shade(base, 0.62); for (let y = 7; y < TILE; y += 8) g.fillRect(0, y, TILE, 1); g.fillStyle = shade(base, 0.78); for (let i = 0; i < 6; i++) g.fillRect(3 + i * 5, 2 + (i % 2) * 8, 1, 3); }
   function clear(g) { g.clearRect(0, 0, TILE, TILE); }
 
@@ -212,7 +212,7 @@ BC.Atlas = (function () {
     ctx.imageSmoothingEnabled = false;
     const add = (name, painter) => { const i = count++; const x = (i % COLS) * TILE, y = Math.floor(i / COLS) * TILE; ctx.save(); ctx.translate(x, y); ctx.beginPath(); ctx.rect(0, 0, TILE, TILE); ctx.clip(); painter(ctx); ctx.restore(); tiles[name] = i; return i; };
     Object.keys(BLOCK_PAINTERS).forEach(n => add(n, BLOCK_PAINTERS[n]));
-    BC.TREES.forEach(t => { if (t.leaf) add('leaves_' + t.id, g => leaves(g, t.leaf, hash(t.id))); });
+    BC.TREES.forEach(t => { if (t.leaf) add('leaves_' + t.id, g => leaves(g, t.leaf, hash(t.id), t.fruitColor)); });
     BC.PLANTS.forEach(p => { for (let s = 0; s < 3; s++) add(p.id + '_' + s, g => drawPlant(g, p, s, TILE)); });
     const saps = [['sapling_broad', { id: 'sb', form: 'sapling', art: { leaf: '#4f8a32' } }], ['sapling_conifer', { id: 'sc', form: 'sapling_conifer', art: { leaf: '#2e5a3a' } }], ['sapling_cactus', { id: 'sx', form: 'sapling_cactus', art: { leaf: '#5a8a4a' } }]];
     saps.forEach(([n, p]) => { for (let s = 0; s < 3; s++) add(n + '_' + s, g => drawPlant(g, p, s, TILE)); });

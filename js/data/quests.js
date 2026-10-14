@@ -122,5 +122,10 @@ BC.QUESTS = [
     check: s => s.biomesVisited.size / 6, points: 40,
     quiz: { q: 'Which biome has the richest soil?', options: ['Temperate grassland (prairie)', 'Tropical rainforest', 'Desert', 'Boreal forest'], answer: 0,
       explain: 'Surprising but true. Deep grass roots build thick black mollisols. Rainforest nutrients sit in the living plants, not the soil, which is thin and leached.' } },
+  { id: 'orchard', title: 'The Orchard', goal: 'Shake or snip the leaves of fruit trees and pick 4 different kinds of fruit, then plant a fruit tree seed of your own. Villages keep a small orchard just outside the fence; lone wild fruit trees grow across every region.',
+    lesson: 'An orchard is the slowest garden: a tree planted today fruits in three to eight years and then for a lifetime. Fruit trees need a pollinator partner, winter chill or summer heat depending on the kind, and pruning that lets light into the middle.',
+    check: s => Math.min(1, ((s.fruitSpecies ? s.fruitSpecies.size : 0) / 4) * 0.8 + (Array.from(s.seedSpecies || []).some(id => id.startsWith('tree:') && BC.TREE_BY_ID[id.slice(5)] && BC.TREE_BY_ID[id.slice(5)].fruit) ? 0.2 : 0)), points: 25,
+    quiz: { q: 'You plant one apple tree in a garden with no other apples or crabapples nearby. What happens?', options: ['It flowers but sets almost no fruit: apples need pollen from a different variety', 'It fruits normally', 'It grows pears', 'It dies without a partner'], answer: 0,
+      explain: 'Most apples are self-incompatible: their own pollen will not fertilise their flowers. A different variety, or a crabapple, flowering at the same time within bee range sets the crop. Orchards plant a pollinator row for exactly this reason.' } },
 ];
 BC.LEVELS = [[0, 'Sprout'], [50, 'Seedling'], [120, 'Gardener'], [220, 'Naturalist'], [340, 'Botanist'], [480, 'Ecologist']];

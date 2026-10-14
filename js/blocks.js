@@ -26,8 +26,8 @@ window.BC = window.BC || {};
   const logs = { oak: 20, birch: 21, spruce: 22, tropical: 23, cypress: 24, cactus: 25, mesquite: 26, paloverde: 27, palm: 28 };
   Object.keys(logs).forEach(k => def(logs[k], { name: k === 'cactus' ? 'Saguaro trunk' : { oak: 'Oak log', birch: 'Birch log', spruce: 'Spruce log', tropical: 'Hardwood log', cypress: 'Cypress log', mesquite: 'Mesquite log', paloverde: 'Palo verde log', palm: 'Palm trunk' }[k], log: k, tex: [k === 'cactus' ? 'cactus_top' : 'log_top_' + k, k === 'cactus' ? 'cactus' : 'log_' + k, k === 'cactus' ? 'cactus_top' : 'log_top_' + k], solid: true }));
   BC.LOG_IDS = logs;
-  BC.LEAF_BASE = 30;
-  BC.TREES.forEach((t, i) => { if (t.leaf) def(30 + i, { name: 'Leaves', leaves: true, tree: t.id, tex: ['leaves_' + t.id, 'leaves_' + t.id, 'leaves_' + t.id], solid: true }); });
+  BC.LEAF_BASE = 30; const leafIdx = i => i < 30 ? 30 + i : 170 + (i - 30);
+  BC.TREES.forEach((t, i) => { if (t.leaf) def(leafIdx(i), { name: 'Leaves', leaves: true, tree: t.id, tex: ['leaves_' + t.id, 'leaves_' + t.id, 'leaves_' + t.id], solid: true }); });
   // ---------- planks by species (19 = oak) ----------
   B[19].name = 'Oak planks'; B[19].plank = true; B[19].wood = true; B[18].wood = true;
   const PLANKS = [['birch', 60, 'Birch planks'], ['spruce', 61, 'Spruce planks'], ['tropical', 62, 'Hardwood planks'], ['cypress', 63, 'Cypress planks'], ['mesquite', 64, 'Mesquite planks'], ['paloverde', 65, 'Palo verde planks'], ['palm', 66, 'Palm planks']];
@@ -130,6 +130,6 @@ window.BC = window.BC || {};
     AIR: 0, GRASS_A: 1, ALFISOL: 2, GRASS_M: 3, MOLLISOL: 4, SAND: 5, CALICHE: 6, FLOOR_O: 7, OXISOL: 8, MOSS: 9, PODZOL_E: 10, PODZOL_B: 11,
     PEAT: 12, GLEY: 13, STONE: 14, WATER: 15, GRAVEL: 16, COMPOST: 17, FENCE: 18, PLANKS: 19,
   };
-  BC.leafIdFor = t => 30 + BC.TREES.indexOf(t);
+  BC.leafIdFor = t => leafIdx(BC.TREES.indexOf(t));
   BC.isSolid = id => !!(B[id] && B[id].solid);
 })();

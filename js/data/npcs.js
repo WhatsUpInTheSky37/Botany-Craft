@@ -18,7 +18,7 @@ window.BC = window.BC || {};
   BC.NPC_TYPES = [
     { id: 'nursery', role: 'Nursery owner', shop: 'Nursery & Garden Center', names: ['Mabel', 'Hank', 'Dolores', 'Ray', 'Francine', 'Lonnie', 'Teresa', 'Gus'], color: '#4a8a3a', hat: '#e8d8a0',
       greet: ['Welcome in. Everything on the benches was grown right here, no shipping stress on the roots.', 'Looking for something for sun or for shade? Tell me about your spot first and we will find the plant for it.'],
-      sells: 'local', buys: [buySeeds(1), buyTreeSeeds(2)],
+      sells: 'local', buys: [buySeeds(1), buyTreeSeeds(2), { match: it => it.type === 'fruit', label: 'orchard fruit', price: 'fruit' }],
       service: { id: 'delivery', name: 'Seedling delivery', desc: 'Every couple of minutes a bundle of two seeds suited to this region turns up in your bag.', cost: 12, minutes: 5 },
       topics: [
         ['Right plant, right place', 'Nine out of ten plants we see die were planted in the wrong spot, not cared for wrong. Read the tag: sun means six hours of direct light, part shade means morning sun, shade means none at noon. Match the soil pH and the water too, then you hardly have to do anything.'],
@@ -187,7 +187,7 @@ window.BC = window.BC || {};
 
     { id: 'cook', role: 'Farm-stand cook', shop: 'Farm Stand & Cannery', names: ['Rosalind', 'Benny', 'Odette', 'Marcus'], color: '#c0504a', hat: '#f8f0e0',
       greet: ['Fresh picked this morning beats shipped last week, every time. Bring me what you grow.', 'I pay best for what is in season. That is how a farm stand works.'],
-      sells: [ing('kitchen_scraps', 1), ing('banana_tea', 2), seed('tomato', 3), seed('chili', 3), seed('basil', 2), ing('honey', 5)], buys: [buySeeds(2), buyIng('honey', 5), { match: it => it.type === 'fish', label: 'fresh fish', price: 'fish+' }, buyIng('fish', 4), buyIng('chili_peppers', 2), buyIng('banana_peel', 1)],
+      sells: [ing('kitchen_scraps', 1), ing('banana_tea', 2), seed('tomato', 3), seed('chili', 3), seed('basil', 2), ing('honey', 5)], buys: [buySeeds(2), buyIng('honey', 5), { match: it => it.type === 'fruit', label: 'orchard fruit (in season pays best)', price: 'fruit+' }, { match: it => it.type === 'fish', label: 'fresh fish', price: 'fish+' }, buyIng('fish', 4), buyIng('chili_peppers', 2), buyIng('banana_peel', 1)],
       service: { id: 'market', name: 'Market day', desc: 'I set up your stall: everyone in the village pays you double for whatever you sell while it runs.', cost: 10, minutes: 5 },
       topics: [
         ['Eating in season', 'A tomato in January travelled 3,000 km and was picked green. Food grown within a day of you was picked ripe, which is when the sugars and vitamins peak. Seasonal eating is the cheapest way to eat well.'],

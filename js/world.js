@@ -72,7 +72,7 @@ BC.World = class World {
       this.moisture[ci] = BC.BIOMES[biome].baseMoisture; const nb = BC.SOIL_NUTR[BC.BIOMES[biome].soil]; this.nutr[ci * 3] = nb[0]; this.nutr[ci * 3 + 1] = nb[1]; this.nutr[ci * 3 + 2] = nb[2];
       this.fillColumn(x, z, h, biome);
     }
-    this.computeFlow(); this.carveStreams(); this.placeTrees(); this.placePlants(); this.placeVillages(); this.computeWetness(); this.pickAnimals();
+    this.computeFlow(); this.carveStreams(); this.placeTrees(); this.placePlants(); this.placeVillages(); this.computeWetness(); this.pickAnimals(); this.placeOrchards();
     this.pruneFloating(); this.diffs.clear(); this.generating = false;
     this.genPlantKeys = new Set(this.plants.keys()); this.genTreeKeys = new Set(this.treeAt.keys());
   }
@@ -94,7 +94,7 @@ BC.World = class World {
     }
     for (let y = h + 1; y <= WL; y++) set(y, B.WATER);
   }
-  treeOptions(biome) { return BC.TREES.filter(t => t.biomes[0] === biome || (t.biomes.includes(biome) && this.rand() < 0.3)); }
+  treeOptions(biome) { return BC.TREES.filter(t => !t.fruit && t.biomes[0] === biome || (t.biomes.includes(biome) && this.rand() < 0.3)); }
   placeTrees() {
     const density = { temperate: 0.032, prairie: 0.004, desert: 0.012, rainforest: 0.055, boreal: 0.05, wetland: 0.02 };
     const occupied = new Set();
@@ -104,7 +104,7 @@ BC.World = class World {
       if (this.rand() > density[biome]) continue;
       let ok = true; for (let dz = -2; dz <= 2 && ok; dz++) for (let dx = -2; dx <= 2; dx++) if (occupied.has((x + dx) + ',' + (z + dz))) { ok = false; break; }
       if (!ok) continue;
-      const opts = BC.TREES.filter(t => t.biomes.includes(biome)); if (!opts.length) continue;
+      const opts = BC.TREES.filter(t => !t.fruit && t.biomes.includes(biome)); if (!opts.length) continue;
       const t = opts[Math.floor(this.rand() * opts.length)];
       if (t.biomes[0] !== biome && this.rand() < 0.6) continue;
       if (this.buildTree(t, x, h + 1, z, true)) occupied.add(x + ',' + z);
@@ -112,6 +112,15 @@ BC.World = class World {
   }
   underGlass(x, y, z) { for (let yy = y + 1; yy <= y + 3 && yy < this.H; yy++) { const b = BC.BLOCKS[this.get(x, yy, z)]; if (b && b.transparent) return true; } return false; }
   waterNear(x, y, z, r) { for (let dz = -r; dz <= r; dz++) for (let dx = -r; dx <= r; dx++) for (let dy = -2; dy <= 1; dy++) { const b = this.get(x + dx, y + dy, z + dz); if (b === 15 || b === 162 || b === 77) return true; } return false; }
+  // Fruit trees: a small orchard beside every village and lone wild fruit trees scattered through their regions. Own RNG, so older worlds keep their layout.
+  placeOrchards() {
+    const R = BC.util.rng((this.seed ^ 0x0f2a17) >>> 0); const saved = this.rand; this.rand = R; const W = this.W;
+    this.orchards = []; const clear = (x, z) => { if (x < 3 || z < 3 || x >= W - 3 || z >= this.D - 3) return -1; const h = this.height[x + z * W]; if (h < this.WL + 1 || this.stream[x + z * W]) return -1; const g = BC.BLOCKS[this.blocks[this.idx(x, h, z)]]; if (!g || !g.soil || g.soil === 'stone') return -1; for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) { const xx = x + dx, zz = z + dz; const hh = this.height[xx + zz * W]; if (Math.abs(hh - h) > 1) return -1; for (let y = hh + 1; y <= hh + (dx || dz ? 2 : 6); y++) { const b = this.blocks[this.idx(xx, y, zz)]; if (b !== 0 && !BC.BLOCKS[b].leaves) return -1; } } for (let y = h + 1; y <= h + 6; y++) if (this.blocks[this.idx(x, y, z)] !== 0) return -1; return h; };
+    const plant = (x, z) => { const h = clear(x, z); if (h < 0) return false; const biome = this.biomeAt(x, z); const opts = BC.TREES.filter(t => t.fruit && t.biomes.includes(biome)); if (!opts.length) return false; const t = opts[Math.floor(R() * opts.length)]; for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) this.plants.delete(this.idx(x + dx, this.height[x + dx + (z + dz) * W] + 1, z + dz)); if (!this.buildTree(t, x, h + 1, z, true)) return false; this.orchards.push([x, h + 1, z, t.id]); return true; };
+    (this.villages || []).forEach(v => { let n = 0; for (let tries = 0; tries < 60 && n < 5; tries++) { const side = Math.floor(R() * 4); const a = -6 + Math.floor(R() * 42), b = side & 1 ? 33 + Math.floor(R() * 5) : -8 + Math.floor(R() * 5); const x = v.x + (side < 2 ? a : b), z = v.z + (side < 2 ? b : a); if (plant(x, z)) n++; } });
+    const want = Math.round(W * this.D / 2600); let placed = 0; for (let tries = 0; tries < want * 6 && placed < want; tries++) { if (plant(3 + Math.floor(R() * (W - 6)), 3 + Math.floor(R() * (this.D - 6)))) placed++; }
+    this.rand = saved;
+  }
   pruneFloating() { const dead = []; this.plants.forEach(p => { if (p.onBark) return; const d = BC.PLANT_BY_ID[p.id]; if (d && d.water === 'aquatic') return; const below = BC.BLOCKS[this.get(p.x, p.y - 1, p.z)]; if (!below || !below.solid || this.get(p.x, p.y, p.z) !== 0) dead.push(p); }); dead.forEach(p => this.plants.delete(p.key)); return dead.length; }
   // ---------- hydrology ----------
   // D8 flow: every column drains to its lowest neighbour; accumulation counts how many columns drain through each cell (a proxy for stream size).
