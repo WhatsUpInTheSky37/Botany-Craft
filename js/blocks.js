@@ -100,6 +100,28 @@ window.BC = window.BC || {};
   face(134, 'Bed', 'bedhead', { tex: ['bed_head', 'bed_side', P], extra: { bedPart: 'head' } });
   face(138, 'Bed', 'bedfoot', { tex: ['bed_foot', 'bed_side', P], extra: { bedPart: 'foot', hidden: true } }); for (let k = 0; k < 4; k++) B[138 + k].item = 134;
   def(146, { name: 'Beehive', wood: true, solid: true, hive: true, tex: ['beehive_top', 'beehive', 'planks'] });
+  // ---------- garden gear (25 essentials) ----------
+  // tilled soil: one variant per topsoil, keeps that soil's chemistry
+  const TILL = [[147, 1, 'alfisol', 'Tilled forest soil'], [148, 3, 'mollisol', 'Tilled prairie soil'], [149, 5, 'aridisol', 'Tilled desert soil'], [150, 7, 'oxisol', 'Tilled rainforest soil'], [151, 9, 'spodosol', 'Tilled boreal soil'], [152, 12, 'histosol', 'Tilled peat'], [153, 17, 'compost', 'Tilled compost soil']];
+  BC.TILL_FOR = {}; BC.UNTILL = {}; TILL.forEach(([id, from, soil, name]) => { def(id, { name, soil, horizon: 'Ap', tilled: true, solid: true, grassTop: false, tex: ['tilled', B[from].tex[1], B[from].tex[2]], item: from }); BC.TILL_FOR[from] = id; BC.UNTILL[id] = from; });
+  def(154, { name: 'Glass', solid: true, transparent: true, cutout: true, shape: [[0, 0, 0, 1, 1, 1, 'glass']], tex: ['glass', 'glass', 'glass'], gear: true });
+  def(155, { name: 'Stone wall', solid: true, fence: true, tex: ['stonewall', 'stonewall', 'stonewall'], gear: true });
+  def(156, { name: 'Compost bin', wood: true, solid: true, special: 'compost_bin', tex: ['compostbin_top', 'compostbin', 'planks'], gear: true });
+  def(157, { name: 'Sprinkler', wood: true, solid: false, special: 'sprinkler', shape: [[0.42, 0, 0.42, 0.58, 0.7, 0.58, 'bark_dark'], [0.3, 0.7, 0.3, 0.7, 0.85, 0.7, 'sprinkler']], tex: ['sprinkler', 'sprinkler', 'sprinkler'], gear: true });
+  def(158, { name: 'Scarecrow', wood: true, solid: false, special: 'scarecrow', shape: [[0.46, 0, 0.46, 0.54, 1.6, 0.54, 'bark_dark'], [0.05, 1.0, 0.44, 0.95, 1.1, 0.56, 'bark_dark'], [0.25, 0.7, 0.35, 0.75, 1.3, 0.65, 'scarecrow'], [0.35, 1.3, 0.35, 0.65, 1.6, 0.65, 'straw_face'], [0.2, 1.58, 0.2, 0.8, 1.68, 0.8, 'straw_hat']], tex: ['scarecrow', 'scarecrow', 'scarecrow'], gear: true });
+  def(159, { name: 'Fish trap', wood: true, solid: false, special: 'fish_trap', shape: [[0.1, 0, 0.1, 0.9, 0.6, 0.9, 'fishtrap']], tex: ['fishtrap', 'fishtrap', 'fishtrap'], gear: true });
+  def(160, { name: 'Bird feeder', wood: true, solid: false, special: 'bird_feeder', shape: [[0.46, 0, 0.46, 0.54, 0.8, 0.54, 'bark_dark'], [0.2, 0.8, 0.2, 0.8, 0.9, 0.8, 'planks'], [0.3, 0.9, 0.3, 0.7, 1.15, 0.7, 'birdfeeder'], [0.15, 1.15, 0.15, 0.85, 1.25, 0.85, 'shingles']], tex: ['birdfeeder', 'birdfeeder', 'birdfeeder'], gear: true });
+  def(161, { name: 'Bat house', wood: true, solid: false, special: 'bat_house', shape: [[0.46, 0, 0.46, 0.54, 0.5, 0.54, 'bark_dark'], [0.2, 0.5, 0.35, 0.8, 1.3, 0.65, 'bathouse']], tex: ['bathouse', 'bathouse', 'bathouse'], gear: true });
+  def(162, { name: 'Well', solid: true, special: 'well', wellWater: true, shape: [[0, 0, 0, 1, 0.8, 1, { top: 'water', side: 'stonewall', bottom: 'stone' }], [0.08, 0.8, 0.08, 0.2, 1.6, 0.2, 'bark_dark'], [0.8, 0.8, 0.8, 0.92, 1.6, 0.92, 'bark_dark'], [0, 1.6, 0, 1, 1.75, 1, 'shingles']], tex: ['stonewall', 'stonewall', 'stonewall'], gear: true });
+  def(163, { name: 'Drip line', wood: true, solid: false, special: 'drip', shape: [[0, 0, 0.42, 1, 0.12, 0.58, 'dripline'], [0.42, 0, 0, 0.58, 0.12, 1, 'dripline']], tex: ['dripline', 'dripline', 'dripline'], gear: true });
+  def(164, { name: 'Weather vane', wood: true, solid: false, special: 'vane', shape: [[0.46, 0, 0.46, 0.54, 1.2, 0.54, 'bark_dark'], [0.15, 1.2, 0.46, 0.85, 1.32, 0.54, 'vane'], [0.3, 1.0, 0.3, 0.7, 1.08, 0.7, 'bark_dark']], tex: ['vane', 'vane', 'vane'], gear: true });
+  def(165, { name: 'Insect hotel', wood: true, solid: true, special: 'insect_hotel', habitat: true, tex: ['shingles', 'insecthotel', 'planks'], gear: true });
+  def(166, { name: 'Mushroom log', wood: true, solid: true, special: 'mushroom_log', shape: [[0.1, 0, 0.1, 0.9, 0.6, 0.9, { top: 'mushlog', side: 'mushlog', bottom: 'bark_dark' }]], tex: ['mushlog', 'mushlog', 'mushlog'], gear: true });
+  def(167, { name: 'Waypoint flag', wood: true, solid: false, special: 'flag', shape: [[0.46, 0, 0.46, 0.54, 1.8, 0.54, 'bark_dark'], [0.54, 1.2, 0.47, 1.1, 1.75, 0.53, 'flag']], tex: ['flag', 'flag', 'flag'], gear: true });
+  def(168, { name: 'Clay olla', solid: false, special: 'olla', shape: [[0.3, 0, 0.3, 0.7, 0.35, 0.7, 'terracotta'], [0.38, 0.35, 0.38, 0.62, 0.5, 0.62, 'terracotta']], tex: ['terracotta', 'terracotta', 'terracotta'], gear: true });
+  B[83].special = 'birdhouse'; // the birdhouse now attracts birds too
+  B[77].special = 'rain_barrel'; // and rain barrels hold rain for sprinklers and drip lines
+  BC.SPECIAL_IDS = new Set(Object.keys(B).map(Number).filter(id => B[id] && B[id].special));
   BC.FACING_DIR = [[0, -1], [1, 0], [0, 1], [-1, 0]];
   BC.BLOCKS = B;
   BC.BLOCK = {

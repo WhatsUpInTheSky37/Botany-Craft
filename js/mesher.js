@@ -97,6 +97,7 @@ BC.Mesher = (function () {
       b.quad([[ox - c, y, oz - s], [ox + c, y, oz + s], [ox + c, y + scale, oz + s], [ox - c, y + scale, oz - s]], [-s, 0, c], uvr, sh);
       b.quad([[ox + s, y, oz - c], [ox - s, y, oz + c], [ox - s, y + scale, oz + c], [ox + s, y + scale, oz - c]], [c, 0, s], uvr, sh);
       if (p.pest && !p.wild) { const ps = BC.INSECT_BY_ID[p.pest.id]; const col = new THREE.Color(ps ? ps.color : '#ffffff'); const t = [col.r, col.g, col.b]; const pu = BC.Atlas.uv('pest'); const r2 = 0.42 * (0.5 + 0.5 * p.pest.level); const y2 = y + scale * 0.35; b.quad([[ox - r2, y2, oz], [ox + r2, y2, oz], [ox + r2, y2 + r2 * 2, oz], [ox - r2, y2 + r2 * 2, oz]], [0, 0, 1], pu, [1, 1, 1, 1], t); b.quad([[ox, y2, oz - r2], [ox, y2, oz + r2], [ox, y2 + r2 * 2, oz + r2], [ox, y2 + r2 * 2, oz - r2]], [1, 0, 0], pu, [1, 1, 1, 1], t); }
+      if ((p.shaded || p.frostCover) && !p.wild) { const cu = BC.Atlas.uv(p.shaded ? 'bathouse' : 'straw_face'); const yc = y + scale * 0.95; const tn = p.shaded ? [0.5, 0.5, 0.55] : [1.7, 1.7, 1.7]; b.quad([[ox - 0.5, yc, oz + 0.5], [ox + 0.5, yc, oz + 0.5], [ox + 0.5, yc, oz - 0.5], [ox - 0.5, yc, oz - 0.5]], [0, 1, 0], cu, [1, 1, 1, 1], tn); }
       if (p.covered && !p.wild) { const cu = BC.Atlas.uv('trellis'); const yc = y + scale * 0.9; b.quad([[ox - 0.5, yc, oz + 0.5], [ox + 0.5, yc, oz + 0.5], [ox + 0.5, yc, oz - 0.5], [ox - 0.5, yc, oz - 0.5]], [0, 1, 0], cu, [1, 1, 1, 1], [1.6, 1.6, 1.6]); }
     });
     return b.geometry();

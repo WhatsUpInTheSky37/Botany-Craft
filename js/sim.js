@@ -35,7 +35,9 @@ BC.Sim = (function () {
     factors.push({ key: 'water', label: 'Water', score: wScore, msg: wMsg });
     // ---- light ----
     const light = world.lightAt(x, y, z); let lScore, lMsg;
-    if (def.sun === 'full') { lScore = light > 0.8 ? 1 : light > 0.5 ? 0.55 : 0.2; lMsg = light > 0.8 ? 'Full sun: perfect.' : 'Too shady. It needs full sun; move it away from tree canopy.'; }
+    const shaded = !!p.shaded;
+    if (shaded && def.sun !== 'full') { lScore = 1; lMsg = 'Shade cloth keeps the sun off it.'; }
+    else if (def.sun === 'full') { lScore = light > 0.8 ? 1 : light > 0.5 ? 0.55 : 0.2; lMsg = light > 0.8 ? 'Full sun: perfect.' : 'Too shady. It needs full sun; move it away from tree canopy.'; }
     else if (def.sun === 'part') { lScore = light > 0.35 ? 1 : 0.4; lMsg = light > 0.35 ? 'Light level suits it.' : 'Deep shade is a little dark for it.'; }
     else { lScore = light < 0.65 ? 1 : 0.55; lMsg = light < 0.65 ? 'Dappled shade: just what a forest-floor plant wants.' : 'Full sun scorches this shade plant. Plant under trees.'; }
     factors.push({ key: 'light', label: 'Light', score: lScore, msg: lMsg });
@@ -44,6 +46,7 @@ BC.Sim = (function () {
     const chem = world.soilChem(x, z, soil); const needs = def.needs || (def.hungry ? [0.6, 0.4, 0.5] : def.nFix ? [0.1, 0.3, 0.3] : [0.3, 0.25, 0.3]);
     const avail = [chem.n, chem.p, chem.k]; const names = ['nitrogen', 'phosphorus', 'potassium']; const symptoms = ['older leaves yellow from the tips, growth stalls', 'purple undersides, stunted roots, few flowers', 'brown scorched leaf edges, weak stems']; const fixes = ['bean pods, nettle tea, fish emulsion, manure, legumes nearby', 'bone meal, rock phosphate, buckwheat cuttings, bat guano', 'comfrey tea, wood ash, kelp meal, banana peels'];
     let nScore = 1, nMsg = 'Nutrients: enough N, P and K for this plant.'; let worst = -1, worstRatio = 1;
+    if (soilBlock && soilBlock.tilled) for (let k = 0; k < 3; k++) avail[k] += 0.08;
     for (let k = 0; k < 3; k++) { const ratio = Math.min(1, avail[k] / Math.max(0.05, needs[k] * 0.7)); if (ratio < worstRatio) { worstRatio = ratio; worst = k; } }
     if (worstRatio < 0.95 && worst >= 0) { nScore = Math.max(0.1, worstRatio); nMsg = `Short of ${names[worst]}: ${symptoms[worst]}. Feed the soil with ${fixes[worst]}.`; }
     if (!def.epiphyte && !(def.water === 'aquatic')) factors.push({ key: 'nutrients', label: 'Nutrients', score: nScore, msg: nMsg });
@@ -51,16 +54,17 @@ BC.Sim = (function () {
     if (def.biomes.includes(biome)) { cScore = 1; cMsg = `${BC.BIOMES[biome].short} is its home climate.`; }
     else if ((BC.CLIMATE_NEIGHBORS[def.biomes[0]] || []).includes(biome)) { cScore = 0.55; cMsg = `${BC.BIOMES[biome].short} is a stretch; it grows slowly outside its native ${BC.BIOMES[def.biomes[0]].short.toLowerCase()}.`; }
     else { cScore = 0.08; const home = BC.BIOMES[def.biomes[0]]; const cold = BC.BIOMES[biome].temp === 'cold' || (BC.BIOMES[biome].temp === 'cool' && home.temp === 'hot'); cMsg = cold ? `Wrong climate: frost kills a ${home.short.toLowerCase()} plant here.` : `Wrong climate: a ${home.short.toLowerCase()} plant cannot take this heat and drought.`; }
+    if (cScore < 0.8) { const glass = world.underGlass(x, y, z); if (glass) { cScore = Math.max(cScore, 0.85); cMsg = 'Under glass: the greenhouse keeps it warm and sheltered, whatever the region.'; } else if (p.frostCover) { cScore = Math.max(cScore, 0.7); cMsg = 'A frost blanket is carrying it through the cold nights.'; } else if (p.shaded && (BC.BIOMES[biome].temp === 'hot')) { cScore = Math.max(cScore, 0.7); cMsg = 'Shade cloth takes the edge off the heat.'; } }
     factors.push({ key: 'climate', label: 'Climate', score: cScore, msg: cMsg });
     const min = Math.min(...factors.map(f => f.score)); const mean = factors.reduce((a, f) => a + f.score, 0) / factors.length;
     const score = min * 0.6 + mean * 0.4;
-    return { score, factors, def, soil, moisture: m, light, biome, chem };
+    return { score, factors, def, soil, soilBlock, moisture: m, light, biome, chem };
   }
   function tick(game, dt) {
     const w = game.world;
     // moisture relaxes toward biome base; rain raises it
     const rain = game.weather.raining; const n = w.moisture.length;
-    for (let i = 0; i < n; i += 1) { const base = Math.min(1, BC.BIOMES[BC.BIOME_LIST[w.biome[i]]].baseMoisture + w.wetBonus[i]); let m = w.moisture[i]; if (rain) m += dt * 0.03 * (BC.BIOMES[BC.BIOME_LIST[w.biome[i]]].rainChance + 0.1); const rate = m > base ? 0.01 * (1 - 0.6 * w.mulch[i]) : 0.01; m += (base - m) * Math.min(1, dt * rate); w.moisture[i] = BC.util.clamp(m, 0, 1); }
+    for (let i = 0; i < n; i += 1) { const base = Math.min(1, BC.BIOMES[BC.BIOME_LIST[w.biome[i]]].baseMoisture + w.wetBonus[i]); let m = w.moisture[i]; if (rain) m += dt * 0.03 * (BC.BIOMES[BC.BIOME_LIST[w.biome[i]]].rainChance + 0.1); const tb = BC.BLOCKS[w.get(i % w.W, w.height[i], (i / w.W) | 0)]; const rate = m > base ? 0.01 * (1 - 0.6 * w.mulch[i]) * (tb && tb.tilled ? 0.7 : 1) : 0.01; m += (base - m) * Math.min(1, dt * rate); w.moisture[i] = BC.util.clamp(m, 0, 1); }
     game.soilAcc = (game.soilAcc || 0) + dt; if (game.soilAcc >= 10) { const T = game.soilAcc; game.soilAcc = 0; for (let i = 0; i < n; i++) { const nb = w.nutrBase ? [w.nutrBase[i * 3], w.nutrBase[i * 3 + 1], w.nutrBase[i * 3 + 2]] : BC.SOIL_NUTR[BC.BIOMES[BC.BIOME_LIST[w.biome[i]]].soil]; for (let k = 0; k < 3; k++) { const v = w.nutr[i * 3 + k]; if (v < nb[k]) w.nutr[i * 3 + k] = Math.min(nb[k], v + T * 0.0004 * (1 + w.om[i])); } if (w.mulch[i] > 0) w.mulch[i] = Math.max(0, w.mulch[i] - T * 0.0005);
         // leaching: saturated soil loses nitrogen downhill to wherever it drains (nitrate is mobile, phosphorus is not)
         if (w.moisture[i] > 0.85 && w.flowDir[i] >= 0 && w.nutr[i * 3] > nb[0]) { const d = w.FLOW_DIRS[w.flowDir[i]]; const x = i % w.W, z = (i / w.W) | 0; const j = (x + d[0]) + (z + d[1]) * w.W; const move = (w.nutr[i * 3] - nb[0]) * 0.02 * T / 10; w.nutr[i * 3] -= move; w.nutr[j * 3] = Math.min(1.2, w.nutr[j * 3] + move * 0.6); } } }
@@ -79,7 +83,7 @@ BC.Sim = (function () {
       BC.Pests.tick(game, p, def, ev, dt);
       const pestDrag = p.pest ? Math.min(0.8, p.pest.level * BC.INSECT_BY_ID[p.pest.id].severity) : 0;
       if (p.progress < 1) {
-        const stage0 = p.progress; p.progress = Math.min(1, p.progress + dt * ev.score * (1 - pestDrag) * game.growthMult / def.grow);
+        const tilledBoost = ev.soilBlock && ev.soilBlock.tilled ? 1.15 : 1; const stage0 = p.progress; p.progress = Math.min(1, p.progress + dt * ev.score * (1 - pestDrag) * tilledBoost * game.growthMult / def.grow);
         if (p.progress >= 1 && stage0 < 1) {
           if (p.id.startsWith('tree:')) { const t = def; w.removePlant(p); if (w.buildTree(t, p.x, p.y, p.z, false)) { game.credit(p.owner, 'treeGrown', true, true); game.notify(p.owner, `Your ${t.name} sapling grew into a tree!`, 'good'); game.credit(p.owner, 'journal', 'tree:' + t.id); } return; }
           game.credit(p.owner, 'matured', 1); game.notify(p.owner, `Your ${def.name} is mature. Harvest it with your hand.`, 'good');
