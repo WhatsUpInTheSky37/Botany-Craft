@@ -13,7 +13,7 @@ BC.NPCs = class {
       const apron = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.5, 0.06), new THREE.MeshLambertMaterial({ color: 0xe8e0c8 })); apron.position.set(0, 0.8, 0.18); group.add(apron);
       const y = this.floorAt(Math.floor(n.x), Math.floor(n.z), n.y !== undefined ? n.y + 1 : w.top(Math.floor(n.x), Math.floor(n.z)) + 1); group.position.set(n.x, y, n.z); this.game.scene.add(group);
       const arms = [group.children[4], group.children[5]];
-      this.list.push({ uid: n.uid, type: t, def: t, name: n.name, village: v, x: n.x, y, z: n.z, home: [n.x, n.z], indoors: !!n.indoors, yaw: Math.random() * 6.28, group, arms, target: null, timer: 1 + Math.random() * 3, talking: 0, work: 0, workT: 0 });
+      this.list.push({ uid: n.uid, type: t, def: t, name: n.name, village: v, x: n.x, y, z: n.z, home: [n.x, n.z], origHome: [n.x, n.z], origY: y, origIndoors: !!n.indoors, indoors: !!n.indoors, yaw: Math.random() * 6.28, group, arms, target: null, timer: 1 + Math.random() * 3, talking: 0, work: 0, workT: 0 });
     }));
   }
   // Standing height: the first solid block at or below a reference height, plus one. Ignores roofs overhead.
@@ -23,7 +23,11 @@ BC.NPCs = class {
     const g = this.game; const p = g.player.pos; const w = g.world;
     for (const e of this.list) {
       const dpx = p.x - e.x, dpz = p.z - e.z; const d2 = dpx * dpx + dpz * dpz;
-      if (d2 > 90 * 90) continue; // far away: do not bother
+      // sent on a job: work at the hirer's garden until it ends, then go home
+      const job = g.hires.find(h => h.uid === e.uid && h.until > g.time.t && !['market', 'rain'].includes(h.service) && h.at);
+      if (job) { if (e.home[0] !== job.at[0] + 0.5 || e.home[1] !== job.at[1] + 0.5) { e.home = [job.at[0] + 0.5, job.at[1] + 0.5]; e.indoors = false; let ok = false; for (let r = 1; r <= 5 && !ok; r++) for (let dz = -r; dz <= r && !ok; dz++) for (let dx = -r; dx <= r && !ok; dx++) { const x = job.at[0] + dx, z = job.at[1] + dz; if (x < 1 || z < 1 || x >= w.W - 1 || z >= w.D - 1) continue; const t = w.top(x, z); if (w.waterSurface(x, z) >= 0 || w.get(x, t + 1, z) !== 0 || w.get(x, t + 2, z) !== 0 || w.plantAt(x, t + 1, z)) continue; e.x = x + 0.5; e.z = z + 0.5; e.y = t + 1; ok = true; } e.target = null; e.work = 4; e.workT = 0; } }
+      else if (e.home[0] !== e.origHome[0] || e.home[1] !== e.origHome[1]) { e.home = e.origHome.slice(); e.indoors = e.origIndoors; e.x = e.origHome[0]; e.z = e.origHome[1]; e.y = e.origY; e.target = null; }
+      if (d2 > 90 * 90 && !job) continue; // far away: do not bother
       if (e.talking > 0) e.talking -= dt;
       if (d2 < 16 || e.talking > 0) { e.target = null; const want = Math.atan2(dpx, dpz); let da = want - e.yaw; da = Math.atan2(Math.sin(da), Math.cos(da)); e.yaw += da * Math.min(1, dt * 6); }
       else {

@@ -167,7 +167,7 @@ BC.World = class World {
   // ---------- villages ----------
   // Villages use their own random stream so adding them does not change the rest of the terrain for worlds saved before they existed.
   placeVillages() {
-    this.villages = []; const R = BC.util.rng((this.seed ^ 0x5151a7) >>> 0); const SZ = 28; const WL = this.WL;
+    this.villages = []; this.npcNameCount = {}; const R = BC.util.rng((this.seed ^ 0x5151a7) >>> 0); const SZ = 28; const WL = this.WL;
     const sites = []; const taken = [];
     const biomes = BC.BIOME_LIST.slice(); for (let i = biomes.length - 1; i > 0; i--) { const j = Math.floor(R() * (i + 1)); [biomes[i], biomes[j]] = [biomes[j], biomes[i]]; }
     for (const biome of biomes) {
@@ -253,7 +253,7 @@ BC.World = class World {
     const types = BC.NPC_TYPES.filter(t => t.id !== 'nursery' && t.id !== 'elder'); const picked = [BC.NPC_BY_ID.nursery, BC.NPC_BY_ID.elder]; for (let k = 0; k < 4; k++) picked.push(types[(vi * 4 + k) % types.length]);
     const spots = [[6, 5], [12, 10], [cotA.doorX, cotA.doorZ + 1], [cotB.doorX - 1, cotB.doorZ], [cotC.doorX, cotC.doorZ - 1], [21, 9]]; const spotY = [y0, y0, y0, y0, y0, y0 + 1]; put(11, y0, 10, 98 + 1);
     const name = BC.VILLAGE_NAMES[biome][vi % BC.VILLAGE_NAMES[biome].length];
-    const npcs = picked.map((t, i) => ({ type: t.id, name: t.names[(vi + i) % t.names.length], x: ox + spots[i][0] + 0.5, y: spotY[i], z: oz + spots[i][1] + 0.5, uid: 'v' + vi + 'n' + i, indoors: i === 0 }));
+    const npcs = picked.map((t, i) => ({ type: t.id, name: t.names[(this.npcNameCount[t.id] = (this.npcNameCount[t.id] || 0) + 1) - 1 < t.names.length ? this.npcNameCount[t.id] - 1 : (this.npcNameCount[t.id] - 1) % t.names.length], x: ox + spots[i][0] + 0.5, y: spotY[i], z: oz + spots[i][1] + 0.5, uid: 'v' + vi + 'n' + i, indoors: i === 0 }));
     // keep the shopkeeper's spot clear of furniture
     put(6, y0, 5, 0); put(6, y0 + 1, 5, 0);
     this.villages.push({ id: vi, name, biome, x: ox, z: oz, cx: ox + 14, cz: oz + 14, y: hy, npcs });

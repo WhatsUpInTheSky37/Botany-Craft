@@ -16,7 +16,7 @@ window.BC = window.BC || {};
   const prefix = (p, n) => ({ kind: 'journal_prefix', prefix: p, n });
 
   BC.NPC_TYPES = [
-    { id: 'nursery', role: 'Nursery owner', shop: 'Nursery & Garden Center', names: ['Mabel', 'Hank', 'Dolores', 'Ray'], color: '#4a8a3a', hat: '#e8d8a0',
+    { id: 'nursery', role: 'Nursery owner', shop: 'Nursery & Garden Center', names: ['Mabel', 'Hank', 'Dolores', 'Ray', 'Francine', 'Lonnie', 'Teresa', 'Gus'], color: '#4a8a3a', hat: '#e8d8a0',
       greet: ['Welcome in. Everything on the benches was grown right here, no shipping stress on the roots.', 'Looking for something for sun or for shade? Tell me about your spot first and we will find the plant for it.'],
       sells: 'local', buys: [buySeeds(1), buyTreeSeeds(2)],
       service: { id: 'delivery', name: 'Seedling delivery', desc: 'Every couple of minutes a bundle of two seeds suited to this region turns up in your bag.', cost: 12, minutes: 5 },
@@ -254,7 +254,7 @@ window.BC = window.BC || {};
         { intro: 'Bring me something from each kind of water: a fish from a stream, and kelp or algae scooped from a pond or the coast. I want to see if you can read the land for trade goods.', need: [{ kind: 'items', type: 'fish', n: 1, id: null, any: true }, { kind: 'items_any', type: 'ingredient', ids: ['kelp', 'pond_algae', 'duckweed'], n: 1 }], reward: { coins: 15, items: [{ type: 'ingredient', id: 'fish_emulsion', count: 3 }] }, done: 'A trader who knows where things come from never gets cheated. Fish emulsion: the fish, a month on, worth more than the fish.' },
         { intro: 'Earn 100 leaf coins in total by selling and trading. Then you understand that coins are just barter with a memory.', need: stat('coinsEarned', 100), reward: { coins: 30, items: [{ type: 'seed', id: 'tree:sugar_maple', count: 1 }, { type: 'seed', id: 'coffee', count: 2 }] }, done: 'A hundred coins earned, not found. Two trade goods that built empires: maple for sugar, coffee for everything else.' }] },
 
-    { id: 'elder', role: 'Town elder', shop: 'The Front Porch', names: ['Granddad Eli', 'Nana Ruth', 'Old Teodoro', 'Auntie Mae'], color: '#6a5a4a', hat: '#d8d0c0',
+    { id: 'elder', role: 'Town elder', shop: 'The Front Porch', names: ['Granddad Eli', 'Nana Ruth', 'Old Teodoro', 'Auntie Mae', 'Grandpa Joe', 'Miss Hattie', 'Uncle Virgil', 'Grandma Lucía'], color: '#6a5a4a', hat: '#d8d0c0',
       greet: ['Sit a minute. Every town has a story about how it almost died and what saved it. Ours is worth hearing.', 'The land remembers everything we did to it. Most of what I know, I learned from what it did back.'],
       sells: [], buys: [buyIng('honey', 4), { match: it => it.type === 'seed' && !it.id.startsWith('tree:'), label: 'heirloom seed for the town bank', price: 1 }],
       service: { id: 'oldways', name: 'The old ways', desc: 'I walk your garden and tell you what my grandmother would have done: your crops shake off stress and grow a little faster for five minutes.', cost: 8, minutes: 5 },
