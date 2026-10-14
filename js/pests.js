@@ -15,7 +15,7 @@ BC.Pests = (function () {
       if (p.covered || p.progress < 0.15) return;
       const biome = w.biomeAt(p.x, p.z); const cands = candidates(def, biome); if (!cands.length) return;
       const mono = nearby(w, p, 3, q => q.id === p.id); const comp = companionsNear(w, p); const hab = habitatNear(w, p);
-      let rate = (1 / 900) * (1 + mono * 0.25) * Math.max(0.25, 1 - comp * 0.25) * Math.max(0.4, 1 - hab * 0.15);
+      let rate = (1 / 600) * (1 + mono * 0.25) * Math.max(0.25, 1 - comp * 0.25) * Math.max(0.4, 1 - hab * 0.15);
       if (ev.chem && ev.chem.n > 0.95) rate *= 1.5; if (ev.score < 0.5) rate *= 1.6; rate *= game.growthMult > 1 ? game.growthMult : 1;
       if (Math.random() < rate * dt) {
         const weighted = []; cands.forEach(c => { const wgt = c.hosts.includes('*') ? 1 : 3; for (let i = 0; i < wgt; i++) weighted.push(c); });

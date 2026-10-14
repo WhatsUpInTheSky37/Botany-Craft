@@ -31,10 +31,11 @@ BC.Animals = class Animals {
   remove(e) { const i = this.list.indexOf(e); if (i < 0) return; this.list.splice(i, 1); this.game.scene.remove(e.mesh); if (e.line) { this.game.scene.remove(e.line); e.line = null; } }
   // Position of the player holding a leash (host resolves by name).
   leaderPos(name) { const g = this.game; if (name === g.playerName) return g.player.pos; let out = null; g.peers.forEach(pe => { if (pe.name.toLowerCase() === name) out = pe.group.position; }); return out; }
+  anchor(e) { if (e.tether) { const t = e.tether; return { x: t[0] + 0.5, y: this.game.world.top(t[0], t[1]) + 1, z: t[1] + 0.5, post: true }; } return e.leash ? this.leaderPos(e.leash) : null; }
   updateLeashLines() {
     const g = this.game;
     for (const e of this.list) {
-      const lp = e.leash ? this.leaderPos(e.leash) : null;
+      const lp = this.anchor(e);
       if (!lp) { if (e.line) { g.scene.remove(e.line); e.line = null; } continue; }
       if (!e.line) { const geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]); e.line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: 0xc8a060 })); g.scene.add(e.line); }
       const a = e.line.geometry.attributes.position; a.setXYZ(0, lp.x, lp.y + 1.0, lp.z); a.setXYZ(1, e.mesh.position.x, e.mesh.position.y + 0.5 * (e.def.scale || 1), e.mesh.position.z); a.needsUpdate = true; e.line.geometry.computeBoundingSphere();
@@ -51,14 +52,16 @@ BC.Animals = class Animals {
       let far = (e.x - pl.x) ** 2 + (e.z - pl.z) ** 2; for (const o of others) far = Math.min(far, (e.x - o.x) ** 2 + (e.z - o.z) ** 2); if (far > 70 * 70) continue; // sleep far away
       const nearPlayer = (e.x - pl.x) ** 2 + (e.z - pl.z) ** 2 < 3.2 * 3.2; if (nearPlayer && !stats.journal.has('animal:' + d.id)) this.game.discover('animal:' + d.id, 'seen');
       // on a rope: follow the leader, nothing else
-      if (e.leash) { const lp = this.leaderPos(e.leash); if (!lp) e.leash = null; else { const dx = lp.x - e.x, dz = lp.z - e.z; const dist = Math.hypot(dx, dz); e.state = 'idle'; e.timer = 1; e.plant = null; if (dist > 2.2) { e.target = [lp.x - dx / dist * 1.8, lp.z - dz / dist * 1.8]; } else e.target = null; if (dist > 24) { e.x = lp.x - dx / dist * 2; e.z = lp.z - dz / dist * 2; e.target = null; } } }
+      if (e.leash) { const lp = this.leaderPos(e.leash); if (!lp) e.leash = null; else { const dx = lp.x - e.x, dz = lp.z - e.z; const dist = Math.hypot(dx, dz); e.state = 'idle'; e.timer = 1; e.plant = null; if (dist > 1.8) { e.target = [lp.x - dx / dist * 1.4, lp.z - dz / dist * 1.4]; } else e.target = null; if (dist > 3.2) { const k = (dist - 3.0) / dist; e.x += dx * k; e.z += dz * k; e.target = e.target || [lp.x, lp.z]; } } }
+      if (e.tether) { const a = this.anchor(e); const dx = a.x - e.x, dz = a.z - e.z; const dist = Math.hypot(dx, dz); e.plant = null; if (dist > 2.6) { const k = (dist - 2.4) / dist; e.x += dx * k; e.z += dz * k; e.target = null; e.state = 'idle'; e.timer = 1; } }
       // behaviour selection
       if (!e.leash && (e.state === 'idle' || e.state === 'wander')) {
         if (e.timer <= 0) {
           if (e.state === 'idle') { // choose: forage, pollinate or wander
             let p = null;
-            if (d.role === 'herbivore' && e.cool <= 0) p = this.nearestPlant(e, q => !q.wild && !q.withered && !q.id.startsWith('tree:') && !q.protected, 9);
-            if (d.role === 'pollinator' && e.cool <= 0) p = this.nearestPlant(e, q => { const def = BC.PLANT_BY_ID[q.id]; return def && def.pollinator && q.progress >= 1 && !q.withered && (!q.wild || Math.random() < 0.3); }, 12);
+            if (e.tether) p = null; else if (d.role === 'herbivore' && e.cool <= 0) p = this.nearestPlant(e, q => !q.wild && !q.withered && !q.id.startsWith('tree:') && !q.protected, 9);
+            if (e.tether) p = null; else if (d.role === 'beneficial' && e.cool <= 0) { p = this.nearestPlant(e, q => !q.wild && q.pest && d.eats && d.eats.includes(q.pest.id), 14) || this.nearestPlant(e, q => { const def = BC.PLANT_BY_ID[q.id]; return def && def.pollinator && q.progress >= 1 && !q.withered; }, 10); }
+            else if (d.role === 'pollinator' && e.cool <= 0) p = this.nearestPlant(e, q => { const def = BC.PLANT_BY_ID[q.id]; return def && def.pollinator && q.progress >= 1 && !q.withered && (!q.wild || Math.random() < 0.3); }, 12);
             if (p) { e.target = [p.x + 0.5, p.z + 0.5]; e.plant = p; e.state = 'seek'; e.timer = 12; }
             else { const a = Math.random() * 6.28, r = 2 + Math.random() * 5; const hx = e.home[0] + Math.cos(a) * r, hz = e.home[1] + Math.sin(a) * r; if (this.walkable(e, hx, hz)) { e.target = [hx, hz]; e.state = 'wander'; e.timer = 6; } else e.timer = 0.5; }
           } else { e.state = 'idle'; e.timer = 1 + Math.random() * 3; e.target = null; }
@@ -76,7 +79,7 @@ BC.Animals = class Animals {
           } else { e.state = 'idle'; e.timer = 1 + Math.random() * 3; }
           e.target = null;
         } else {
-          const sp = d.speed * (e.leash ? 1.5 : e.state === 'seek' ? 1.2 : 0.7); const nx = e.x + dx / dist * sp * dt, nz = e.z + dz / dist * sp * dt;
+          const sp = d.speed * (e.leash ? 2.4 : e.state === 'seek' ? 1.2 : 0.7); const nx = e.x + dx / dist * sp * dt, nz = e.z + dz / dist * sp * dt;
           if (this.walkable(e, nx, nz)) { e.x = nx; e.z = nz; const ty = Math.atan2(dx, dz); let da = ty - e.yaw; da = Math.atan2(Math.sin(da), Math.cos(da)); e.yaw += da * Math.min(1, 6 * dt); }
           else { e.target = null; e.state = 'idle'; e.timer = 0.5; if (e.plant && d.role === 'herbivore') { e.cool = 30; } }
         }
@@ -104,7 +107,7 @@ BC.Animals = class Animals {
   raycast(origin, dir, maxD) {
     let best = null, bd = maxD; for (const e of this.list) { const c = this.tmp.set(e.x, e.y + 0.5 * (e.def.scale || 1), e.z); const oc = c.clone().sub(origin); const t = oc.dot(dir); if (t < 0 || t > bd) continue; const r = Math.max(0.5, Math.max(e.def.body[1], e.def.body[2]) * (e.def.scale || 1) * 0.8); const d2 = oc.lengthSq() - t * t; if (d2 < r * r) { bd = t; best = e; } } return best ? { entity: best, dist: bd } : null;
   }
-  serialize() { return this.list.map(e => ({ id: e.def.id, x: e.x, z: e.z, uid: e.uid })); }
+  serialize() { return this.list.map(e => { const o = { id: e.def.id, x: e.x, z: e.z, uid: e.uid }; if (e.tether) o.tether = e.tether; return o; }); }
 };
 // Minimal geometry merge (positions, normals, colors) so we don't need the examples bundle.
 BC.mergeGeometries = function (geos) {
