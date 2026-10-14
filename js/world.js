@@ -250,8 +250,8 @@ BC.World = class World {
     put(11, y0, 14 + 1, 98 + 0); put(16, y0, 12, 98 + 2); put(12, y0, 11, 106 + 2);
     const flowers = localPlants.filter(p => p.pollinator); for (let x = 0; x < SZ; x += 3) { if (x >= 12 && x <= 15) continue; sow(x, 12, pick(flowers.length ? flowers : pool)); sow(x, 15, pick(flowers.length ? flowers : pool)); }
     // choose the folk: nursery owner always; four others, rotating so every kind appears somewhere
-    const types = BC.NPC_TYPES.filter(t => t.id !== 'nursery'); const picked = [BC.NPC_BY_ID.nursery]; for (let k = 0; k < 4; k++) picked.push(types[(vi * 4 + k) % types.length]);
-    const spots = [[6, 5], [cotA.doorX, cotA.doorZ + 1], [cotB.doorX - 1, cotB.doorZ], [cotC.doorX, cotC.doorZ - 1], [21, 9]]; const spotY = [y0, y0, y0, y0, y0 + 1];
+    const types = BC.NPC_TYPES.filter(t => t.id !== 'nursery' && t.id !== 'elder'); const picked = [BC.NPC_BY_ID.nursery, BC.NPC_BY_ID.elder]; for (let k = 0; k < 4; k++) picked.push(types[(vi * 4 + k) % types.length]);
+    const spots = [[6, 5], [12, 10], [cotA.doorX, cotA.doorZ + 1], [cotB.doorX - 1, cotB.doorZ], [cotC.doorX, cotC.doorZ - 1], [21, 9]]; const spotY = [y0, y0, y0, y0, y0, y0 + 1]; put(11, y0, 10, 98 + 1);
     const name = BC.VILLAGE_NAMES[biome][vi % BC.VILLAGE_NAMES[biome].length];
     const npcs = picked.map((t, i) => ({ type: t.id, name: t.names[(vi + i) % t.names.length], x: ox + spots[i][0] + 0.5, y: spotY[i], z: oz + spots[i][1] + 0.5, uid: 'v' + vi + 'n' + i, indoors: i === 0 }));
     // keep the shopkeeper's spot clear of furniture
