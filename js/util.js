@@ -18,5 +18,6 @@ BC.PLAYER_COLORS = ['#4f7a3a', '#e3a62b', '#d8405a', '#3a7ac8', '#8a4ac8', '#e87
 
 BC.FIBRE_PLANTS = { big_bluestem: 2, cattail: 2, wild_rice: 1, agave: 3, sphagnum: 1, fireweed: 1, pineapple: 1 };
 BC.MATERIALS = { fibre: { name: 'Plant fibre', desc: 'Stringy leaves and stems. Craft 3 into rope.' }, rope: { name: 'Rope', desc: 'Tap a large animal to lead it; tap again to let go.' } };
+BC.CHEST_SLOTS = 37;
 BC.isSmallAnimal = d => !!(d.flies || (d.scale && d.scale <= 0.6));
 BC.HAND = { type: 'tool', id: 'hand' };

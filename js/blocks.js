@@ -70,7 +70,7 @@ window.BC = window.BC || {};
   def(70, { name: 'Barrel', wood: true, solid: true, tex: ['barrel_top', 'barrel_side', 'barrel_top'] });
   def(71, { name: 'Crate', wood: true, solid: true, tex: ['crate', 'crate', 'crate'] });
   def(72, { name: 'Workbench', wood: true, solid: true, tex: ['workbench_top', 'workbench_side', P] });
-  def(73, { name: 'Chest', wood: true, solid: true, tex: ['chest_top', 'chest_front', P] });
+  def(73, { name: 'Chest', wood: true, solid: true, chest: true, tex: ['chest_top', 'chest_front', P] });
   def(74, { name: 'Wood shingles', wood: true, solid: true, tex: ['shingles', 'shingles', 'shingles'] });
   def(75, { name: 'Carved panel', wood: true, solid: true, tex: ['carved', 'carved', 'carved'] });
   def(76, { name: 'Raised garden bed', wood: true, solid: true, soil: 'compost', horizon: 'A', grassTop: true, tex: ['raisedbed_top', 'raisedbed_side', P] });

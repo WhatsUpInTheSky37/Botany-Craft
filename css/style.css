@@ -192,3 +192,4 @@ body.touch #compass { top: calc(104px + env(safe-area-inset-top, 0px)); } @media
 
 .pestbox { border: 1px solid #d9a07a; background: #fbe9dd; border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; font-size: 14px; } .pestbox p { margin: 4px 0; } .pestbox.ok { border-color: #a8c89a; background: #e9f3e2; } .small-btn { margin-top: 6px; padding: 6px 10px; font-size: 13px; border-radius: 8px; border: 1px solid var(--rule); background: var(--paper-2); color: var(--ink); }
 .bar.npk i { background: #b08a4a; }
+.chest-grid { padding: 10px; border-radius: 10px; background: rgba(120,80,30,0.12); border: 1px solid var(--rule); min-height: 60px; }
