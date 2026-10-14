@@ -197,3 +197,17 @@ body.touch #compass { top: calc(104px + env(safe-area-inset-top, 0px)); } @media
 #npc-answer { margin-top: 10px; }
 #breath { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(118px + env(safe-area-inset-bottom, 0px)); width: 220px; background: var(--hud-bg); border-radius: 12px; padding: 6px 10px; color: #fff; font-size: 12px; pointer-events: none; } #breath .bar { height: 8px; margin-top: 4px; }
 #fishbar { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(150px + env(safe-area-inset-bottom, 0px)); width: 260px; background: var(--hud-bg); border-radius: 12px; padding: 8px 12px; color: #fff; font-size: 13px; pointer-events: none; text-align: center; } #fishbar .bar { height: 10px; margin: 6px 0 4px; } #fishbar .bar i { transition: none; } #fishbar small { opacity: 0.8; }
+
+/* ---------- quiet HUD on phones and small windows ---------- */
+.menu.quick { display: flex; gap: 6px; margin-bottom: 8px; } .menu.quick button { flex: 1; }
+body.touch #btn-journal, body.touch #btn-quests, body.touch #btn-map, body.touch #btn-exit { display: none; }
+body.touch #quest-tracker { display: none; }
+body.touch #score { display: none; }
+body.touch #biome-pill span { display: none; } body.touch #biome-pill b { font-size: 14px; } body.touch #biome-pill { max-width: 38vw; }
+body.touch #topbar .pill { padding: 5px 10px; opacity: 0.85; } body.touch #clock span { font-size: 12.5px; } body.touch #weather { font-size: 10.5px; }
+body.touch #side-buttons { top: calc(54px + env(safe-area-inset-top, 0px)); gap: 6px; } body.touch #side-buttons button { padding: 7px 12px; font-size: 13px; opacity: 0.9; }
+body.touch #btn-menu::before { content: '☰ '; }
+body.touch #shared-pill { top: calc(50px + env(safe-area-inset-top, 0px)); max-width: 40vw; padding: 3px 10px; opacity: 0.85; } body.touch #shared-pill b { font-size: 11.5px; display: inline; } body.touch #shared-pill span { display: inline; font-size: 11px; margin-left: 6px; }
+body.touch #compass { top: calc(78px + env(safe-area-inset-top, 0px)); opacity: 0.85; } body.touch #compass .peer { padding: 2px 9px 2px 3px; font-size: 11.5px; gap: 6px; } body.touch #compass .peer i { width: 20px; height: 20px; font-size: 14px; }
+body.touch #item-name { font-size: 12px; opacity: 0.9; }
+@media (max-width: 900px) { #quest-tracker { display: none; } #score { display: none; } #biome-pill span { display: none; } }
