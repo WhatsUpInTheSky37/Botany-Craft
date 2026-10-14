@@ -16,7 +16,7 @@ BC.Mesher = (function () {
     // tangent axes
     let t1, t2; if (n[1] !== 0) { t1 = [v[0] ? 1 : -1, 0, 0]; t2 = [0, 0, v[2] ? 1 : -1]; } else if (n[0] !== 0) { t1 = [0, v[1] ? 1 : -1, 0]; t2 = [0, 0, v[2] ? 1 : -1]; } else { t1 = [v[0] ? 1 : -1, 0, 0]; t2 = [0, v[1] ? 1 : -1, 0]; }
     const bx = x + n[0], by = y + n[1], bz = z + n[2];
-    const occ = (dx, dy, dz) => { const id = world.get(bx + dx, by + dy, bz + dz); const b = BC.BLOCKS[id]; return b && b.solid && !b.fence ? 1 : 0; };
+    const occ = (dx, dy, dz) => { const id = world.get(bx + dx, by + dy, bz + dz); const b = BC.BLOCKS[id]; return b && b.solid && !b.fence && !b.shape ? 1 : 0; };
     const s1 = occ(t1[0], t1[1], t1[2]), s2 = occ(t2[0], t2[1], t2[2]); const c = occ(t1[0] + t2[0], t1[1] + t2[1], t1[2] + t2[2]);
     return s1 && s2 ? 3 : s1 + s2 + c;
   }
@@ -30,10 +30,10 @@ BC.Mesher = (function () {
       const b = this.n; if (shades[0] + shades[2] > shades[1] + shades[3]) this.idx.push(b, b + 1, b + 2, b, b + 2, b + 3); else this.idx.push(b + 1, b + 2, b + 3, b + 1, b + 3, b);
       this.n += 4;
     }
-    box(x0, y0, z0, x1, y1, z1, tile, shadeK) { // axis-aligned box with all faces
-      const uvr = BC.Atlas.uv(tile); const k = shadeK || 1;
+    box(x0, y0, z0, x1, y1, z1, tile, shadeK) { // axis-aligned box with all faces; tile is a name or {top, side, bottom}
+      const k = shadeK || 1; const tiles = typeof tile === 'string' ? [tile, tile, tile] : [tile.top, tile.side, tile.bottom];
       const X = [x0, x1], Y = [y0, y1], Z = [z0, z1];
-      FACES.forEach(f => { const verts = f.v.map(v => [X[v[0]], Y[v[1]], Z[v[2]]]); this.quad(verts, f.n, uvr, [f.s * k, f.s * k, f.s * k, f.s * k]); });
+      FACES.forEach(f => { const verts = f.v.map(v => [X[v[0]], Y[v[1]], Z[v[2]]]); this.quad(verts, f.n, BC.Atlas.uv(tiles[f.t]), [f.s * k, f.s * k, f.s * k, f.s * k]); });
     }
     geometry() {
       if (!this.n) return null; const g = new THREE.BufferGeometry();
@@ -44,7 +44,7 @@ BC.Mesher = (function () {
   }
 
   function buildChunk(world, cx, cz) {
-    const solid = new Builder(), water = new Builder();
+    const solid = new Builder(), water = new Builder(), cutout = new Builder();
     const x0 = cx * 16, z0 = cz * 16, x1 = Math.min(world.W, x0 + 16), z1 = Math.min(world.D, z0 + 16);
     for (let z = z0; z < z1; z++) for (let x = x0; x < x1; x++) for (let y = 0; y < world.H; y++) {
       const id = world.blocks[world.idx(x, y, z)]; if (id === 0) continue; const b = BC.BLOCKS[id]; if (!b) continue;
@@ -53,15 +53,16 @@ BC.Mesher = (function () {
         for (let fi = 2; fi < 6; fi++) { const f = FACES[fi]; if (world.get(x + f.n[0], y + f.n[1], z + f.n[2]) === 0) water.quad(f.v.map(v => [x + v[0], y + v[1] * 0.88, z + v[2]]), f.n, BC.Atlas.uv('water'), [f.s, f.s, f.s, f.s]); }
         continue;
       }
+      if (b.shape) { const dst = b.cutout ? cutout : solid; const lit = b.lit ? 1.25 : 1; b.shape.forEach(bx => dst.box(x + bx[0], y + bx[1], z + bx[2], x + bx[3], y + bx[4], z + bx[5], bx[6], lit)); continue; }
       if (b.fence) {
         solid.box(x + 0.375, y, z + 0.375, x + 0.625, y + 1, z + 0.625, 'planks');
         const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-        dirs.forEach(([dx, dz]) => { const nb = BC.BLOCKS[world.get(x + dx, y, z + dz)]; if (nb && (nb.fence || (nb.solid && !nb.leaves))) { const ax = dx !== 0; for (const ry of [0.35, 0.75]) solid.box(x + (ax ? (dx > 0 ? 0.6 : 0) : 0.44), y + ry, z + (ax ? 0.44 : (dz > 0 ? 0.6 : 0)), x + (ax ? (dx > 0 ? 1 : 0.4) : 0.56), y + ry + 0.12, z + (ax ? 0.56 : (dz > 0 ? 1 : 0.4)), 'planks', 0.9); } });
+        dirs.forEach(([dx, dz]) => { const nb = BC.BLOCKS[world.get(x + dx, y, z + dz)]; if (nb && (nb.fence || (nb.solid && !nb.leaves && !nb.shape))) { const ax = dx !== 0; for (const ry of [0.35, 0.75]) solid.box(x + (ax ? (dx > 0 ? 0.6 : 0) : 0.44), y + ry, z + (ax ? 0.44 : (dz > 0 ? 0.6 : 0)), x + (ax ? (dx > 0 ? 1 : 0.4) : 0.56), y + ry + 0.12, z + (ax ? 0.56 : (dz > 0 ? 1 : 0.4)), 'planks', 0.9); } });
         continue;
       }
       for (let fi = 0; fi < 6; fi++) {
         const f = FACES[fi]; const nid = world.get(x + f.n[0], y + f.n[1], z + f.n[2]); const nb = BC.BLOCKS[nid];
-        if (nb && nb.solid && !nb.fence) continue;
+        if (nb && nb.solid && !nb.fence && !nb.shape) continue;
         if (y === 0 && fi === 1) continue;
         const tile = b.tex[f.t]; const uvr = BC.Atlas.uv(tile);
         const shades = [0, 1, 2, 3].map(vi => f.s * AO_SHADE[aoFor(world, x, y, z, f, vi)]);
@@ -70,7 +71,7 @@ BC.Mesher = (function () {
         solid.quad(f.v.map(v => [x + v[0], y + v[1], z + v[2]]), f.n, uvr, shades, tint);
       }
     }
-    return { solid: solid.geometry(), water: water.geometry() };
+    return { solid: solid.geometry(), water: water.geometry(), cutout: cutout.geometry() };
   }
 
   function plantTile(p) {

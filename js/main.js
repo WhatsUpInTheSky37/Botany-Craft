@@ -58,9 +58,9 @@ BC.Game = class Game {
   }
   packPlant(p) { return { id: p.id, x: p.x, y: p.y, z: p.z, wild: p.wild, progress: p.progress, health: p.health, pollinated: p.pollinated, withered: p.withered, onBark: p.onBark, owner: p.owner }; }
   begin() { this.clearChunks(); this.world.dirty.clear(); this.streamChunks(true); this.ui.hideStart(); this.ui.renderHotbar(); this.ui.updateQuestTracker(); this.ui.setLockHint(true); this.ui.updateShared(); this.ui.updateHUD(); this.running = true; this.last = performance.now(); if (!this.loopStarted) { this.loopStarted = true; requestAnimationFrame(t => this.loop(t)); } }
-  clearChunks() { this.chunks.forEach((c, ci) => this.unloadChunk(ci)); this.chunks.clear(); }
+  clearChunks() { Array.from(this.chunks.keys()).forEach(ci => this.unloadChunk(ci)); this.chunks.clear(); }
   clearAnimals() { this.animals.list.forEach(e => { this.scene.remove(e.mesh); if (e.line) this.scene.remove(e.line); }); this.animals.list = []; }
-  unloadChunk(ci) { const c = this.chunks.get(ci); if (!c) return; ['solid', 'water', 'plants'].forEach(k => { if (c[k]) { this.scene.remove(c[k]); c[k].geometry.dispose(); } }); this.chunks.delete(ci); }
+  unloadChunk(ci) { const c = this.chunks.get(ci); if (!c) return; ['solid', 'water', 'plants', 'cutout'].forEach(k => { if (c[k]) { this.scene.remove(c[k]); c[k].geometry.dispose(); } }); this.chunks.delete(ci); }
   // Only chunks near the player are meshed. `initial` builds the nearest ring synchronously so the world is never empty on arrival.
   streamChunks(initial) {
     const w = this.world; const R = this.RADIUS || 7; const pcx = Math.floor(this.player.pos.x / 16), pcz = Math.floor(this.player.pos.z / 16);
@@ -73,7 +73,7 @@ BC.Game = class Game {
     const cx = ci % this.world.CX, cz = Math.floor(ci / this.world.CX); let c = this.chunks.get(ci); if (!c) { c = {}; this.chunks.set(ci, c); }
     const res = BC.Mesher.buildChunk(this.world, cx, cz); const pg = BC.Mesher.buildPlants(this.world, cx, cz);
     const swap = (k, geo, mat) => { if (c[k]) { this.scene.remove(c[k]); c[k].geometry.dispose(); c[k] = null; } if (geo) { const m = new THREE.Mesh(geo, mat); m.frustumCulled = true; this.scene.add(m); c[k] = m; } };
-    swap('solid', res.solid, this.matSolid); swap('water', res.water, this.matWater); swap('plants', pg, this.matPlant);
+    swap('solid', res.solid, this.matSolid); swap('water', res.water, this.matWater); swap('plants', pg, this.matPlant); swap('cutout', res.cutout, this.matPlant);
   }
   spawnAnimals(list) { list.forEach(a => this.animals.spawn(a.id, a.x, a.z)); }
   reset() { try { if (this.mode === 'shared') localStorage.removeItem(this.SHARED_KEY); else localStorage.removeItem(this.SAVE_KEY); } catch (e) { } location.reload(); }
@@ -241,7 +241,7 @@ BC.Game = class Game {
     for (let i = 0; i < 40 && dist <= maxD; i++) {
       const p = w.plantAt(x, y, z); if (p && dist > 0.2) { hit = { type: 'plant', plant: p, x, y, z, dist }; break; }
       const id = w.get(x, y, z); const b = BC.BLOCKS[id];
-      if (b && b.solid) { hit = { type: 'block', x, y, z, id, normal: n, dist }; break; }
+      if (b && (b.solid || b.shape)) { hit = { type: 'block', x, y, z, id, normal: n, dist }; break; }
       if (b && b.liquid && wantsWater && w.get(x, y + 1, z) === 0) { hit = { type: 'water', x, y, z, dist }; break; }
       if (tmx < tmy && tmx < tmz) { x += sx; dist = tmx; tmx += tdx; n = [-sx, 0, 0]; } else if (tmy < tmz) { y += sy; dist = tmy; tmy += tdy; n = [0, -sy, 0]; } else { z += sz; dist = tmz; tmz += tdz; n = [0, 0, -sz]; }
     }
@@ -259,14 +259,14 @@ BC.Game = class Game {
     const s = JSON.stringify(info); if (s !== this.lastTargetStr) { this.lastTargetStr = s; this.ui.setTarget(info); }
   }
   hintFor(it, b, tree, h) {
-    if (it.type === 'tool') { if (it.id === 'can') return b.soil ? 'Tap to water this spot' : ''; if (b.unbreakable || (b.id === BC.BLOCK.STONE && h.y <= 1)) return 'Bedrock cannot be dug'; const verb = b.log ? 'chop' : b.leaves ? 'shake out seeds' : 'dig'; return `${this.player.touch ? 'tap' : 'hold click'} to ${verb} · ${this.player.touch ? 'hold' : 'right-click'} to read`; }
+    if (it.type === 'tool') { if (b.toggle !== undefined && it.id === 'hand') return 'Tap to open / close'; if (it.id === 'can') return b.soil ? 'Tap to water this spot' : ''; if (b.unbreakable || (b.id === BC.BLOCK.STONE && h.y <= 1)) return 'Bedrock cannot be dug'; const verb = b.log ? 'chop' : b.leaves ? 'shake out seeds' : 'dig'; return `${this.player.touch ? 'tap' : 'hold click'} to ${verb} · ${this.player.touch ? 'hold' : 'right-click'} to read`; }
     if (it.type === 'seed') { const def = BC.Sim.defFor({ id: it.id }); if (def.epiphyte) return b.log ? 'Tap the trunk side to attach it' : 'Epiphytes need a tree trunk'; return h.normal[1] === 1 && b.soil ? 'Tap to plant here' : 'Aim at the top of a soil block'; }
-    if (it.type === 'compost') return b.soil ? 'Tap to amend this soil' : ''; if (it.type === 'block') return 'Tap to place'; if (it.type === 'animal') return 'Tap to release it here'; return '';
+    if (it.type === 'compost') return b.soil ? 'Tap to amend this soil' : ''; if (it.type === 'block') return BC.BLOCKS[it.id].dir ? 'Tap to place (faces the way you look)' : 'Tap to place'; if (it.type === 'animal') return 'Tap to release it here'; return '';
   }
   // ---------- digging & chopping ----------
   // Hits needed to break a block with a tool. Category: wood (logs, planks, fences), soil, stone, soft (leaves).
   hitsFor(toolId, b) {
-    const cat = b.leaves ? 'soft' : (b.log || b.fence || b.id === BC.BLOCK.PLANKS) ? 'wood' : (b.id === BC.BLOCK.STONE || b.id === BC.BLOCK.GRAVEL || b.id === BC.BLOCK.CALICHE) ? 'stone' : 'soil';
+    const cat = b.leaves ? 'soft' : (b.log || b.fence || b.wood || b.plank) ? 'wood' : (b.id === BC.BLOCK.STONE || b.id === BC.BLOCK.GRAVEL || b.id === BC.BLOCK.CALICHE) ? 'stone' : 'soil';
     const T = { hand: { wood: 5, soil: 4, stone: 8, soft: 1 }, trowel: { wood: 4, soil: 2, stone: 3, soft: 1 }, axe: { wood: 2, soil: 2, stone: 4, soft: 1 } };
     return (T[toolId] || T.hand)[cat];
   }
@@ -290,13 +290,14 @@ BC.Game = class Game {
       this.lastInspect = { x: h.x, y: h.y, z: h.z };
       if (!this.discover('soil:' + b.soil, 'dug')) { const below = BC.BLOCKS[w.get(h.x, h.y - 1, h.z)]; if (below && below.soil && below.soil !== b.soil) this.toast(`Dug through ${b.name.toLowerCase()} (${b.horizon} horizon). Below: ${below.name.toLowerCase()}.`, ''); }
       if (b.soil !== 'stone' && Math.random() < 0.12 && ['alfisol', 'mollisol', 'histosol', 'compost'].includes(b.soil)) { this.discover('animal:earthworm', 'dug'); }
-    } else this.give({ type: 'block', id: h.id, count: 1 });
+    } else { this.give({ type: 'block', id: b.item !== undefined ? b.item : h.id, count: 1 }); if (b.bedPart) { const d = BC.FACING_DIR[b.facing]; const sgn = b.bedPart === 'head' ? 1 : -1; const px = h.x + d[0] * sgn, pz = h.z + d[1] * sgn; const pb = BC.BLOCKS[w.get(px, h.y, pz)]; if (pb && pb.bedPart && pb.bedPart !== b.bedPart) w.set(px, h.y, pz, 0); } }
   }
   // ---------- actions ----------
   applyWater(x, z, local) { const w = this.world; for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) { const xx = x + dx, zz = z + dz; if (xx >= 0 && zz >= 0 && xx < w.W && zz < w.D) w.moisture[xx + zz * w.W] = Math.min(1, w.moisture[xx + zz * w.W] + (dx === 0 && dz === 0 ? 1 : 0.5)); } w.markDirty(x, z); if (local && this.mode === 'shared') this.net.send('water', { x, z }); }
   primary() {
     if (this.ui.modalOpen()) return; const h = this.raycast(); if (!h) return; const it = this.cur(); const w = this.world; const st = this.stats;
     if (h.type === 'animal') return this.animalAction(h.entity, it);
+    if (h.type === 'block' && BC.BLOCKS[h.id].toggle !== undefined && it.type === 'tool' && it.id === 'hand') { w.set(h.x, h.y, h.z, BC.BLOCKS[h.id].toggle); this.mining = null; return; }
     if (this.isDigTool(it)) {
       if (h.type === 'plant') { if (it.id === 'hand') return this.handOnPlant(h.plant); w.removePlant(h.plant); this.toast('Plant removed.', ''); return; }
       if (h.type !== 'block') return; this.lastPrimary = performance.now(); return this.mineHit(h, it);
@@ -305,7 +306,11 @@ BC.Game = class Game {
     if (it.type === 'seed') return this.plantSeed(it, h);
     if (it.type === 'compost') { if (h.type !== 'block' || !BC.BLOCKS[h.id].soil) return this.toast('Compost goes on soil.', ''); const b = BC.BLOCKS[h.id]; if (b.soil === 'stone') return this.toast('Rock is not soil. Nothing to amend.', ''); w.set(h.x, h.y, h.z, BC.BLOCK.COMPOST); this.take(it); st.compostUsed = true; this.toast('Soil amended with compost: pH buffered to 6.5, more humus, better water holding.', 'good'); this.lastInspect = { x: h.x, y: h.y, z: h.z }; this.discover('soil:compost', 'made'); return; }
     if (it.type === 'animal') { if (h.type !== 'block') return; const [nx, ny, nz] = h.normal; const x = h.x + nx, z = h.z + nz; const t = w.top(x, z); if (w.get(x, t + 1, z) !== 0) return this.toast('No room to release it there.', ''); const e = this.animals.spawn(it.id, x + 0.5, z + 0.5); if (!e) return; if (this.mode === 'shared') this.net.send('animal_add', { uid: e.uid, id: it.id, x: e.x, z: e.z }); this.take(it); this.toast(`Released the ${e.def.name.toLowerCase()}.` + (e.def.role === 'pollinator' ? ' Pollinators released near flowering crops will visit them.' : ''), 'good'); return; }
-    if (it.type === 'block') { if (h.type !== 'block') return; const [nx, ny, nz] = h.normal; const x = h.x + nx, y = h.y + ny, z = h.z + nz; const cur = w.get(x, y, z); if (cur !== 0 && cur !== 15) return; if (w.plantAt(x, y, z)) return this.toast('A plant is in the way.', ''); const p = this.player.pos; if (x + 1 > p.x - 0.3 && x < p.x + 0.3 && z + 1 > p.z - 0.3 && z < p.z + 0.3 && y + 1 > p.y && y < p.y + 1.8) return; w.set(x, y, z, it.id); this.take(it); if (it.id === BC.BLOCK.FENCE) this.checkFences(); return; }
+    if (it.type === 'block') { if (h.type !== 'block') return; const [nx, ny, nz] = h.normal; const x = h.x + nx, y = h.y + ny, z = h.z + nz; const cur = w.get(x, y, z); if (cur !== 0 && cur !== 15) return; if (w.plantAt(x, y, z)) return this.toast('A plant is in the way.', ''); const p = this.player.pos; if (x + 1 > p.x - 0.3 && x < p.x + 0.3 && z + 1 > p.z - 0.3 && z < p.z + 0.3 && y + 1 > p.y && y < p.y + 1.8) return; const def = BC.BLOCKS[it.id]; let id = it.id;
+      if (def.dir) { const d = this.player.dir(); const f = ((Math.round(Math.atan2(d.x, -d.z) / (Math.PI / 2)) % 4) + 4) % 4; id = def.pane || def.id === 84 ? it.id + (f % 2) : it.id + f;
+        if (def.bedPart) { const dv = BC.FACING_DIR[f]; const fx = x - dv[0], fz = z - dv[1]; const fc = w.get(fx, y, fz); if ((fc !== 0 && fc !== 15) || w.plantAt(fx, y, fz)) return this.toast('A bed needs two free blocks: this one and the one behind it.', ''); if (fx + 1 > p.x - 0.3 && fx < p.x + 0.3 && fz + 1 > p.z - 0.3 && fz < p.z + 0.3 && y + 1 > p.y && y < p.y + 1.8) return; w.set(fx, y, fz, 138 + f); }
+        if (def.tall && w.get(x, y + 1, z) !== 0) return this.toast('A door needs the block above it free.', ''); }
+      w.set(x, y, z, id); this.take(it); if (it.id === BC.BLOCK.FENCE || def.wood) this.checkFences(); return; }
   }
   animalAction(e, it) {
     const d = e.def; const small = BC.isSmallAnimal(d); const rope = it.type === 'material' && it.id === 'rope';
@@ -362,18 +367,19 @@ BC.Game = class Game {
   isFenced(p) { const w = this.world; for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const b = BC.BLOCKS[w.get(p.x + dx, p.y, p.z + dz)]; if (!b || !b.solid) return false; } return true; }
   checkFences() { let any = false; this.world.plants.forEach(p => { if (!p.wild && this.isFenced(p)) { p.protected = true; any = true; } }); if (any && !this.stats.fenced) { this.stats.fenced = true; this.toast('Your crop is fenced on all four sides. Deer and rabbits will go hungry.', 'good'); } }
   // ---------- inventory ----------
-  give(item) { const ex = this.inventory.find(i => i && i.type === item.type && i.id === item.id && i.type !== 'tool'); if (ex) { ex.count += item.count; } else { let slot = -1; for (let i = 0; i < 9; i++) if (!this.inventory[i]) { slot = i; break; } if (slot >= 0) this.inventory[slot] = item; else { this.inventory.push(item); this.toast(`${this.itemName(item)} went into your bag (E).`, ''); } } this.ui.renderHotbar(); }
+  give(item) { const ex = this.inventory.find(i => i && i.type === item.type && i.id === item.id && i.type !== 'tool'); if (ex) { ex.count += item.count; } else { let slot = -1; for (let i = 0; i < 9; i++) if (!this.inventory[i]) { slot = i; break; } if (slot >= 0) this.inventory[slot] = item; else { this.inventory.push(item); this.toast(`${this.itemShortName(item)} went into your bag (E).`, ''); } } this.ui.renderHotbar(); }
   take(item) { item.count--; if (item.count <= 0) { const i = this.inventory.indexOf(item); if (i >= 0 && i < 9) this.inventory[i] = null; else if (i >= 9) this.inventory.splice(i, 1); } this.ui.renderHotbar(); }
   count(match) { return this.inventory.reduce((a, i) => a + (i && match(i) ? (i.count || 0) : 0), 0); }
   consume(match, n) { for (const i of this.inventory) { if (n <= 0) break; if (!i || !match(i)) continue; const k = Math.min(n, i.count); i.count -= k; n -= k; } this.inventory = this.inventory.map((i, idx) => (i && i.count !== undefined && i.count <= 0) ? null : i).filter((i, idx) => idx < 9 || i); while (this.inventory.length < 9) this.inventory.push(null); this.ui.renderHotbar(); }
   canCraft(r) { return r.ins.every(inp => this.count(inp.match) >= inp.n); }
-  craft(r) { if (!this.canCraft(r)) return false; r.ins.forEach(inp => this.consume(inp.match, inp.n)); this.give(Object.assign({}, r.out)); this.toast(`Crafted ${r.out.count} × ${this.itemName(r.out)}.`, 'good'); return true; }
+  craft(r) { if (!this.canCraft(r)) return false; r.ins.forEach(inp => this.consume(inp.match, inp.n)); this.give(Object.assign({}, r.out)); this.toast(`Crafted ${r.out.count} × ${this.itemShortName(r.out)}.`, 'good'); return true; }
   bagItems() { return this.inventory.map((it, i) => ({ it, i })).filter(x => x.i >= 9 && x.it); }
   moveToHotbar(bagIndex) { const it = this.inventory[bagIndex]; if (!it) return; const cur = this.inventory[this.selected]; if (cur && cur.type === 'tool') { this.toast('Pick an empty or non-tool hotbar slot first.', ''); return; } this.inventory[this.selected] = it; if (cur) this.inventory[bagIndex] = cur; else this.inventory.splice(bagIndex, 1); this.ui.renderHotbar(); }
   moveToBag(slot) { const it = this.inventory[slot]; if (!it || it.type === 'tool') return; this.inventory[slot] = null; this.inventory.push(it); this.ui.renderHotbar(); }
   select(i) { if (i < 0 || i > 8) return; this.selected = i; this.ui.renderHotbar(); }
   scrollHotbar(d) { this.select((this.selected + d + 9) % 9); }
-  itemName(it) { if (!it) return 'Empty slot'; if (it.type === 'tool') return { hand: 'Hand: collect, harvest, catch small animals (digs slowly)', trowel: 'Shovel: digs soil in 2 hits', axe: 'Axe: chops wood in 2 hits', can: 'Watering can' }[it.id]; if (it.type === 'seed') { const d = BC.Sim.defFor({ id: it.id }); return `${d.seed} (${d.name})`; } if (it.type === 'compost') return 'Compost: tap a soil block to amend it'; if (it.type === 'block') { const b = BC.BLOCKS[it.id]; return b.fence ? 'Fence post: place around crops' : b.name + ' (block)'; } if (it.type === 'material') { const m = BC.MATERIALS[it.id]; return m ? `${m.name}: ${m.desc}` : it.id; } if (it.type === 'animal') { const d = BC.ANIMAL_BY_ID[it.id]; return d ? `${d.name} (caught): tap the ground to release` : 'Animal'; } return ''; }
+  itemShortName(it) { return this.itemName(it).split(':')[0].replace(/ \((block|faces the way you look)\)$/, ''); }
+  itemName(it) { if (!it) return 'Empty slot'; if (it.type === 'tool') return { hand: 'Hand: collect, harvest, catch small animals (digs slowly)', trowel: 'Shovel: digs soil in 2 hits', axe: 'Axe: chops wood in 2 hits', can: 'Watering can' }[it.id]; if (it.type === 'seed') { const d = BC.Sim.defFor({ id: it.id }); return `${d.seed} (${d.name})`; } if (it.type === 'compost') return 'Compost: tap a soil block to amend it'; if (it.type === 'block') { const b = BC.BLOCKS[it.id]; return b.fence ? 'Fence post: place around crops' : b.id === 76 ? 'Raised garden bed: plantable compost soil in a wooden frame' : b.dir ? b.name + ' (faces the way you look)' : b.wood || b.plank ? b.name : b.name + ' (block)'; } if (it.type === 'material') { const m = BC.MATERIALS[it.id]; return m ? `${m.name}: ${m.desc}` : it.id; } if (it.type === 'animal') { const d = BC.ANIMAL_BY_ID[it.id]; return d ? `${d.name} (caught): tap the ground to release` : 'Animal'; } return ''; }
   itemIcon(it, size) {
     if (!it) return null;
     if (it.type === 'animal') { const d = BC.ANIMAL_BY_ID[it.id]; return d ? this.ui.imgFor('animal', d) : null; }

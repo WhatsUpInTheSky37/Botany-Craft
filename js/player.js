@@ -60,7 +60,9 @@ BC.Player = class Player {
     const sy = Math.sin(this.yaw), cy = Math.cos(this.yaw);
     const vx = (mx * cy - mz * sy) * speed, vz = (-mx * sy - mz * cy) * speed;
     const accel = this.onGround ? 14 : 5; this.vel.x += (vx - this.vel.x) * Math.min(1, accel * dt); this.vel.z += (vz - this.vel.z) * Math.min(1, accel * dt);
-    if (this.inWater) { this.vel.y += (-2 - this.vel.y) * Math.min(1, 3 * dt); if (this.jumpQueued || k.Space) this.vel.y = 3.2; } else { this.vel.y -= 22 * dt; if (this.jumpQueued && this.onGround) { this.vel.y = 7.6; this.onGround = false; } }
+    const onLadder = (BC.BLOCKS[feet] && BC.BLOCKS[feet].climb) || (BC.BLOCKS[head] && BC.BLOCKS[head].climb);
+    if (onLadder) { const up = this.jumpQueued || k.Space || mz > 0.3; const down = k.ShiftLeft || mz < -0.3; this.vel.y = up ? 3 : down ? -3 : -0.6; this.vel.x *= 0.5; this.vel.z *= 0.5; }
+    else if (this.inWater) { this.vel.y += (-2 - this.vel.y) * Math.min(1, 3 * dt); if (this.jumpQueued || k.Space) this.vel.y = 3.2; } else { this.vel.y -= 22 * dt; if (this.jumpQueued && this.onGround) { this.vel.y = 7.6; this.onGround = false; } }
     this.jumpQueued = false; if (this.vel.y < -40) this.vel.y = -40;
     // move per axis with collision
     const step = (axis, d) => {

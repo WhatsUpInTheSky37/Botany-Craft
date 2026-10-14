@@ -34,7 +34,7 @@ BC.World = class World {
   addPlant(p) { p.key = this.idx(p.x, p.y, p.z); this.plants.set(p.key, p); this.markDirty(p.x, p.z); if (this.onPlant && !this.remote && !this.generating) this.onPlant(p, false); return p; }
   removePlant(p) { this.plants.delete(p.key); this.markDirty(p.x, p.z); if (this.onPlant && !this.remote && !this.generating) this.onPlant(p, true); }
   // light reaching a cell: 1 = open sky, lower under leaves.
-  lightAt(x, y, z) { let l = 1; for (let yy = y + 1; yy < this.H; yy++) { const b = BC.BLOCKS[this.get(x, yy, z)]; if (!b || b.id === 0 || b.liquid) continue; if (b.leaves) l *= 0.55; else if (b.fence) l *= 0.9; else l *= 0.25; if (l < 0.05) break; } return l; }
+  lightAt(x, y, z) { let l = 1; for (let yy = y + 1; yy < this.H; yy++) { const b = BC.BLOCKS[this.get(x, yy, z)]; if (!b || b.id === 0 || b.liquid) continue; if (b.leaves) l *= 0.55; else if (b.fence || b.shape || b.cutout) l *= 0.9; else l *= 0.25; if (l < 0.05) break; } return l; }
 
   // ---------- generation ----------
   generate() {
