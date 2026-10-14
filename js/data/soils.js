@@ -143,3 +143,5 @@ BC.SOILS = {
   },
 };
 BC.PH_NOTES = 'pH runs from 0 (acid) to 14 (alkaline); 7 is neutral. Each step is ten times stronger. Most garden plants like 6 to 7. Below 5.5, phosphorus and calcium become hard for roots to absorb; above 7.5, iron becomes locked up and leaves turn yellow between the veins (chlorosis).';
+// Baseline available N, P, K per soil (game units, 1 = plenty).
+BC.SOIL_NUTR = { alfisol: [0.6, 0.5, 0.55], mollisol: [0.85, 0.6, 0.75], aridisol: [0.2, 0.3, 0.45], oxisol: [0.3, 0.15, 0.3], spodosol: [0.3, 0.25, 0.3], histosol: [0.55, 0.15, 0.25], gley: [0.4, 0.3, 0.4], compost: [0.8, 0.7, 0.7], stone: [0.05, 0.1, 0.1], sand_subsoil: [0.1, 0.2, 0.3], bark: [0.3, 0.2, 0.3] };

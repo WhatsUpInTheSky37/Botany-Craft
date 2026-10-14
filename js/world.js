@@ -8,6 +8,7 @@ BC.World = class World {
     this.biome = new Uint8Array(this.W * this.D);
     this.height = new Uint8Array(this.W * this.D);
     this.moisture = new Float32Array(this.W * this.D);
+    this.nutr = new Float32Array(this.W * this.D * 3); this.phShift = new Float32Array(this.W * this.D); this.om = new Float32Array(this.W * this.D); this.mulch = new Float32Array(this.W * this.D); this.hives = new Map();
     this.plants = new Map(); this.treeAt = new Map(); this.diffs = new Map();
     this.dirty = new Set(); this.CX = Math.ceil(this.W / 16); this.CZ = Math.ceil(this.D / 16);
     this.rand = BC.util.rng(this.seed);
@@ -30,6 +31,11 @@ BC.World = class World {
   surface(x, z) { for (let y = this.H - 1; y >= 0; y--) if (this.get(x, y, z) !== 0) return y; return 0; }
   soilAt(x, y, z) { const b = BC.BLOCKS[this.get(x, y, z)]; return b && b.soil ? BC.SOILS[b.soil] : null; }
   plantKey(x, y, z) { return this.idx(x, y, z); }
+  col(x, z) { return x + z * this.W; }
+  baseNutr(x, z) { const b = BC.BIOMES[this.biomeAt(x, z)]; return BC.SOIL_NUTR[b.soil]; }
+  soilChem(x, z, soil) { const i = this.col(x, z); const ph = BC.util.clamp((soil ? soil.ph : 6.5) + this.phShift[i], 3.5, 9); return { ph, n: this.nutr[i * 3], p: this.nutr[i * 3 + 1], k: this.nutr[i * 3 + 2], om: this.om[i], mulch: this.mulch[i] }; }
+  // Apply an ingredient to a soil column. Returns a description of what changed.
+  amend(x, z, ing) { const i = this.col(x, z); const out = []; const npk = ing.npk || [0, 0, 0]; ['N', 'P', 'K'].forEach((nm, k) => { if (npk[k]) { const before = this.nutr[i * 3 + k]; this.nutr[i * 3 + k] = Math.min(1.2, before + npk[k] * 0.5); out.push(nm + ' +' + Math.round((this.nutr[i * 3 + k] - before) * 100)); } }); if (ing.ph) { this.phShift[i] = BC.util.clamp(this.phShift[i] + ing.ph, -2.5, 2.5); out.push('pH ' + (ing.ph > 0 ? 'up' : 'down') + ' ' + Math.abs(ing.ph).toFixed(1)); } if (ing.om) { this.om[i] = Math.min(1, this.om[i] + ing.om); out.push('humus +' + Math.round(ing.om * 100)); } if (ing.moisture) { this.mulch[i] = Math.min(1, this.mulch[i] + ing.moisture); out.push('mulch'); } this.markDirty(x, z); return out; }
   plantAt(x, y, z) { return this.plants.get(this.idx(x, y, z)); }
   addPlant(p) { p.key = this.idx(p.x, p.y, p.z); this.plants.set(p.key, p); this.markDirty(p.x, p.z); if (this.onPlant && !this.remote && !this.generating) this.onPlant(p, false); return p; }
   removePlant(p) { this.plants.delete(p.key); this.markDirty(p.x, p.z); if (this.onPlant && !this.remote && !this.generating) this.onPlant(p, true); }
@@ -55,7 +61,7 @@ BC.World = class World {
       if (biome === 'wetland') h = Math.min(h, WL + 1);
       h = BC.util.clamp(Math.round(h), 3, H - 12);
       this.biome[ci] = BC.BIOME_LIST.indexOf(biome); this.height[ci] = h;
-      this.moisture[ci] = BC.BIOMES[biome].baseMoisture;
+      this.moisture[ci] = BC.BIOMES[biome].baseMoisture; const nb = BC.SOIL_NUTR[BC.BIOMES[biome].soil]; this.nutr[ci * 3] = nb[0]; this.nutr[ci * 3 + 1] = nb[1]; this.nutr[ci * 3 + 2] = nb[2];
       this.fillColumn(x, z, h, biome);
     }
     this.placeTrees(); this.placePlants(); this.pickAnimals();
@@ -142,7 +148,7 @@ BC.World = class World {
   }
   pickAnimals() {
     const perBiome = {}; for (let z = 4; z < this.D - 4; z += 3) for (let x = 4; x < this.W - 4; x += 3) { const b = this.biomeAt(x, z); const h = this.height[x + z * this.W]; if (h < this.WL) continue; (perBiome[b] = perBiome[b] || []).push([x, z]); }
-    BC.ANIMALS.forEach(a => { if (a.hidden) return; a.biomes.forEach((b, bi) => { const cells = perBiome[b]; if (!cells || !cells.length) return; const n = Math.round((bi === 0 ? 4 : 2) * this.scale); for (let i = 0; i < n; i++) { const c = cells[Math.floor(this.rand() * cells.length)]; this.spawnAnimals.push({ id: a.id, x: c[0] + 0.5, z: c[1] + 0.5 }); } }); });
+    BC.ANIMALS.forEach(a => { if (a.hidden) return; a.biomes.forEach((b, bi) => { const cells = perBiome[b]; if (!cells || !cells.length) return; const n = Math.round((a.insect ? (bi === 0 ? 1.5 : 0.5) : (bi === 0 ? 4 : 2)) * this.scale); for (let i = 0; i < n; i++) { const c = cells[Math.floor(this.rand() * cells.length)]; this.spawnAnimals.push({ id: a.id, x: c[0] + 0.5, z: c[1] + 0.5 }); } }); });
   }
   openAround(x, z, r) { for (let dz = -r; dz <= r; dz++) for (let dx = -r; dx <= r; dx++) { const h = this.height[(x + dx) + (z + dz) * this.W]; for (let y = h + 1; y <= h + 3; y++) if (this.get(x + dx, y, z + dz) !== 0) return false; } return true; }
   findSpawn(biome) {
@@ -156,11 +162,13 @@ BC.World = class World {
   serialize() {
     const diffs = []; this.diffs.forEach((v, k) => diffs.push(k, v));
     const plants = [], removed = []; const gen = this.genPlantKeys || new Set();
-    this.plants.forEach(p => { if (p.wild && gen.has(p.key) && p.progress >= 1 && !p.withered) return; plants.push({ id: p.id, x: p.x, y: p.y, z: p.z, wild: p.wild, progress: p.progress, health: p.health, pollinated: p.pollinated, withered: p.withered, onBark: p.onBark, owner: p.owner }); });
+    this.plants.forEach(p => { if (p.wild && gen.has(p.key) && p.progress >= 1 && !p.withered) return; plants.push({ id: p.id, x: p.x, y: p.y, z: p.z, wild: p.wild, progress: p.progress, health: p.health, pollinated: p.pollinated, withered: p.withered, onBark: p.onBark, owner: p.owner, pest: p.pest || undefined, covered: p.covered || undefined }); });
     gen.forEach(k => { if (!this.plants.has(k)) removed.push(k); });
     const trees = []; const gt = this.genTreeKeys || new Set(); this.treeAt.forEach((v, k) => { if (!gt.has(k)) trees.push(k, v); });
     const moist = []; for (let i = 0; i < this.moisture.length; i++) { const base = BC.BIOMES[BC.BIOME_LIST[this.biome[i]]].baseMoisture; if (Math.abs(this.moisture[i] - base) > 0.03) moist.push(i, Math.round(this.moisture[i] * 100)); }
-    return { v: 2, W: this.W, D: this.D, H: this.H, diffs, plants, removed, trees, moist };
+    const soil = []; for (let i = 0; i < this.W * this.D; i++) { const nb = BC.SOIL_NUTR[BC.BIOMES[BC.BIOME_LIST[this.biome[i]]].soil]; const n = this.nutr[i * 3], pp = this.nutr[i * 3 + 1], k = this.nutr[i * 3 + 2]; if (Math.abs(n - nb[0]) > 0.02 || Math.abs(pp - nb[1]) > 0.02 || Math.abs(k - nb[2]) > 0.02 || Math.abs(this.phShift[i]) > 0.02 || this.om[i] > 0.02 || this.mulch[i] > 0.02) soil.push(i, Math.round(n * 100), Math.round(pp * 100), Math.round(k * 100), Math.round(this.phShift[i] * 100), Math.round(this.om[i] * 100), Math.round(this.mulch[i] * 100)); }
+    const hives = []; this.hives.forEach((h, k) => hives.push(k, h.honey || 0, h.wax || 0, Math.round(h.t || 0)));
+    return { v: 2, W: this.W, D: this.D, H: this.H, diffs, plants, removed, trees, moist, soil, hives };
   }
   restore(s) {
     const prev = this.remote; this.remote = true;
@@ -170,6 +178,8 @@ BC.World = class World {
       s.plants.forEach(p => { const ex = this.plants.get(this.idx(p.x, p.y, p.z)); if (ex) this.removePlant(ex); this.addPlant(p); });
       for (let i = 0; i < s.trees.length; i += 2) this.treeAt.set(s.trees[i], s.trees[i + 1]);
       if (s.moist) for (let i = 0; i < s.moist.length; i += 2) this.moisture[s.moist[i]] = s.moist[i + 1] / 100;
+      if (s.soil) for (let i = 0; i < s.soil.length; i += 7) { const c = s.soil[i]; this.nutr[c * 3] = s.soil[i + 1] / 100; this.nutr[c * 3 + 1] = s.soil[i + 2] / 100; this.nutr[c * 3 + 2] = s.soil[i + 3] / 100; this.phShift[c] = s.soil[i + 4] / 100; this.om[c] = s.soil[i + 5] / 100; this.mulch[c] = s.soil[i + 6] / 100; }
+      if (s.hives) { this.hives.clear(); for (let i = 0; i < s.hives.length; i += 4) this.hives.set(s.hives[i], { honey: s.hives[i + 1], wax: s.hives[i + 2], t: s.hives[i + 3] }); }
     } else {
       this.plants.forEach(p => this.markDirty(p.x, p.z)); this.plants.clear(); s.plants.forEach(p => this.addPlant(p));
       this.treeAt.clear(); for (let i = 0; i < s.trees.length; i += 2) this.treeAt.set(s.trees[i], s.trees[i + 1]);

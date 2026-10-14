@@ -88,6 +88,9 @@ BC.Atlas = (function () {
     bed_head: g => { noise(g, '#b83030', 0.1, 84, 2); g.fillStyle = '#f0ece0'; g.fillRect(4, 3, 24, 11); g.fillStyle = '#d8d4c8'; g.fillRect(4, 12, 24, 2); },
     bed_foot: g => { noise(g, '#b83030', 0.1, 85, 2); g.fillStyle = '#902020'; for (let y = 4; y < TILE; y += 8) g.fillRect(0, y, TILE, 2); g.fillStyle = '#e0d8c0'; g.fillRect(0, 26, TILE, 6); },
     bed_side: g => { planks(g, '#9a6a3a'); g.fillStyle = '#b83030'; g.fillRect(0, 0, TILE, 12); g.fillStyle = '#e0d8c0'; g.fillRect(0, 12, TILE, 3); },
+    pest: g => { clear(g); g.fillStyle = '#ffffff'; const r = rng(90); for (let i = 0; i < 9; i++) { const x = 6 + r() * 20, y = 6 + r() * 20; g.beginPath(); g.ellipse(x, y, 2.6, 1.8, r() * 3, 0, 6.283); g.fill(); g.fillRect(x - 3.5, y - 0.5, 7, 1); } },
+    beehive: g => { planks(g, '#c8a860'); g.fillStyle = '#8a6a3a'; for (let y = 6; y < TILE; y += 7) g.fillRect(0, y, TILE, 2); g.fillStyle = '#2a1a0a'; g.fillRect(12, 22, 8, 4); g.fillStyle = '#f0c020'; g.fillRect(9, 10, 2, 2); g.fillRect(21, 15, 2, 2); },
+    beehive_top: g => { planks(g, '#c8a860'); g.fillStyle = '#8a6a3a'; g.fillRect(0, 0, TILE, 2); g.fillRect(0, 30, TILE, 2); g.fillRect(0, 0, 2, TILE); g.fillRect(30, 0, 2, TILE); },
     table_icon: g => { clear(g); g.fillStyle = '#b08a52'; g.fillRect(2, 8, 28, 5); g.fillRect(5, 13, 4, 16); g.fillRect(23, 13, 4, 16); },
     stool_icon: g => { clear(g); g.fillStyle = '#b08a52'; g.fillRect(6, 12, 20, 5); g.fillRect(8, 17, 3, 12); g.fillRect(21, 17, 3, 12); },
     stairs_icon: g => { clear(g); g.fillStyle = '#b08a52'; g.fillRect(2, 16, 28, 14); g.fillRect(16, 2, 14, 14); },
@@ -204,5 +207,13 @@ BC.Atlas = (function () {
   function uv(name) { const i = tiles[name]; if (i === undefined) throw new Error('missing tile ' + name); const e = 0.6 / (TILE * COLS); const u0 = (i % COLS) / COLS + e, v0 = 1 - Math.floor(i / COLS) / COLS - e; return [u0, v0, u0 + 1 / COLS - 2 * e, v0 - 1 / COLS + 2 * e]; }
   function spriteCanvas(p, stage, size, withered) { const c = document.createElement('canvas'); c.width = c.height = size; const g = c.getContext('2d'); g.imageSmoothingEnabled = false; drawPlant(g, p, stage, size, withered); return c; }
   function tileCanvas(name, size) { const c = document.createElement('canvas'); c.width = c.height = size; const g = c.getContext('2d'); g.imageSmoothingEnabled = false; const i = tiles[name]; g.drawImage(canvas, (i % COLS) * TILE, Math.floor(i / COLS) * TILE, TILE, TILE, 0, 0, size, size); return c; }
-  return { build, uv, spriteCanvas, tileCanvas, TILE, COLS, has: n => tiles[n] !== undefined, shade, mix };
+  // Icon for an ingredient: a glyph per group tinted by a stable colour from its name.
+  function ingredientCanvas(ing, size) { const c = document.createElement('canvas'); c.width = c.height = size; const g = c.getContext('2d'); const k = size / 32; const h = hash(ing.id); const col = `hsl(${h % 360},${45 + (h >> 8) % 30}%,${38 + (h >> 16) % 20}%)`; g.save(); g.scale(k, k);
+    if (ing.group === 'control') { g.fillStyle = '#e8eef0'; g.fillRect(11, 4, 10, 6); g.fillStyle = col; g.beginPath(); g.moveTo(8, 10); g.lineTo(24, 10); g.lineTo(26, 30); g.lineTo(6, 30); g.closePath(); g.fill(); g.fillStyle = 'rgba(255,255,255,0.35)'; g.fillRect(9, 13, 3, 14); }
+    else if (ing.group === 'mineral') { g.fillStyle = col; g.beginPath(); g.moveTo(4, 29); g.quadraticCurveTo(16, 2, 28, 29); g.closePath(); g.fill(); g.fillStyle = 'rgba(255,255,255,0.3)'; for (let i = 0; i < 14; i++) g.fillRect(8 + ((i * 7) % 16), 16 + ((i * 5) % 12), 1.5, 1.5); }
+    else if (ing.group === 'mulch') { g.fillStyle = col; for (let i = 0; i < 10; i++) { g.save(); g.translate(16, 24); g.rotate(-0.6 + i * 0.13); g.fillRect(-14, -2 - i * 1.6, 28, 2.2); g.restore(); } }
+    else if (ing.group === 'fertilizer') { g.fillStyle = '#8a6a3a'; g.beginPath(); g.moveTo(6, 12); g.lineTo(26, 12); g.lineTo(23, 30); g.lineTo(9, 30); g.closePath(); g.fill(); g.fillStyle = col; g.beginPath(); g.ellipse(16, 12, 10, 4, 0, 0, 6.283); g.fill(); g.fillStyle = '#f0e8d0'; g.fillRect(12, 18, 8, 6); }
+    else { g.fillStyle = col; g.beginPath(); g.ellipse(16, 18, 10, 8, 0.3, 0, 6.283); g.fill(); g.fillStyle = shade(col.startsWith('#') ? col : '#6a8a4a', 0.7); g.fillRect(15, 6, 2, 10); }
+    g.restore(); return c; }
+  return { build, uv, spriteCanvas, tileCanvas, ingredientCanvas, TILE, COLS, has: n => tiles[n] !== undefined, shade, mix };
 })();

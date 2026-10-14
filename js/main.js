@@ -19,7 +19,7 @@ BC.Game = class Game {
     this.ui.showStart({ hasSave, shared, known: this.knownWorlds(), onNew: region => this.newGame(region), onContinue: () => this.load() || this.newGame('temperate'), onShared: opts => this.startShared(opts), onForget: id => { this.forgetWorld(id); this.ui.renderKnownWorlds(this.knownWorlds()); } });
   }
   resetStats() {
-    this.stats = { inspected: new Set(), seedSpecies: new Set(), maxDig: 0, plantedGood: 0, watered: 0, matured: 0, legumesPlanted: 0, threeSisters: false, pollinated: false, blueberryAcid: false, cactusInSand: false, compostMade: 0, compostUsed: false, biomesVisited: new Set(), treeGrown: false, fenced: false, invasiveRemoved: 0, journal: new Set(), questsDone: new Set(), harvests: 0, compostMaterial: 0, planted: 0 };
+    this.stats = { inspected: new Set(), seedSpecies: new Set(), maxDig: 0, plantedGood: 0, watered: 0, matured: 0, legumesPlanted: 0, threeSisters: false, pollinated: false, blueberryAcid: false, cactusInSand: false, compostMade: 0, compostUsed: false, biomesVisited: new Set(), treeGrown: false, fenced: false, invasiveRemoved: 0, journal: new Set(), questsDone: new Set(), harvests: 0, compostMaterial: 0, planted: 0, amendmentsUsed: new Set(), pestsSeen: 0, pestsTreated: 0, beneficialWin: 0, companionPlanted: false, fertilised: 0, honey: 0 };
     this.inventory = [{ type: 'tool', id: 'hand' }, { type: 'tool', id: 'trowel' }, { type: 'tool', id: 'axe' }, { type: 'tool', id: 'can' }, null, null, null, null, null]; this.selected = 0; this.points = 0;
   }
   setupScene() {
@@ -56,7 +56,7 @@ BC.Game = class Game {
     w.onBlocks = (list, tid) => { if (this.mode === 'shared') this.net.send('blocks', { list, tid }); };
     w.onPlant = (p, removed) => { if (this.mode === 'shared') this.net.send('plant', removed ? { key: p.key, rm: true } : { key: p.key, p: this.packPlant(p) }); };
   }
-  packPlant(p) { return { id: p.id, x: p.x, y: p.y, z: p.z, wild: p.wild, progress: p.progress, health: p.health, pollinated: p.pollinated, withered: p.withered, onBark: p.onBark, owner: p.owner }; }
+  packPlant(p) { return { id: p.id, x: p.x, y: p.y, z: p.z, wild: p.wild, progress: p.progress, health: p.health, pollinated: p.pollinated, withered: p.withered, onBark: p.onBark, owner: p.owner, pest: p.pest || undefined, covered: p.covered || undefined }; }
   begin() { this.clearChunks(); this.world.dirty.clear(); this.streamChunks(true); this.ui.hideStart(); this.ui.renderHotbar(); this.ui.updateQuestTracker(); this.ui.setLockHint(true); this.ui.updateShared(); this.ui.updateHUD(); this.running = true; this.last = performance.now(); if (!this.loopStarted) { this.loopStarted = true; requestAnimationFrame(t => this.loop(t)); } }
   clearChunks() { Array.from(this.chunks.keys()).forEach(ci => this.unloadChunk(ci)); this.chunks.clear(); }
   clearAnimals() { this.animals.list.forEach(e => { this.scene.remove(e.mesh); if (e.line) this.scene.remove(e.line); }); this.animals.list = []; }
@@ -116,8 +116,8 @@ BC.Game = class Game {
   }
   sharedState() { return { world: this.world.serialize(), time: this.time, weather: this.weather, animals: this.animals.list.length ? this.animals.serialize() : (this.world.spawnAnimals || []) }; }
   applySharedState(state) { if (!state || !state.world) return; this.world.restore(state.world); if (state.time) this.time = state.time; if (state.weather) { this.weather = state.weather; this.rain.visible = !!this.weather.raining; } this.sharedAnimals = state.animals; }
-  playerState() { const st = this.stats; const S = o => Array.from(o); return { inventory: this.inventory, selected: this.selected, points: this.points, pos: { x: this.player.pos.x, y: this.player.pos.y, z: this.player.pos.z, yaw: this.player.yaw, pitch: this.player.pitch }, stats: Object.assign({}, st, { inspected: S(st.inspected), seedSpecies: S(st.seedSpecies), biomesVisited: S(st.biomesVisited), journal: S(st.journal), questsDone: S(st.questsDone) }) }; }
-  applyPlayerState(ps) { const st = ps.stats; this.stats = Object.assign(this.stats, st, { inspected: new Set(st.inspected), seedSpecies: new Set(st.seedSpecies), biomesVisited: new Set(st.biomesVisited), journal: new Set(st.journal), questsDone: new Set(st.questsDone) }); this.inventory = ps.inventory || []; while (this.inventory.length < 9) this.inventory.push(null); if (!this.inventory.some(i => i && i.type === 'tool' && i.id === 'axe')) this.give({ type: 'tool', id: 'axe' }); this.selected = Math.min(ps.selected || 0, 8); this.points = ps.points || 0; if (ps.pos) { this.player.pos.set(ps.pos.x, ps.pos.y, ps.pos.z); this.player.yaw = ps.pos.yaw; this.player.pitch = ps.pos.pitch; } }
+  playerState() { const st = this.stats; const S = o => Array.from(o); return { inventory: this.inventory, selected: this.selected, points: this.points, pos: { x: this.player.pos.x, y: this.player.pos.y, z: this.player.pos.z, yaw: this.player.yaw, pitch: this.player.pitch }, stats: Object.assign({}, st, { inspected: S(st.inspected), seedSpecies: S(st.seedSpecies), biomesVisited: S(st.biomesVisited), journal: S(st.journal), questsDone: S(st.questsDone), amendmentsUsed: S(st.amendmentsUsed || []) }) }; }
+  applyPlayerState(ps) { const st = ps.stats; this.stats = Object.assign(this.stats, st, { inspected: new Set(st.inspected), seedSpecies: new Set(st.seedSpecies), biomesVisited: new Set(st.biomesVisited), journal: new Set(st.journal), questsDone: new Set(st.questsDone), amendmentsUsed: new Set(st.amendmentsUsed || []) }); this.inventory = ps.inventory || []; while (this.inventory.length < 9) this.inventory.push(null); if (!this.inventory.some(i => i && i.type === 'tool' && i.id === 'axe')) this.give({ type: 'tool', id: 'axe' }); this.selected = Math.min(ps.selected || 0, 8); this.points = ps.points || 0; if (ps.pos) { this.player.pos.set(ps.pos.x, ps.pos.y, ps.pos.z); this.player.yaw = ps.pos.yaw; this.player.pitch = ps.pos.pitch; } }
   bindNetEvents() {
     const n = this.net, w = () => this.world;
     const remote = fn => { const W = w(); const prev = W.remote; W.remote = true; try { fn(W); } finally { W.remote = prev; } };
@@ -126,7 +126,9 @@ BC.Game = class Game {
       block: m => remote(W => { const above = W.plantAt(m.x, m.y + 1, m.z); if (m.id !== 0 && above) W.removePlant(above); W.set(m.x, m.y, m.z, m.id); }),
       blocks: m => remote(W => { m.list.forEach(b => { W.set(b[0], b[1], b[2], b[3]); W.treeAt.set(W.idx(b[0], b[1], b[2]), m.tid); }); }),
       plant: m => remote(W => { const ex = W.plants.get(m.key); if (m.rm) { if (ex) W.removePlant(ex); } else { if (ex) W.removePlant(ex); W.addPlant(m.p); } }),
-      plants: m => { const W = w(); m.list.forEach(u => { const p = W.plants.get(u[0]); if (!p) return; const before = BC.Mesher.plantTile(p); p.progress = u[1]; p.health = u[2]; p.withered = !!u[3]; p.pollinated = !!u[4]; if (BC.Mesher.plantTile(p) !== before) W.markDirty(p.x, p.z); }); },
+      plants: m => { const W = w(); m.list.forEach(u => { const p = W.plants.get(u[0]); if (!p) return; const before = BC.Mesher.plantTile(p); const pestBefore = p.pest ? p.pest.id + '|' + Math.round(p.pest.level * 4) : ''; p.progress = u[1]; p.health = u[2]; p.withered = !!u[3]; p.pollinated = !!u[4]; if (u.length > 5) { p.pest = u[5] ? { id: u[5], level: u[6] } : null; const cov = !!u[7]; if (cov !== !!p.covered) W.markDirty(p.x, p.z); p.covered = cov; } const pestAfter = p.pest ? p.pest.id + '|' + Math.round(p.pest.level * 4) : ''; if (BC.Mesher.plantTile(p) !== before || pestBefore !== pestAfter) W.markDirty(p.x, p.z); }); },
+      amend: m => { const W = w(); const ing = BC.INGREDIENT_BY_ID[m.id]; if (ing) W.amend(m.x, m.z, ing); },
+      hive: m => { const W = w(); if (m.rm) W.hives.delete(m.key); else W.hives.set(m.key, m.h); },
       water: m => this.applyWater(m.x, m.z, false),
     };
     Object.keys(apply).forEach(ev => n.on(ev, m => { if (this.syncBuffer) this.syncBuffer.push([ev, m]); else apply[ev](m); }));
@@ -142,6 +144,8 @@ BC.Game = class Game {
     n.on('synced', async m => { if (!this.syncRequested) return; this.syncRequested = false; clearTimeout(this.syncTimer); try { if (m.version > this.worldVersion) { const d = await n.loadWorld(n.creds.world, n.creds.pin); this.applySharedState(d.state); this.worldVersion = d.version; } } catch (e) { console.warn(e); } this.replaySync(); });
     n.on('stat', m => { if (m.to === this.playerName) this.applyCredit(m.key, m.val, m.set); });
     n.on('toast', m => { if (m.to === this.playerName) this.toast(m.msg, m.kind); });
+    n.on('give', m => { if (m.to === this.playerName) { this.give(m.item); this.obtained(m.item); } });
+    n.on('hive_take', (m, from) => { if (n.isHost) this.takeHoney(m.key, m.by); });
     n.on('hello', (m, from) => { const pe = this.peers.get(from); if (pe) { pe.target.set(m.x, m.y, m.z); pe.group.position.copy(pe.target); } });
   }
   requestSync() { if (this.syncRequested) return; this.syncRequested = true; this.syncBuffer = []; this.net.send('need_sync', {}); clearTimeout(this.syncTimer); this.syncTimer = setTimeout(() => { if (this.syncRequested) { this.syncRequested = false; this.replaySync(); } }, 20000); }
@@ -165,7 +169,7 @@ BC.Game = class Game {
     const n = this.net, a = this.netAcc; a.pos += dt; a.plants += dt; a.animals += dt; a.time += dt;
     if (a.pos >= 0.2) { a.pos = 0; const p = this.player.pos; const k = `${p.x.toFixed(1)},${p.y.toFixed(1)},${p.z.toFixed(1)},${this.player.yaw.toFixed(1)}`; if (k !== this.lastPosKey) { this.lastPosKey = k; n.send('pos', { x: +p.x.toFixed(2), y: +p.y.toFixed(2), z: +p.z.toFixed(2), yaw: +this.player.yaw.toFixed(2) }); } }
     if (!n.isHost) return;
-    if (a.plants >= 1) { a.plants = 0; const list = []; this.world.plants.forEach(p => { if (p.wild && p.progress >= 1) return; const sig = `${p.progress.toFixed(3)}|${p.health.toFixed(2)}|${p.withered ? 1 : 0}|${p.pollinated ? 1 : 0}`; if (p.netSig !== sig) { p.netSig = sig; list.push([p.key, +p.progress.toFixed(3), +p.health.toFixed(2), p.withered ? 1 : 0, p.pollinated ? 1 : 0]); } }); if (list.length && this.peers.size) n.send('plants', { list }); }
+    if (a.plants >= 1) { a.plants = 0; const list = []; this.world.plants.forEach(p => { if (p.wild && p.progress >= 1) return; const pl = p.pest ? +p.pest.level.toFixed(2) : 0; const sig = `${p.progress.toFixed(3)}|${p.health.toFixed(2)}|${p.withered ? 1 : 0}|${p.pollinated ? 1 : 0}|${p.pest ? p.pest.id : ''}|${pl}|${p.covered ? 1 : 0}`; if (p.netSig !== sig) { p.netSig = sig; list.push([p.key, +p.progress.toFixed(3), +p.health.toFixed(2), p.withered ? 1 : 0, p.pollinated ? 1 : 0, p.pest ? p.pest.id : 0, pl, p.covered ? 1 : 0]); } }); if (list.length && this.peers.size) n.send('plants', { list }); }
     if (a.animals >= 0.5 && this.peers.size) { a.animals = 0; n.send('animals', { list: this.animals.snapshot() }); }
     if (a.time >= 10 && this.peers.size) { a.time = 0; n.send('time', { t: this.time.t }); }
   }
@@ -176,6 +180,7 @@ BC.Game = class Game {
     const auth = this.isAuthority();
     this.player.update(this.ui.modalOpen() ? 0 : dt);
     if (this.holdPrimary && !this.ui.modalOpen() && now - (this.lastPrimary || 0) > 320) { const it = this.cur(); if (this.isDigTool(it)) { const h = this.raycast(); if (h && h.type === 'block') this.primary(); } } if (auth) this.animals.update(dt); else this.animals.updateGuest(dt);
+    if (auth) { this.tickHives(dt); this.tickRespawns(); }
     this.time.t += dt; this.time.dayFrac = (this.time.t / this.DAY) % 1; this.time.day = Math.floor(this.time.t / this.DAY) + 1;
     if (this.ffTimer > 0) { this.ffTimer -= dt; if (this.ffTimer <= 0) { this.growthMult = 1; this.toast('Fast-forward finished.', ''); } }
     this.simAcc += dt; if (this.simAcc >= 0.5) { if (auth) { BC.Sim.tick(this, this.simAcc); this.updateWeather(this.simAcc); } this.simAcc = 0; }
@@ -223,10 +228,12 @@ BC.Game = class Game {
   applyCredit(key, val, set) { if (key === 'journal') { this.discover(val, 'grown'); return; } if (set) this.stats[key] = val; else this.stats[key] = (this.stats[key] || 0) + val; }
   notify(owner, msg, kind) { if (this.mode !== 'shared' || !owner || owner === this.playerName) this.toast(msg, kind); else this.net.send('toast', { to: owner, msg, kind }); }
   discover(key, how) {
+    { const [k0, i0] = key.split(':'); if (k0 === 'animal' && BC.ANIMAL_BY_ID[i0] && BC.ANIMAL_BY_ID[i0].insect) key = 'insect:' + i0; }
     if (this.stats.journal.has(key)) return false; this.stats.journal.add(key); this.points += 3;
     const [kind, id] = key.split(':');
     if (kind === 'animal' && how === 'seen') { this.toast(`New animal spotted: ${BC.ANIMAL_BY_ID[id].name}. Inspect it to add notes to your journal.`, 'good'); return true; }
     if (kind === 'tree' && how === 'grown') return true;
+    if (kind === 'insect' && how === 'seen') { const d = BC.INSECT_BY_ID[id]; this.toast(`New insect: ${d ? d.name : id}. It is in your journal under Insects.`, 'good'); return true; }
     this.queue(() => this.ui.showCard(key, true, this.lastInspect)); return true;
   }
   // ---------- targeting ----------
@@ -236,7 +243,7 @@ BC.Game = class Game {
     let x = Math.floor(o.x), y = Math.floor(o.y), z = Math.floor(o.z); const sx = Math.sign(d.x), sy = Math.sign(d.y), sz = Math.sign(d.z);
     const tdx = Math.abs(1 / (d.x || 1e-9)), tdy = Math.abs(1 / (d.y || 1e-9)), tdz = Math.abs(1 / (d.z || 1e-9));
     let tmx = (sx > 0 ? (x + 1 - o.x) : (o.x - x)) * tdx, tmy = (sy > 0 ? (y + 1 - o.y) : (o.y - y)) * tdy, tmz = (sz > 0 ? (z + 1 - o.z) : (o.z - z)) * tdz;
-    let n = [0, 0, 0], dist = 0; const it = this.cur(); const wantsWater = it && it.type === 'seed' && BC.Sim.defFor({ id: it.id }).water === 'aquatic';
+    let n = [0, 0, 0], dist = 0; const it = this.cur(); const wantsWater = it && ((it.type === 'seed' && BC.Sim.defFor({ id: it.id }).water === 'aquatic') || (it.type === 'tool' && it.id === 'hand'));
     let hit = null;
     for (let i = 0; i < 40 && dist <= maxD; i++) {
       const p = w.plantAt(x, y, z); if (p && dist > 0.2) { hit = { type: 'plant', plant: p, x, y, z, dist }; break; }
@@ -251,9 +258,9 @@ BC.Game = class Game {
   updateTarget() {
     const h = this.raycast(); let info = null; const it = this.cur();
     if (h) {
-      if (h.type === 'plant') { const def = BC.Sim.defFor(h.plant); const p = h.plant; const mine = !p.wild && (this.mode !== 'shared' || !p.owner || p.owner === this.playerName); const whose = p.wild ? '' : (mine ? 'Your crop' : `${p.owner}'s crop`); const st = p.withered ? 'Withered' : p.wild ? (p.progress >= 1 ? 'Wild, mature' : 'Wild, regrowing') : p.progress >= 1 ? `${whose}: ready to harvest` : `${whose}: ${Math.round(p.progress * 100)}% grown`; info = { name: def.name, sub: def.sci + ' · ' + st, hint: it.type === 'tool' && it.id === 'hand' ? (p.wild ? (p.progress >= 1 ? (def.invasive ? 'Tap to pull it out' : 'Tap to collect seeds') : 'Regrowing: come back soon') : p.progress >= 1 ? 'Tap to harvest' : 'Tap to check its health') : 'Inspect: right-click or long-press' }; }
-      else if (h.type === 'block') { const b = BC.BLOCKS[h.id]; const tree = (b.log || b.leaves) ? BC.TREE_BY_ID[this.world.treeAt.get(this.world.idx(h.x, h.y, h.z))] : null; const soil = b.soil ? BC.SOILS[b.soil] : null; let hint = this.hintFor(it, b, tree, h); if (this.isDigTool(it)) { const key = h.x + ',' + h.y + ',' + h.z + ':' + it.id; const m = this.mining && this.mining.key === key ? this.mining : null; const need = this.hitsFor(it.id, b); hint = (m ? `${m.hits}/${need}` : `${need} ${need === 1 ? 'hit' : 'hits'}`) + ' · ' + hint; } info = { name: tree ? tree.name : b.name, sub: tree ? tree.sci + (b.leaves ? ' · leaves' : ' · trunk') : soil ? `${soil.name} (${soil.order}) · pH ${soil.ph}` : '', hint }; }
-      else if (h.type === 'water') info = { name: 'Shallow water', sub: 'Tap to plant here', hint: '' };
+      if (h.type === 'plant') { const def = BC.Sim.defFor(h.plant); const p = h.plant; const mine = !p.wild && (this.mode !== 'shared' || !p.owner || p.owner === this.playerName); const whose = p.wild ? '' : (mine ? 'Your crop' : `${p.owner}'s crop`); const st = p.withered ? 'Withered' : p.wild ? (p.progress >= 1 ? 'Wild, mature' : 'Wild, regrowing') : p.progress >= 1 ? `${whose}: ready to harvest` : `${whose}: ${Math.round(p.progress * 100)}% grown`; const pestNote = p.pest && !p.wild ? ` · ${BC.INSECT_BY_ID[p.pest.id] ? BC.INSECT_BY_ID[p.pest.id].name : 'pests'}!` : ''; info = { name: def.name, sub: def.sci + ' · ' + st + pestNote, hint: it.type === 'ingredient' ? (BC.INGREDIENT_BY_ID[it.id].apply === 'plant' ? 'Tap to apply to this plant' : BC.INGREDIENT_BY_ID[it.id].apply === 'soil' ? 'Tap to feed the soil under it' : 'Raw material: craft it first (E)') : it.type === 'tool' && it.id === 'hand' && p.pest && !p.wild ? 'Tap to hand-pick the pests' : it.type === 'tool' && it.id === 'hand' ? (p.wild ? (p.progress >= 1 ? (def.invasive ? 'Tap to pull it out' : 'Tap to collect seeds') : 'Regrowing: come back soon') : p.progress >= 1 ? 'Tap to harvest' : 'Tap to check its health') : 'Inspect: right-click or long-press' }; }
+      else if (h.type === 'block') { const b = BC.BLOCKS[h.id]; const tree = (b.log || b.leaves) ? BC.TREE_BY_ID[this.world.treeAt.get(this.world.idx(h.x, h.y, h.z))] : null; const soil = b.soil ? BC.SOILS[b.soil] : null; let hint = this.hintFor(it, b, tree, h); if (this.isDigTool(it)) { const key = h.x + ',' + h.y + ',' + h.z + ':' + it.id; const m = this.mining && this.mining.key === key ? this.mining : null; const need = this.hitsFor(it.id, b); hint = (m ? `${m.hits}/${need}` : `${need} ${need === 1 ? 'hit' : 'hits'}`) + ' · ' + hint; } if (b.hive) { const hv = this.world.hives.get(this.world.idx(h.x, h.y, h.z)); hint = hv && hv.honey >= 1 ? `${hv.honey} honey ready · tap with your hand` : 'Bees are working · ' + (hv ? Math.round((hv.t || 0) / this.HIVE_SECS * 100) + '%' : '0%') + ' to the next comb'; } if (soil && it.type === 'ingredient') { const ing = BC.INGREDIENT_BY_ID[it.id]; hint = ing.apply === 'soil' ? 'Tap to work it into this soil' : ing.apply === 'plant' ? 'Aim at an infested crop' : 'Raw material: craft it first (E)'; } info = { name: tree ? tree.name : b.name, sub: tree ? tree.sci + (b.leaves ? ' · leaves' : ' · trunk') : soil ? `${soil.name} (${soil.order}) · ${this.soilLine(h.x, h.z, soil)}` : '', hint }; }
+      else if (h.type === 'water') { const wb = this.waterBounty(h.x, h.z); info = it.type === 'seed' ? { name: 'Shallow water', sub: 'Tap to plant here', hint: '' } : { name: 'Water', sub: wb.length ? 'Tap to scoop ' + wb.map(i => BC.INGREDIENT_BY_ID[i].name.toLowerCase()).join(' or ') : 'Nothing to gather here', hint: '' }; }
       else if (h.type === 'animal') { const d = h.entity.def; const e = h.entity; const small = BC.isSmallAnimal(d); const rope = it.type === 'material' && it.id === 'rope'; info = { name: d.name, sub: d.sci + (e.leash ? ` · on ${e.leash}'s rope` : ''), hint: rope ? (small ? 'Small enough to catch by hand' : e.leash ? 'Tap to let go' : 'Tap to lead it with the rope') : small ? 'Tap to catch · hold to read about it' : 'Hold to read about it · craft a rope to lead it' }; }
     }
     const s = JSON.stringify(info); if (s !== this.lastTargetStr) { this.lastTargetStr = s; this.ui.setTarget(info); }
@@ -284,25 +291,29 @@ BC.Game = class Game {
     const above = w.plantAt(h.x, h.y + 1, h.z); if (above) w.removePlant(above);
     w.set(h.x, h.y, h.z, 0);
     if (b.log) { this.give({ type: 'block', id: h.id, count: 1 }); const tid = w.treeAt.get(w.idx(h.x, h.y, h.z)); if (tid) { this.lastInspect = null; this.discover('tree:' + tid, 'chopped'); } this.toast(`Chopped: 1 ${b.name.toLowerCase()}. Craft it into planks in your Bag (E).`, 'good'); }
-    else if (b.leaves) { const tid = w.treeAt.get(w.idx(h.x, h.y, h.z)); if (tid && Math.random() < 0.4) { this.give({ type: 'seed', id: 'tree:' + tid, count: 1 }); this.toast(`Found ${BC.TREE_BY_ID[tid].seed}!`, 'good'); st.seedSpecies.add('tree:' + tid); } else this.toast('Just leaves. Shake another branch for seeds.', ''); if (tid) this.discover('tree:' + tid, 'leaves'); }
+    else if (b.leaves) { if (Math.random() < 0.35) this.gain('leaf_litter', 1); const tid = w.treeAt.get(w.idx(h.x, h.y, h.z)); if (tid && Math.random() < 0.4) { this.give({ type: 'seed', id: 'tree:' + tid, count: 1 }); this.toast(`Found ${BC.TREE_BY_ID[tid].seed}!`, 'good'); st.seedSpecies.add('tree:' + tid); } else this.toast('Just leaves. Shake another branch for seeds.', ''); if (tid) this.discover('tree:' + tid, 'leaves'); }
     else if (b.soil) {
       this.give({ type: 'block', id: h.id, count: 1 }); const depth = Math.max(1, w.height[h.x + h.z * w.W] - h.y + 1); if (h.y <= w.height[h.x + h.z * w.W]) st.maxDig = Math.max(st.maxDig, depth);
       this.lastInspect = { x: h.x, y: h.y, z: h.z };
       if (!this.discover('soil:' + b.soil, 'dug')) { const below = BC.BLOCKS[w.get(h.x, h.y - 1, h.z)]; if (below && below.soil && below.soil !== b.soil) this.toast(`Dug through ${b.name.toLowerCase()} (${b.horizon} horizon). Below: ${below.name.toLowerCase()}.`, ''); }
-      if (b.soil !== 'stone' && Math.random() < 0.12 && ['alfisol', 'mollisol', 'histosol', 'compost'].includes(b.soil)) { this.discover('animal:earthworm', 'dug'); }
-    } else { this.give({ type: 'block', id: b.item !== undefined ? b.item : h.id, count: 1 }); if (b.bedPart) { const d = BC.FACING_DIR[b.facing]; const sgn = b.bedPart === 'head' ? 1 : -1; const px = h.x + d[0] * sgn, pz = h.z + d[1] * sgn; const pb = BC.BLOCKS[w.get(px, h.y, pz)]; if (pb && pb.bedPart && pb.bedPart !== b.bedPart) w.set(px, h.y, pz, 0); } }
+      if (b.soil !== 'stone' && Math.random() < 0.12 && ['alfisol', 'mollisol', 'histosol', 'compost'].includes(b.soil)) { this.discover('animal:earthworm', 'dug'); this.gain('worm_castings', 1); }
+      this.dropFrom('dig', h.id, 0.3);
+    } else { this.give({ type: 'block', id: b.item !== undefined ? b.item : h.id, count: 1 }); if (b.hive) { const key = w.idx(h.x, h.y, h.z); w.hives.delete(key); if (this.mode === 'shared') this.net.send('hive', { key, rm: true }); } if (b.bedPart) { const d = BC.FACING_DIR[b.facing]; const sgn = b.bedPart === 'head' ? 1 : -1; const px = h.x + d[0] * sgn, pz = h.z + d[1] * sgn; const pb = BC.BLOCKS[w.get(px, h.y, pz)]; if (pb && pb.bedPart && pb.bedPart !== b.bedPart) w.set(px, h.y, pz, 0); } }
   }
   // ---------- actions ----------
   applyWater(x, z, local) { const w = this.world; for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) { const xx = x + dx, zz = z + dz; if (xx >= 0 && zz >= 0 && xx < w.W && zz < w.D) w.moisture[xx + zz * w.W] = Math.min(1, w.moisture[xx + zz * w.W] + (dx === 0 && dz === 0 ? 1 : 0.5)); } w.markDirty(x, z); if (local && this.mode === 'shared') this.net.send('water', { x, z }); }
   primary() {
     if (this.ui.modalOpen()) return; const h = this.raycast(); if (!h) return; const it = this.cur(); const w = this.world; const st = this.stats;
     if (h.type === 'animal') return this.animalAction(h.entity, it);
+    if (h.type === 'water' && it.type === 'tool' && it.id === 'hand') return this.scoopWater(h);
+    if (h.type === 'block' && BC.BLOCKS[h.id].hive && it.type === 'tool' && it.id === 'hand') { const key = w.idx(h.x, h.y, h.z); if (this.isAuthority()) this.takeHoney(key, this.playerName); else this.net.send('hive_take', { key, by: this.playerName }); return; }
+    if (it.type === 'ingredient') return this.useIngredient(it, h);
     if (h.type === 'block' && BC.BLOCKS[h.id].toggle !== undefined && it.type === 'tool' && it.id === 'hand') { w.set(h.x, h.y, h.z, BC.BLOCKS[h.id].toggle); this.mining = null; return; }
     if (this.isDigTool(it)) {
       if (h.type === 'plant') { if (it.id === 'hand') return this.handOnPlant(h.plant); w.removePlant(h.plant); this.toast('Plant removed.', ''); return; }
       if (h.type !== 'block') return; this.lastPrimary = performance.now(); return this.mineHit(h, it);
     }
-    if (it.type === 'tool' && it.id === 'can') { if (h.type !== 'block' && h.type !== 'plant') return; this.applyWater(h.x, h.z, true); st.watered++; this.toast(`Watered. Moisture here is now ${Math.round(w.moisture[h.x + h.z * w.W] * 100)}%.`, 'good'); return; }
+    if (it.type === 'tool' && it.id === 'can') { if (h.type !== 'block' && h.type !== 'plant') return; if (h.type === 'plant' && h.plant.pest && !h.plant.wild) { const r = BC.Pests.waterSpray(this, h.plant); this.syncPlant(h.plant); this.applyWater(h.x, h.z, true); st.watered++; return this.toast(r.msg, r.ok ? 'good' : ''); } this.applyWater(h.x, h.z, true); st.watered++; this.toast(`Watered. Moisture here is now ${Math.round(w.moisture[h.x + h.z * w.W] * 100)}%.`, 'good'); return; }
     if (it.type === 'seed') return this.plantSeed(it, h);
     if (it.type === 'compost') { if (h.type !== 'block' || !BC.BLOCKS[h.id].soil) return this.toast('Compost goes on soil.', ''); const b = BC.BLOCKS[h.id]; if (b.soil === 'stone') return this.toast('Rock is not soil. Nothing to amend.', ''); w.set(h.x, h.y, h.z, BC.BLOCK.COMPOST); this.take(it); st.compostUsed = true; this.toast('Soil amended with compost: pH buffered to 6.5, more humus, better water holding.', 'good'); this.lastInspect = { x: h.x, y: h.y, z: h.z }; this.discover('soil:compost', 'made'); return; }
     if (it.type === 'animal') { if (h.type !== 'block') return; const [nx, ny, nz] = h.normal; const x = h.x + nx, z = h.z + nz; const t = w.top(x, z); if (w.get(x, t + 1, z) !== 0) return this.toast('No room to release it there.', ''); const e = this.animals.spawn(it.id, x + 0.5, z + 0.5); if (!e) return; if (this.mode === 'shared') this.net.send('animal_add', { uid: e.uid, id: it.id, x: e.x, z: e.z }); this.take(it); this.toast(`Released the ${e.def.name.toLowerCase()}.` + (e.def.role === 'pollinator' ? ' Pollinators released near flowering crops will visit them.' : ''), 'good'); return; }
@@ -310,7 +321,7 @@ BC.Game = class Game {
       if (def.dir) { const d = this.player.dir(); const f = ((Math.round(Math.atan2(d.x, -d.z) / (Math.PI / 2)) % 4) + 4) % 4; id = def.pane || def.id === 84 ? it.id + (f % 2) : it.id + f;
         if (def.bedPart) { const dv = BC.FACING_DIR[f]; const fx = x - dv[0], fz = z - dv[1]; const fc = w.get(fx, y, fz); if ((fc !== 0 && fc !== 15) || w.plantAt(fx, y, fz)) return this.toast('A bed needs two free blocks: this one and the one behind it.', ''); if (fx + 1 > p.x - 0.3 && fx < p.x + 0.3 && fz + 1 > p.z - 0.3 && fz < p.z + 0.3 && y + 1 > p.y && y < p.y + 1.8) return; w.set(fx, y, fz, 138 + f); }
         if (def.tall && w.get(x, y + 1, z) !== 0) return this.toast('A door needs the block above it free.', ''); }
-      w.set(x, y, z, id); this.take(it); if (it.id === BC.BLOCK.FENCE || def.wood) this.checkFences(); return; }
+      w.set(x, y, z, id); this.take(it); if (def.hive) { const key = w.idx(x, y, z); const hv = { honey: 0, wax: 0, t: 0 }; w.hives.set(key, hv); if (this.mode === 'shared') this.net.send('hive', { key, h: hv }); this.toast('Beehive set. Bees forage flowers within about 8 blocks: plant clover, sunflowers, lavender or fruit trees nearby and comb builds faster.', 'good'); } if (it.id === BC.BLOCK.FENCE || def.wood) this.checkFences(); return; }
   }
   animalAction(e, it) {
     const d = e.def; const small = BC.isSmallAnimal(d); const rope = it.type === 'material' && it.id === 'rope';
@@ -321,9 +332,10 @@ BC.Game = class Game {
       e.leash = e.leash ? null : this.playerName; if (this.mode === 'shared') this.net.send('leash', { uid: e.uid, by: e.leash }); this.stats.inspected.add('animal:' + d.id); this.discover('animal:' + d.id, 'inspected');
       this.toast(e.leash ? `The ${d.name.toLowerCase()} is on your rope and will follow you. Tap it again to let go.` : `You let the ${d.name.toLowerCase()} go.`, 'good'); return;
     }
-    if (!small) { this.toast(`Too big to pick up. Craft a rope (3 plant fibre) to lead a ${d.name.toLowerCase()}.`, ''); return this.inspect({ type: 'animal', entity: e }); }
+    if (!small) { const gift = this.animalGift(e); if (gift) return; this.toast(`Too big to pick up. Craft a rope (3 plant fibre) to lead a ${d.name.toLowerCase()}.`, ''); return this.inspect({ type: 'animal', entity: e }); }
+    const catchIng = BC.INGREDIENTS.find(i => i.from.catch && i.from.catch.includes(d.id)); if (catchIng) { this.animals.remove(e); if (this.mode === 'shared') this.net.send('animal_rm', { uid: e.uid }); this.gain(catchIng.id, 1, true); this.stats.inspected.add('animal:' + d.id); this.respawnLater(d.id, e.x, e.z); if (!this.discover('animal:' + d.id, 'inspected')) this.toast(`Caught a ${d.name.toLowerCase()}. Whole fish and crab are fertiliser: bury them deep, or craft fish emulsion and crab shell meal.`, 'good'); return; }
     this.animals.remove(e); if (this.mode === 'shared') this.net.send('animal_rm', { uid: e.uid }); this.give({ type: 'animal', id: d.id, count: 1 }); this.stats.inspected.add('animal:' + d.id);
-    const note = d.id === 'dart_frog' ? ' You scooped it up with a leaf: never touch a dart frog bare-handed.' : d.id === 'bumblebee' ? ' Gently: a squeezed bee stings.' : d.role === 'pollinator' ? ' Release it next to your flowering crops.' : '';
+    if (d.id === 'little_brown_bat' || d.id === 'long_nosed_bat') this.gain('bat_guano', 1); const note = d.id === 'dart_frog' ? ' You scooped it up with a leaf: never touch a dart frog bare-handed.' : d.id === 'bumblebee' ? ' Gently: a squeezed bee stings.' : d.role === 'pollinator' ? ' Release it next to your flowering crops.' : '';
     if (!this.discover('animal:' + d.id, 'inspected')) this.toast(`Caught a ${d.name.toLowerCase()}. It is in your bag.${note}`, 'good'); else this.toast(`Caught a ${d.name.toLowerCase()}.${note}`, 'good');
   }
   secondary() { if (this.ui.modalOpen()) return; const h = this.raycast(); if (h) this.inspect(h); }
@@ -342,11 +354,13 @@ BC.Game = class Game {
       p.progress = 0.5; w.markDirty(p.x, p.z); this.syncPlant(p); const first = !st.seedSpecies.has(def.id); st.seedSpecies.add(def.id); if (first) this.points += 5;
       this.give({ type: 'seed', id: def.id, count: 2 }); const fib = BC.FIBRE_PLANTS[def.id] || 0; if (fib) this.give({ type: 'material', id: 'fibre', count: fib }); this.lastInspect = p; if (!this.discover(key, 'collected')) this.toast(`Collected 2 × ${def.seed}.` + (fib ? ` Also ${fib} plant fibre for rope.` : ''), 'good'); st.inspected.add(key); return;
     }
+    if (p.pest) { const r = BC.Pests.handPick(this, p); this.syncPlant(p); this.toast(r.msg, r.ok ? 'good' : ''); return; }
     if (p.progress < 1) { const ev = BC.Sim.evaluate(w, p); st.inspected.add(key); if (!this.discover(key, 'inspected')) this.ui.showCard(key, false, p, ev); return; }
     // harvest
     const n = p.pollinated ? 4 : 2; this.give({ type: 'seed', id: def.id, count: n }); st.harvests++; this.points += 2; st.compostMaterial++;
     let msg = `Harvested ${def.name}: ${n} × ${def.seed}${p.pollinated ? ' (pollinated: double seeds)' : ''}.`; const fib = BC.FIBRE_PLANTS[def.id] || 0; if (fib) { this.give({ type: 'material', id: 'fibre', count: fib }); msg += ` +${fib} plant fibre.`; }
     if (st.compostMaterial >= 3) { st.compostMaterial -= 3; st.compostMade++; this.give({ type: 'compost', count: 1 }); msg += ' Plant waste became 1 compost.'; }
+    { const got = this.dropFrom('harvest', def.id, 0.7, true); if (got.length) msg += ' Also: ' + got.join(', ') + '.'; }
     if (def.life && def.life.startsWith('Annual')) { w.removePlant(p); msg += ' Annuals die after seeding.'; } else { p.progress = 0.45; p.pollinated = false; w.markDirty(p.x, p.z); this.syncPlant(p); }
     this.toast(msg, 'good');
   }
@@ -360,10 +374,42 @@ BC.Game = class Game {
     const p = w.addPlant({ id: it.id, x, y, z, wild: false, progress: 0, health: 1, onBark, owner: this.playerName }); this.take(it); st.planted++;
     const ev = BC.Sim.evaluate(w, p); if (ev.score > 0.6) st.plantedGood++;
     if (def.nFix) st.legumesPlanted++;
+    { let crop = false, comp = false; w.plants.forEach(q => { if (q.wild || q === p || Math.abs(q.x - x) > 2 || Math.abs(q.z - z) > 2) return; const qd = BC.PLANT_BY_ID[q.id]; if (!qd) return; if (qd.companion) comp = true; else crop = true; }); if ((def.companion && crop) || (!def.companion && comp)) { if (!st.companionPlanted) this.toast(`${def.name} planted next to ${def.companion ? 'a crop' : 'a companion plant'}: mixed beds confuse pests and feed their predators.`, 'good'); st.companionPlanted = true; } }
     if (['corn', 'bean', 'squash'].includes(def.id)) { const near = id => { let f = false; w.plants.forEach(q => { if (!q.wild && q.id === id && Math.abs(q.x - x) <= 2 && Math.abs(q.z - z) <= 2) f = true; }); return f; }; if (near('corn') && near('bean') && near('squash')) st.threeSisters = true; }
     const worst = ev.factors.slice().sort((a, b) => a.score - b.score)[0];
     this.toast(ev.score > 0.7 ? `Planted ${def.name}. Conditions look good.` : ev.score > 0.4 ? `Planted ${def.name}. It will struggle: ${worst.msg}` : `Planted ${def.name}, but ${worst.msg.charAt(0).toLowerCase() + worst.msg.slice(1)}`, ev.score > 0.7 ? 'good' : ev.score > 0.4 ? '' : 'bad');
   }
+  // ---------- ingredients ----------
+  obtained(item) { if (item && item.type === 'ingredient' && !this.stats.journal.has('ingredient:' + item.id)) { this.lastInspect = null; this.discover('ingredient:' + item.id, 'found'); } }
+  gain(id, n, quiet) { const g = BC.INGREDIENT_BY_ID[id]; if (!g) return; this.give({ type: 'ingredient', id, count: n || 1 }); if (!quiet && this.stats.journal.has('ingredient:' + id)) this.toast(`+${n || 1} ${g.name.toLowerCase()}`, ''); this.obtained({ type: 'ingredient', id }); }
+  // Drop ingredients whose `from[kind]` lists `id`. Returns names given.
+  dropFrom(kind, id, chance, quiet) { const got = []; BC.INGREDIENTS.forEach(g => { const src = g.from[kind]; if (!src) return; const star = src.includes('*'); if (!star && !src.includes(id)) return; const gc = g.chance !== undefined ? g.chance : g.from.chance; const c = gc !== undefined ? gc : (star ? 0.5 : chance); if (Math.random() >= c) return; this.gain(g.id, 1, true); got.push(g.name.toLowerCase()); }); if (!quiet && got.length) this.toast('Gathered ' + got.join(', ') + '.', ''); return got; }
+  waterBounty(x, z) { const biome = this.world.biomeAt(x, z); const out = ['pond_algae']; if (biome === 'wetland') out.push('duckweed'); if (biome === 'mangrove') out.push('kelp', 'oyster_shell'); return out; }
+  scoopWater(h) { const key = h.x + ',' + h.z; this.scoops = this.scoops || new Map(); const last = this.scoops.get(key) || -1e9; if (this.time.t - last < 90) return this.toast('You already scooped here. Algae regrow in a minute or two.', ''); const opts = this.waterBounty(h.x, h.z); const id = opts[Math.floor(Math.random() * opts.length)]; this.scoops.set(key, this.time.t); this.gain(id, 1, true); const g = BC.INGREDIENT_BY_ID[id]; if (this.stats.journal.has('ingredient:' + id)) this.toast(`Scooped ${g.name.toLowerCase()}. ${id === 'pond_algae' ? 'Dry it and dig it in: a free nitrogen source.' : id === 'kelp' ? 'Rinse the salt off before composting.' : ''}`, 'good'); }
+  animalGift(e) { const d = e.def; const g = BC.INGREDIENTS.filter(i => i.from.animal && i.from.animal.includes(d.id)); if (!g.length) return false; if (e.giftT && this.time.t - e.giftT < 180) { this.toast(`The ${d.name.toLowerCase()} has nothing more for you yet. Come back later.`, ''); return true; } e.giftT = this.time.t; const pick = g[Math.floor(Math.random() * g.length)]; this.gain(pick.id, 1, true); if (this.stats.journal.has('ingredient:' + pick.id)) this.toast(`Collected ${pick.name.toLowerCase()} where the ${d.name.toLowerCase()} had been.`, 'good'); return true; }
+  respawnLater(id, x, z) { this.respawns = this.respawns || []; this.respawns.push({ id, x, z, t: this.time.t + 150 }); }
+  tickRespawns() { if (!this.respawns || !this.respawns.length || !this.isAuthority()) return; const now = this.time.t; this.respawns = this.respawns.filter(r => { if (now < r.t) return true; const e = this.animals.spawn(r.id, r.x, r.z); if (e && this.mode === 'shared') this.net.send('animal_add', { uid: e.uid, id: r.id, x: e.x, z: e.z }); return false; }); }
+  useIngredient(it, h) {
+    const g = BC.INGREDIENT_BY_ID[it.id]; const w = this.world, st = this.stats; if (!g) return;
+    if (g.apply === 'none') { const uses = BC.RECIPES.filter(r => r.ins.some(i => i.match(it))).map(r => r.name); return this.toast(`${g.name} is a raw material. ${uses.length ? 'Craft it into ' + uses.slice(0, 4).join(', ') + ' in your Bag (E).' : 'Compost it with other scraps.'}`, ''); }
+    if (g.apply === 'plant') {
+      if (h.type !== 'plant' || h.plant.wild) return this.toast(`${g.name} goes on a crop you planted. Aim at the plant itself.`, '');
+      const p = h.plant; const r = BC.Pests.treat(this, p, it.id); if (r.ok && !r.keep) this.take(it); if (r.ok) { this.syncPlant(p); if (this.mode === 'shared') this.net.send('plant', { key: p.key, p: this.packPlant(p) }); } return this.toast(r.msg, r.ok ? 'good' : '');
+    }
+    // soil amendment: tap soil, or a crop to feed the soil under it
+    let x, y, z; if (h.type === 'plant') { x = h.plant.x; y = h.plant.y - 1; z = h.plant.z; } else if (h.type === 'block') { x = h.x; y = h.y; z = h.z; } else return this.toast(`${g.name} goes on soil.`, '');
+    const b = BC.BLOCKS[w.get(x, y, z)]; if (!b || !b.soil) return this.toast(`${g.name} goes on soil, not ${b ? b.name.toLowerCase() : 'air'}.`, '');
+    if (b.soil === 'stone') return this.toast('Bare rock has no soil life to feed. Dig down to soil or build a raised bed.', '');
+    const before = w.soilChem(x, z, BC.SOILS[b.soil]); const out = w.amend(x, z, g); this.take(it); st.fertilised++; st.amendmentsUsed.add(g.id);
+    if (this.mode === 'shared') this.net.send('amend', { x, z, id: g.id });
+    const after = w.soilChem(x, z, BC.SOILS[b.soil]); const over = after.n > 1 ? ' Careful: nitrogen is now very high, which draws aphids and burns roots.' : '';
+    const limeNote = (g.id === 'garden_lime' || g.id === 'wood_ash') && before.ph >= 7 ? ' This soil was already alkaline: iron and phosphorus lock up above pH 7.5.' : (g.id === 'sulfur_dust' || g.id === 'peat_moss' || g.id === 'pine_needle_mulch') && before.ph <= 5.5 ? ' This soil was already acid: below pH 5.5 aluminium becomes toxic to roots.' : '';
+    this.lastInspect = { x, y, z }; this.toast(`${g.name} worked in: ${out.length ? out.join(', ') : 'no change'}. pH now ${after.ph.toFixed(1)}.${over}${limeNote}`, over || limeNote ? '' : 'good');
+  }
+  soilLine(x, z, soil) { const c = this.world.soilChem(x, z, soil); const lv = v => v < 0.25 ? 'low' : v < 0.6 ? 'ok' : v <= 1 ? 'rich' : 'excess'; return `pH ${c.ph.toFixed(1)} · N ${lv(c.n)} · P ${lv(c.p)} · K ${lv(c.k)}${c.mulch > 0.05 ? ' · mulched' : ''}`; }
+  get HIVE_SECS() { return 240; }
+  tickHives(dt) { const w = this.world; if (!w.hives.size) return; w.hives.forEach((h, key) => { const c = w.coords(key); let flowers = 0; w.plants.forEach(q => { const d = BC.PLANT_BY_ID[q.id]; if (d && d.pollinator && q.progress >= 1 && Math.abs(q.x - c[0]) <= 8 && Math.abs(q.z - c[2]) <= 8) flowers++; }); const rate = 0.3 + Math.min(1.2, flowers * 0.15); h.t = (h.t || 0) + dt * rate * this.growthMult; if (h.t >= this.HIVE_SECS && (h.honey || 0) < 6) { h.t -= this.HIVE_SECS; h.honey = (h.honey || 0) + 1; if (Math.random() < 0.5) h.wax = (h.wax || 0) + 1; } }); }
+  takeHoney(key, by) { const w = this.world; const h = w.hives.get(key); if (!h) return; const give = (item) => { if (by === this.playerName || this.mode !== 'shared') { this.give(item); this.obtained(item); } else this.net.send('give', { to: by, item }); }; if (!h.honey) { this.notify(by, 'No capped comb yet. Bees need flowering plants within about 8 blocks; more flowers, faster honey.', ''); return; } const n = h.honey, wx = h.wax || 0; give({ type: 'ingredient', id: 'honey', count: n }); if (wx) give({ type: 'ingredient', id: 'beeswax', count: wx }); h.honey = 0; h.wax = 0; this.credit(by, 'honey', n); if (this.mode === 'shared') this.net.send('hive', { key, h }); this.notify(by, `Took ${n} honey${wx ? ` and ${wx} beeswax` : ''}. Leave the bees enough for themselves: a hive needs about 25 kg of honey to get through a winter.`, 'good'); }
   isFenced(p) { const w = this.world; for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const b = BC.BLOCKS[w.get(p.x + dx, p.y, p.z + dz)]; if (!b || !b.solid) return false; } return true; }
   checkFences() { let any = false; this.world.plants.forEach(p => { if (!p.wild && this.isFenced(p)) { p.protected = true; any = true; } }); if (any && !this.stats.fenced) { this.stats.fenced = true; this.toast('Your crop is fenced on all four sides. Deer and rabbits will go hungry.', 'good'); } }
   // ---------- inventory ----------
@@ -372,14 +418,14 @@ BC.Game = class Game {
   count(match) { return this.inventory.reduce((a, i) => a + (i && match(i) ? (i.count || 0) : 0), 0); }
   consume(match, n) { for (const i of this.inventory) { if (n <= 0) break; if (!i || !match(i)) continue; const k = Math.min(n, i.count); i.count -= k; n -= k; } this.inventory = this.inventory.map((i, idx) => (i && i.count !== undefined && i.count <= 0) ? null : i).filter((i, idx) => idx < 9 || i); while (this.inventory.length < 9) this.inventory.push(null); this.ui.renderHotbar(); }
   canCraft(r) { return r.ins.every(inp => this.count(inp.match) >= inp.n); }
-  craft(r) { if (!this.canCraft(r)) return false; r.ins.forEach(inp => this.consume(inp.match, inp.n)); this.give(Object.assign({}, r.out)); this.toast(`Crafted ${r.out.count} × ${this.itemShortName(r.out)}.`, 'good'); return true; }
+  craft(r) { if (!this.canCraft(r)) return false; r.ins.forEach(inp => this.consume(inp.match, inp.n)); this.give(Object.assign({}, r.out)); this.obtained(r.out); (r.also || []).forEach(o => { this.give(Object.assign({}, o)); this.obtained(o); }); this.toast(`Crafted ${r.out.count} × ${this.itemShortName(r.out)}${r.also ? ' and ' + r.also.map(o => `${o.count} × ${this.itemShortName(o)}`).join(', ') : ''}.`, 'good'); return true; }
   bagItems() { return this.inventory.map((it, i) => ({ it, i })).filter(x => x.i >= 9 && x.it); }
   moveToHotbar(bagIndex) { const it = this.inventory[bagIndex]; if (!it) return; const cur = this.inventory[this.selected]; if (cur && cur.type === 'tool') { this.toast('Pick an empty or non-tool hotbar slot first.', ''); return; } this.inventory[this.selected] = it; if (cur) this.inventory[bagIndex] = cur; else this.inventory.splice(bagIndex, 1); this.ui.renderHotbar(); }
   moveToBag(slot) { const it = this.inventory[slot]; if (!it || it.type === 'tool') return; this.inventory[slot] = null; this.inventory.push(it); this.ui.renderHotbar(); }
   select(i) { if (i < 0 || i > 8) return; this.selected = i; this.ui.renderHotbar(); }
   scrollHotbar(d) { this.select((this.selected + d + 9) % 9); }
   itemShortName(it) { return this.itemName(it).split(':')[0].replace(/ \((block|faces the way you look)\)$/, ''); }
-  itemName(it) { if (!it) return 'Empty slot'; if (it.type === 'tool') return { hand: 'Hand: collect, harvest, catch small animals (digs slowly)', trowel: 'Shovel: digs soil in 2 hits', axe: 'Axe: chops wood in 2 hits', can: 'Watering can' }[it.id]; if (it.type === 'seed') { const d = BC.Sim.defFor({ id: it.id }); return `${d.seed} (${d.name})`; } if (it.type === 'compost') return 'Compost: tap a soil block to amend it'; if (it.type === 'block') { const b = BC.BLOCKS[it.id]; return b.fence ? 'Fence post: place around crops' : b.id === 76 ? 'Raised garden bed: plantable compost soil in a wooden frame' : b.dir ? b.name + ' (faces the way you look)' : b.wood || b.plank ? b.name : b.name + ' (block)'; } if (it.type === 'material') { const m = BC.MATERIALS[it.id]; return m ? `${m.name}: ${m.desc}` : it.id; } if (it.type === 'animal') { const d = BC.ANIMAL_BY_ID[it.id]; return d ? `${d.name} (caught): tap the ground to release` : 'Animal'; } return ''; }
+  itemName(it) { if (!it) return 'Empty slot'; if (it.type === 'tool') return { hand: 'Hand: collect, harvest, catch small animals (digs slowly)', trowel: 'Shovel: digs soil in 2 hits', axe: 'Axe: chops wood in 2 hits', can: 'Watering can' }[it.id]; if (it.type === 'seed') { const d = BC.Sim.defFor({ id: it.id }); return `${d.seed} (${d.name})`; } if (it.type === 'compost') return 'Compost: tap a soil block to amend it'; if (it.type === 'block') { const b = BC.BLOCKS[it.id]; return b.fence ? 'Fence post: place around crops' : b.id === 76 ? 'Raised garden bed: plantable compost soil in a wooden frame' : b.dir ? b.name + ' (faces the way you look)' : b.wood || b.plank ? b.name : b.name + ' (block)'; } if (it.type === 'material') { const m = BC.MATERIALS[it.id]; return m ? `${m.name}: ${m.desc}` : it.id; } if (it.type === 'animal') { const d = BC.ANIMAL_BY_ID[it.id]; return d ? `${d.name} (caught): tap the ground to release` : 'Animal'; } if (it.type === 'ingredient') { const g = BC.INGREDIENT_BY_ID[it.id]; if (!g) return it.id; const how = g.apply === 'soil' ? 'tap soil to apply' : g.apply === 'plant' ? 'tap an infested crop' : 'raw material: craft it'; return `${g.name}: ${how}`; } return ''; }
   itemIcon(it, size) {
     if (!it) return null;
     if (it.type === 'animal') { const d = BC.ANIMAL_BY_ID[it.id]; return d ? this.ui.imgFor('animal', d) : null; }
@@ -387,6 +433,7 @@ BC.Game = class Game {
     if (it.type === 'seed') { const d = BC.Sim.defFor({ id: it.id }); if (d.shape) { const c = BC.Atlas.tileCanvas(d.leaf ? 'leaves_' + d.id : 'cactus', size); const g = c.getContext('2d'); g.fillStyle = '#5a3a1a'; g.beginPath(); g.ellipse(size * 0.5, size * 0.72, size * 0.16, size * 0.22, 0.3, 0, 6.283); g.fill(); return c; } return BC.Atlas.spriteCanvas(d, 2, size); }
     if (it.type === 'block') { const b = BC.BLOCKS[it.id]; const c = BC.Atlas.tileCanvas(b.tex[1], size); if (b.fence) { const g = c.getContext('2d'); g.clearRect(0, 0, size, size); g.fillStyle = '#9a7a4a'; g.fillRect(size * 0.2, size * 0.1, size * 0.14, size * 0.85); g.fillRect(size * 0.66, size * 0.1, size * 0.14, size * 0.85); g.fillRect(size * 0.1, size * 0.3, size * 0.8, size * 0.1); g.fillRect(size * 0.1, size * 0.6, size * 0.8, size * 0.1); } return c; }
     if (it.type === 'compost') return BC.Atlas.tileCanvas('compost', size);
+    if (it.type === 'ingredient') { const g = BC.INGREDIENT_BY_ID[it.id]; return g ? BC.Atlas.ingredientCanvas(g, size) : null; }
     const c = document.createElement('canvas'); c.width = c.height = size; const g = c.getContext('2d'); const s = size / 32;
     if (it.id === 'hand') { g.fillStyle = '#e8b890'; g.fillRect(9 * s, 12 * s, 14 * s, 14 * s); for (let i = 0; i < 4; i++) g.fillRect((9 + i * 3.6) * s, (4 + (i === 0 || i === 3 ? 3 : 0)) * s, 2.8 * s, 10 * s); g.fillRect(4 * s, 14 * s, 6 * s, 3 * s); }
     else if (it.id === 'trowel') { g.fillStyle = '#7a4a2a'; g.fillRect(14 * s, 2 * s, 4 * s, 12 * s); g.fillStyle = '#b8b8c0'; g.beginPath(); g.moveTo(9 * s, 14 * s); g.lineTo(23 * s, 14 * s); g.lineTo(16 * s, 30 * s); g.closePath(); g.fill(); }

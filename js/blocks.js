@@ -99,6 +99,7 @@ window.BC = window.BC || {};
   face(130, 'Picket gate (open)', 'gateopen', { tex: ['gate', 'gate', 'gate'], extra: { solid: false, hidden: true } }); for (let k = 0; k < 4; k++) { B[130 + k].toggle = 126 + k; B[130 + k].item = 126; }
   face(134, 'Bed', 'bedhead', { tex: ['bed_head', 'bed_side', P], extra: { bedPart: 'head' } });
   face(138, 'Bed', 'bedfoot', { tex: ['bed_foot', 'bed_side', P], extra: { bedPart: 'foot', hidden: true } }); for (let k = 0; k < 4; k++) B[138 + k].item = 134;
+  def(146, { name: 'Beehive', wood: true, solid: true, hive: true, tex: ['beehive_top', 'beehive', 'planks'] });
   BC.FACING_DIR = [[0, -1], [1, 0], [0, 1], [-1, 0]];
   BC.BLOCKS = B;
   BC.BLOCK = {

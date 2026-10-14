@@ -189,3 +189,6 @@ body.touch #compass { top: calc(104px + env(safe-area-inset-top, 0px)); } @media
 .world-card .here { font-style: normal; font-size: 12px; opacity: 0.8; }
 .world-list.dark .world-card { background: var(--paper-2); border-color: var(--rule); } .world-list.dark .world-card .online { color: #2d7a1e; } .world-list.dark .world-card .join.ghost { color: var(--ink); border-color: var(--ink-soft); }
 .world-card .acts { grid-row: 1 / 5; }
+
+.pestbox { border: 1px solid #d9a07a; background: #fbe9dd; border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; font-size: 14px; } .pestbox p { margin: 4px 0; } .pestbox.ok { border-color: #a8c89a; background: #e9f3e2; } .small-btn { margin-top: 6px; padding: 6px 10px; font-size: 13px; border-radius: 8px; border: 1px solid var(--rule); background: var(--paper-2); color: var(--ink); }
+.bar.npk i { background: #b08a4a; }

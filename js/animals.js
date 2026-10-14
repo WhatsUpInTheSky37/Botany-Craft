@@ -43,7 +43,7 @@ BC.Animals = class Animals {
   nearestPlant(e, pred, range) {
     let best = null, bd = range * range; this.game.world.plants.forEach(p => { if (!pred(p)) return; const d = (p.x + 0.5 - e.x) ** 2 + (p.z + 0.5 - e.z) ** 2; if (d < bd) { bd = d; best = p; } }); return best;
   }
-  walkable(e, x, z) { const w = this.game.world; if (x < 1 || z < 1 || x >= w.W - 1 || z >= w.D - 1) return false; const t = w.top(x | 0, z | 0); const under = w.get(x | 0, t, z | 0); const above = w.get(x | 0, t + 1, z | 0); if (above === 15 && !(e.def.id === 'moose' || e.def.id === 'frog' || e.def.id === 'heron' || e.def.flies)) return false; if (above === 15 && w.get(x | 0, t + 2, z | 0) === 15) return false; if (BC.BLOCKS[under] && BC.BLOCKS[under].fence) return false; if (Math.abs(t + 1 - e.y) > 1.6 && !e.def.flies) return false; return true; }
+  walkable(e, x, z) { const w = this.game.world; if (x < 1 || z < 1 || x >= w.W - 1 || z >= w.D - 1) return false; const t = w.top(x | 0, z | 0); const under = w.get(x | 0, t, z | 0); const above = w.get(x | 0, t + 1, z | 0); if (e.def.aquatic) return above === 15; if (above === 15 && !(e.def.id === 'moose' || e.def.id === 'frog' || e.def.id === 'heron' || e.def.flies)) return false; if (above === 15 && w.get(x | 0, t + 2, z | 0) === 15) return false; if (BC.BLOCKS[under] && BC.BLOCKS[under].fence) return false; if (Math.abs(t + 1 - e.y) > 1.6 && !e.def.flies) return false; return true; }
   update(dt) {
     const w = this.game.world; const pl = this.game.player.pos; const stats = this.game.stats; const others = this.game.peerPositions();
     for (const e of this.list) {
@@ -82,7 +82,7 @@ BC.Animals = class Animals {
         }
       }
       // ground follow
-      const t = w.top(e.x | 0, e.z | 0); let gy = t + 1; if (w.get(e.x | 0, t + 1, e.z | 0) === 15) gy = t + 1.6;
+      const t = w.top(e.x | 0, e.z | 0); let gy = t + 1; if (w.get(e.x | 0, t + 1, e.z | 0) === 15) gy = d.aquatic ? t + 1.1 : t + 1.6;
       const targetY = gy + (d.flies ? e.fly + Math.sin(e.bob * 2) * 0.2 : 0); e.y += (targetY - e.y) * Math.min(1, 8 * dt);
       const hop = (d.id === 'cottontail' || d.id === 'hare' || d.id === 'frog' || d.id === 'dart_frog') && e.target ? Math.abs(Math.sin(e.bob * 8)) * 0.25 : (e.target && !d.flies ? Math.abs(Math.sin(e.bob * 10)) * 0.04 : 0);
       e.mesh.position.set(e.x, e.y + hop, e.z); e.mesh.rotation.y = e.yaw; e.mesh.rotation.z = d.flies ? Math.sin(e.bob * 3) * 0.1 : 0;

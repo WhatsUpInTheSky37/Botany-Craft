@@ -175,6 +175,11 @@ BC.TREES = [
     seed: 'mangrove propagules',
     teach: 'A tree that walks into the sea on stilt roots. Its seeds germinate while still on the branch, then drop as pencil-shaped seedlings that float until they strike mud and root.',
     facts: ['Mangroves filter salt at the root and excrete the rest through old leaves. The roots take in oxygen through pores above the water line.', 'Mangrove forests shelter juvenile fish, trap sediment, and absorbed much of the 2004 tsunami\'s energy where they had not been cleared for shrimp farms.', 'Per hectare, mangrove mud stores four times more carbon than rainforest.'] },
+  { id: 'neem', name: 'Neem', sci: 'Azadirachta indica', family: 'Meliaceae (mahogany family)',
+    biomes: ['rainforest', 'desert'], soils: ['oxisol', 'aridisol', 'compost'], ph: [5.5, 8.0], water: 'low', sun: 'full', shape: 'broad', log: 'tropical', leaf: '#3a8a40', height: [6, 8], grow: 420,
+    seed: 'neem seeds',
+    teach: 'The village pharmacy of India. Its seeds hold azadirachtin, which stops insects feeding and moulting; the oil is the most widely used botanical pesticide in the world. Twigs are chewed as toothbrushes.',
+    facts: ['Locusts will starve rather than eat neem leaves; the compound was identified when a 1959 Sudanese locust plague left neem trees untouched.', 'It grows in poor, dry soil and is planted across the Sahel against desertification.', 'Neem cake, the pressed seed, is a fertiliser that also suppresses nematodes.'] },
 ];
 BC.TREE_BY_ID = {};
 BC.TREES.forEach(t => { BC.TREE_BY_ID[t.id] = t; });
