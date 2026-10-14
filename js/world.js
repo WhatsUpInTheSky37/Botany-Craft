@@ -9,6 +9,7 @@ BC.World = class World {
     this.height = new Uint8Array(this.W * this.D);
     this.moisture = new Float32Array(this.W * this.D);
     this.nutr = new Float32Array(this.W * this.D * 3); this.phShift = new Float32Array(this.W * this.D); this.om = new Float32Array(this.W * this.D); this.mulch = new Float32Array(this.W * this.D); this.hives = new Map(); this.chests = new Map();
+    this.hf = new Float32Array(this.W * this.D); this.nutrBase = null; this.flowDir = new Int8Array(this.W * this.D).fill(-1); this.flowAcc = new Float32Array(this.W * this.D); this.wetBonus = new Float32Array(this.W * this.D); this.wlvl = new Uint8Array(this.W * this.D * this.H); this.waterQueue = []; this.stream = new Uint8Array(this.W * this.D);
     this.plants = new Map(); this.treeAt = new Map(); this.diffs = new Map();
     this.dirty = new Set(); this.CX = Math.ceil(this.W / 16); this.CZ = Math.ceil(this.D / 16);
     this.rand = BC.util.rng(this.seed);
@@ -21,8 +22,9 @@ BC.World = class World {
   set(x, y, z, id, silent) {
     if (!this.inBounds(x, y, z)) return;
     const i = this.idx(x, y, z); if (this.blocks[i] === id) return;
-    this.blocks[i] = id; if (!silent) this.diffs.set(i, id);
+    const was = this.blocks[i]; this.blocks[i] = id; if (!silent) this.diffs.set(i, id);
     if (this.onBlock && !this.remote) this.onBlock(x, y, z, id);
+    if (id === 0 || id === 15 || was === 15) this.onWaterChange(x, y, z, id, was);
     this.markDirty(x, z); if ((x & 15) === 0) this.markDirty(x - 1, z); if ((x & 15) === 15) this.markDirty(x + 1, z); if ((z & 15) === 0) this.markDirty(x, z - 1); if ((z & 15) === 15) this.markDirty(x, z + 1);
   }
   markDirty(x, z) { if (x < 0 || z < 0 || x >= this.W || z >= this.D) return; this.dirty.add((x >> 4) + (z >> 4) * this.CX); }
@@ -59,12 +61,12 @@ BC.World = class World {
       if (biome === 'desert') h = 13 + (h - 13) * 0.6 + 1; // flatter, higher: no lakes
       if (biome !== 'desert' && h >= WL - 1 && h <= WL + 1.2 && moist > 0.38 && temp > 0.2) biome = 'wetland';
       if (biome === 'wetland') h = Math.min(h, WL + 1);
-      h = BC.util.clamp(Math.round(h), 3, H - 12);
+      this.hf[ci] = h; h = BC.util.clamp(Math.round(h), 3, H - 12);
       this.biome[ci] = BC.BIOME_LIST.indexOf(biome); this.height[ci] = h;
       this.moisture[ci] = BC.BIOMES[biome].baseMoisture; const nb = BC.SOIL_NUTR[BC.BIOMES[biome].soil]; this.nutr[ci * 3] = nb[0]; this.nutr[ci * 3 + 1] = nb[1]; this.nutr[ci * 3 + 2] = nb[2];
       this.fillColumn(x, z, h, biome);
     }
-    this.placeTrees(); this.placePlants(); this.placeVillages(); this.pickAnimals();
+    this.computeFlow(); this.carveStreams(); this.placeTrees(); this.placePlants(); this.placeVillages(); this.computeWetness(); this.pickAnimals();
     this.diffs.clear(); this.generating = false;
     this.genPlantKeys = new Set(this.plants.keys()); this.genTreeKeys = new Set(this.treeAt.keys());
   }
@@ -92,7 +94,7 @@ BC.World = class World {
     const occupied = new Set();
     for (let z = 3; z < this.D - 3; z += 1) for (let x = 3; x < this.W - 3; x += 1) {
       const biome = this.biomeAt(x, z); const h = this.height[x + z * this.W];
-      if (h < this.WL + (biome === 'wetland' ? -1 : 1)) continue;
+      if (h < this.WL + (biome === 'wetland' ? -1 : 1) || this.stream[x + z * this.W]) continue;
       if (this.rand() > density[biome]) continue;
       let ok = true; for (let dz = -2; dz <= 2 && ok; dz++) for (let dx = -2; dx <= 2; dx++) if (occupied.has((x + dx) + ',' + (z + dz))) { ok = false; break; }
       if (!ok) continue;
@@ -102,6 +104,59 @@ BC.World = class World {
       if (this.buildTree(t, x, h + 1, z, true)) occupied.add(x + ',' + z);
     }
   }
+  // ---------- hydrology ----------
+  // D8 flow: every column drains to its lowest neighbour; accumulation counts how many columns drain through each cell (a proxy for stream size).
+  computeFlow() {
+    const W = this.W, D = this.D, H = this.hf; const dirs = [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]]; this.FLOW_DIRS = dirs;
+    const n = (x, z) => { if (this.height[x + z * W] < this.WL) return -1; const h0 = H[x + z * W]; let best = -1, bd = 0; for (let k = 0; k < 8; k++) { const nx = x + dirs[k][0], nz = z + dirs[k][1]; if (nx < 0 || nz < 0 || nx >= W || nz >= D) continue; const drop = (h0 - H[nx + nz * W]) / (k % 2 ? 1.414 : 1); if (drop > bd) { bd = drop; best = k; } } return best; };
+    for (let z = 0; z < D; z++) for (let x = 0; x < W; x++) this.flowDir[x + z * W] = n(x, z);
+    const order = new Uint32Array(W * D); for (let i = 0; i < W * D; i++) order[i] = i; order.sort((a, b) => H[b] - H[a]);
+    const acc = this.flowAcc; acc.fill(1);
+    for (let k = 0; k < order.length; k++) { const i = order[k]; const d = this.flowDir[i]; if (d < 0) continue; const x = i % W, z = (i / W) | 0; const j = (x + dirs[d][0]) + (z + dirs[d][1]) * W; acc[j] += acc[i]; }
+  }
+  // Streams: where enough land drains through a column above the lake level, cut the surface down one block and fill it with water.
+  carveStreams() {
+    const W = this.W, D = this.D, WL = this.WL; const dirs = this.FLOW_DIRS;
+    const land = []; for (let i = 0; i < W * D; i++) if (this.height[i] > WL) land.push(this.flowAcc[i]); land.sort((a, b) => a - b); const T = Math.max(40, land[Math.floor(land.length * 0.985)] || 40); this.streamT = T;
+    const cells = []; for (let i = 0; i < W * D; i++) { if (this.flowAcc[i] >= T && this.height[i] > WL) cells.push(i); }
+    const cut = i => { const x = i % W, z = (i / W) | 0; const h = this.height[i]; if (h <= WL) return; if (BC.BIOME_LIST[this.biome[i]] === 'desert' && this.flowAcc[i] < T * 3) return; const bi = this.idx(x, h, z); this.blocks[bi] = 15; for (let y = h + 1; y < this.H; y++) { const k = this.idx(x, y, z); if (this.blocks[k]) { this.blocks[k] = 0; } } this.height[i] = h - 1; this.stream[i] = 1; const under = this.idx(x, h - 1, z); if (!BC.BLOCKS[this.blocks[under]] || !BC.BLOCKS[this.blocks[under]].solid) this.blocks[under] = BC.BLOCK.GRAVEL; };
+    cells.forEach(cut);
+    // widen the big ones onto neighbours no higher than the channel
+    cells.forEach(i => { if (this.flowAcc[i] < T * 4) return; const x = i % W, z = (i / W) | 0; for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = x + dx, nz = z + dz; if (nx < 1 || nz < 1 || nx >= W - 1 || nz >= D - 1) continue; const j = nx + nz * W; if (this.stream[j] || this.height[j] > this.height[i] + 1) continue; cut(j); } });
+    // make every stream block drain: lower a stream cell that sits above its downstream neighbour by more than one so water steps down, not jumps
+    for (let pass = 0; pass < 2; pass++) cells.forEach(i => { const d = this.flowDir[i]; if (d < 0) return; const x = i % W, z = (i / W) | 0; const j = (x + dirs[d][0]) + (z + dirs[d][1]) * W; if (this.stream[j] && this.height[j] < this.height[i] - 1) { /* small cascade: fine */ } });
+  }
+  // Riparian bonus: soil next to water stays wetter; the biggest drainages are fertile bottomland.
+  computeWetness() {
+    const W = this.W, D = this.D; for (let z = 0; z < D; z++) for (let x = 0; x < W; x++) this.wetBonus[x + z * W] = this.wetAt(x, z);
+    for (let i = 0; i < W * D; i++) { this.moisture[i] = Math.min(1, BC.BIOMES[BC.BIOME_LIST[this.biome[i]]].baseMoisture + this.wetBonus[i]); if (this.flowAcc[i] > (this.streamT || 160) * 0.4 && this.height[i] > this.WL) { for (let k = 0; k < 3; k++) this.nutr[i * 3 + k] = Math.min(1, this.nutr[i * 3 + k] * 1.3 + 0.05); this.om[i] = Math.max(this.om[i], 0.15); } }
+    this.nutrBase = Float32Array.from(this.nutr); this.omBase = Float32Array.from(this.om);
+  }
+  wetAt(x, z) { const h = this.height[x + z * this.W]; let best = 0; for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) { const nx = x + dx, nz = z + dz; if (nx < 0 || nz < 0 || nx >= this.W || nz >= this.D) continue; const hn = this.height[nx + nz * this.W]; for (let y = Math.max(0, h - 1); y <= h + 1; y++) { if (this.get(nx, y, nz) === 15) { const d = Math.max(Math.abs(dx), Math.abs(dz)); best = Math.max(best, d <= 1 ? 0.28 : 0.14); } } void hn; } return Math.min(0.45, best + Math.min(0.12, Math.log1p(this.flowAcc[x + z * this.W]) * 0.012)); }
+  refreshWetness(x, z) { for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) { const nx = x + dx, nz = z + dz; if (nx < 0 || nz < 0 || nx >= this.W || nz >= this.D) continue; this.wetBonus[nx + nz * this.W] = this.wetAt(nx, nz); } }
+  drainage(x, z) { const i = x + z * this.W; const d = this.flowDir[i]; const names = ['east', 'south-east', 'south', 'south-west', 'west', 'north-west', 'north', 'north-east']; const acc = this.flowAcc[i]; const T = this.streamT || 160; return { dir: d < 0 ? 'nowhere (a basin: water pools here)' : names[d], acc, kind: this.stream[i] ? 'stream bed' : acc >= T ? 'stream course' : acc > T * 0.4 ? 'bottomland (floodplain)' : acc > 12 ? 'slope' : 'upland / ridge', wet: this.wetBonus[i] }; }
+  // Live water: a dug or placed opening next to water lets it flow in; water falls, then spreads up to seven blocks sideways, losing a level each step.
+  onWaterChange(x, y, z, id, was) {
+    if (this.generating) return;
+    if (id === 0) { for (const [dx, dy, dz] of [[1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1], [0, 1, 0]]) if (this.get(x + dx, y + dy, z + dz) === 15) this.waterQueue.push(this.idx(x + dx, y + dy, z + dz)); }
+    if (id === 15) { this.waterQueue.push(this.idx(x, y, z)); }
+    if (id === 15 || was === 15) { this.refreshWetness(x, z); if (this.onWater) this.onWater(x, y, z, id); }
+  }
+  levelOf(i) { return this.wlvl[i]; } // 0 = source (lakes, streams), 1..7 flowing
+  tickWater(max) {
+    let n = 0; const q = this.waterQueue; const prev = this.remote; this.remote = true;
+    while (q.length && n < (max || 150)) {
+      const i = q.shift(); n++; if (this.blocks[i] !== 15) continue; const [x, y, z] = this.coords(i); const L = y <= this.WL || this.stream[x + z * this.W] ? 0 : this.wlvl[i];
+      const below = y > 0 ? this.get(x, y - 1, z) : 1;
+      if (below === 0) { const j = this.idx(x, y - 1, z); this.wlvl[j] = 7; this.set(x, y - 1, z, 15); this.flooded(x, y - 1, z); continue; }
+      const spread = L === 0 ? 7 : L - 1; if (spread < 1) continue;
+      for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = x + dx, nz = z + dz; if (!this.inBounds(nx, y, nz)) continue; if (this.get(nx, y, nz) !== 0) continue; const j = this.idx(nx, y, nz); this.wlvl[j] = spread; this.set(nx, y, nz, 15); this.flooded(nx, y, nz); }
+    }
+    this.remote = prev; return n;
+  }
+  flooded(x, y, z) { const p = this.plantAt(x, y, z); if (p && !(BC.PLANT_BY_ID[p.id] && BC.PLANT_BY_ID[p.id].water === 'aquatic')) this.removePlant(p); if (this.onFlood) this.onFlood(x, y, z); }
+  waterSurface(x, z) { for (let y = this.H - 1; y >= 0; y--) { const b = this.get(x, y, z); if (b === 15) return y; if (b !== 0) return -1; } return -1; }
+  isFlowing(x, z) { return this.stream[x + z * this.W] === 1 || this.flowAcc[x + z * this.W] > (this.streamT || 160); }
   // ---------- villages ----------
   // Villages use their own random stream so adding them does not change the rest of the terrain for worlds saved before they existed.
   placeVillages() {
@@ -222,7 +277,7 @@ BC.World = class World {
     const density = { temperate: 0.07, prairie: 0.1, desert: 0.05, rainforest: 0.09, boreal: 0.07, wetland: 0.1 };
     for (let z = 1; z < this.D - 1; z++) for (let x = 1; x < this.W - 1; x++) {
       const biome = this.biomeAt(x, z); if (this.rand() > density[biome]) continue;
-      const h = this.height[x + z * this.W];
+      const h = this.height[x + z * this.W]; if (this.stream[x + z * this.W]) continue;
       const opts = BC.PLANTS.filter(p => p.biomes[0] === biome || (p.biomes.includes(biome) && this.rand() < 0.4));
       if (!opts.length) continue;
       const p = opts[Math.floor(this.rand() * opts.length)];
@@ -257,21 +312,24 @@ BC.World = class World {
     this.plants.forEach(p => { if (p.wild && gen.has(p.key) && p.progress >= 1 && !p.withered) return; plants.push({ id: p.id, x: p.x, y: p.y, z: p.z, wild: p.wild, progress: p.progress, health: p.health, pollinated: p.pollinated, withered: p.withered, onBark: p.onBark, owner: p.owner, pest: p.pest || undefined, covered: p.covered || undefined }); });
     gen.forEach(k => { if (!this.plants.has(k)) removed.push(k); });
     const trees = []; const gt = this.genTreeKeys || new Set(); this.treeAt.forEach((v, k) => { if (!gt.has(k)) trees.push(k, v); });
-    const moist = []; for (let i = 0; i < this.moisture.length; i++) { const base = BC.BIOMES[BC.BIOME_LIST[this.biome[i]]].baseMoisture; if (Math.abs(this.moisture[i] - base) > 0.03) moist.push(i, Math.round(this.moisture[i] * 100)); }
-    const soil = []; for (let i = 0; i < this.W * this.D; i++) { const nb = BC.SOIL_NUTR[BC.BIOMES[BC.BIOME_LIST[this.biome[i]]].soil]; const n = this.nutr[i * 3], pp = this.nutr[i * 3 + 1], k = this.nutr[i * 3 + 2]; if (Math.abs(n - nb[0]) > 0.02 || Math.abs(pp - nb[1]) > 0.02 || Math.abs(k - nb[2]) > 0.02 || Math.abs(this.phShift[i]) > 0.02 || this.om[i] > 0.02 || this.mulch[i] > 0.02) soil.push(i, Math.round(n * 100), Math.round(pp * 100), Math.round(k * 100), Math.round(this.phShift[i] * 100), Math.round(this.om[i] * 100), Math.round(this.mulch[i] * 100)); }
+    const moist = []; for (let i = 0; i < this.moisture.length; i++) { const base = Math.min(1, BC.BIOMES[BC.BIOME_LIST[this.biome[i]]].baseMoisture + this.wetBonus[i]); if (Math.abs(this.moisture[i] - base) > 0.03) moist.push(i, Math.round(this.moisture[i] * 100)); }
+    const soil = []; for (let i = 0; i < this.W * this.D; i++) { const nb = this.nutrBase ? [this.nutrBase[i * 3], this.nutrBase[i * 3 + 1], this.nutrBase[i * 3 + 2]] : BC.SOIL_NUTR[BC.BIOMES[BC.BIOME_LIST[this.biome[i]]].soil]; const ob = this.omBase ? this.omBase[i] : 0; const n = this.nutr[i * 3], pp = this.nutr[i * 3 + 1], k = this.nutr[i * 3 + 2]; if (Math.abs(n - nb[0]) > 0.02 || Math.abs(pp - nb[1]) > 0.02 || Math.abs(k - nb[2]) > 0.02 || Math.abs(this.phShift[i]) > 0.02 || Math.abs(this.om[i] - ob) > 0.02 || this.mulch[i] > 0.02) soil.push(i, Math.round(n * 100), Math.round(pp * 100), Math.round(k * 100), Math.round(this.phShift[i] * 100), Math.round(this.om[i] * 100), Math.round(this.mulch[i] * 100)); }
     const hives = []; this.hives.forEach((h, k) => hives.push(k, h.honey || 0, h.wax || 0, Math.round(h.t || 0)));
     const chests = []; this.chests.forEach((slots, k) => { if (slots.some(Boolean)) chests.push([k, slots.map((it, i) => it ? [i, it.type, it.id === undefined ? null : it.id, it.count] : null).filter(Boolean)]); });
-    return { v: 2, W: this.W, D: this.D, H: this.H, diffs, plants, removed, trees, moist, soil, hives, chests };
+    const wl = []; this.diffs.forEach((v, k) => { if (v === 15 && this.wlvl[k]) wl.push(k, this.wlvl[k]); });
+    return { v: 2, W: this.W, D: this.D, H: this.H, diffs, plants, removed, trees, moist, soil, hives, chests, wl };
   }
   restore(s) {
-    const prev = this.remote; this.remote = true;
-    for (let i = 0; i < s.diffs.length; i += 2) { const k = s.diffs[i], v = s.diffs[i + 1]; if (this.blocks[k] !== v) { this.blocks[k] = v; const c = this.coords(k); this.markDirty(c[0], c[2]); } this.diffs.set(k, v); }
+    const prev = this.remote; this.remote = true; let waterTouched = false;
+    for (let i = 0; i < s.diffs.length; i += 2) { const k = s.diffs[i], v = s.diffs[i + 1]; if (this.blocks[k] !== v) { if (v === 15 || this.blocks[k] === 15) waterTouched = true; this.blocks[k] = v; const c = this.coords(k); this.markDirty(c[0], c[2]); } this.diffs.set(k, v); }
+    if (waterTouched) this.computeWetness();
     if (s.v === 2) {
       (s.removed || []).forEach(k => { const p = this.plants.get(k); if (p) this.removePlant(p); });
       s.plants.forEach(p => { const ex = this.plants.get(this.idx(p.x, p.y, p.z)); if (ex) this.removePlant(ex); this.addPlant(p); });
       for (let i = 0; i < s.trees.length; i += 2) this.treeAt.set(s.trees[i], s.trees[i + 1]);
       if (s.moist) for (let i = 0; i < s.moist.length; i += 2) this.moisture[s.moist[i]] = s.moist[i + 1] / 100;
       if (s.soil) for (let i = 0; i < s.soil.length; i += 7) { const c = s.soil[i]; this.nutr[c * 3] = s.soil[i + 1] / 100; this.nutr[c * 3 + 1] = s.soil[i + 2] / 100; this.nutr[c * 3 + 2] = s.soil[i + 3] / 100; this.phShift[c] = s.soil[i + 4] / 100; this.om[c] = s.soil[i + 5] / 100; this.mulch[c] = s.soil[i + 6] / 100; }
+      if (s.wl) for (let i = 0; i < s.wl.length; i += 2) this.wlvl[s.wl[i]] = s.wl[i + 1];
       if (s.chests) { this.chests.clear(); s.chests.forEach(([k, items]) => { const slots = new Array(BC.CHEST_SLOTS).fill(null); items.forEach(([i, type, id, count]) => { if (i < slots.length) slots[i] = id === null ? { type, count } : { type, id, count }; }); this.chests.set(k, slots); }); }
       if (s.hives) { this.hives.clear(); for (let i = 0; i < s.hives.length; i += 4) this.hives.set(s.hives[i], { honey: s.hives[i + 1], wax: s.hives[i + 2], t: s.hives[i + 3] }); }
     } else {

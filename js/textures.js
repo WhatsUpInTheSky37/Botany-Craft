@@ -215,5 +215,7 @@ BC.Atlas = (function () {
     else if (ing.group === 'fertilizer') { g.fillStyle = '#8a6a3a'; g.beginPath(); g.moveTo(6, 12); g.lineTo(26, 12); g.lineTo(23, 30); g.lineTo(9, 30); g.closePath(); g.fill(); g.fillStyle = col; g.beginPath(); g.ellipse(16, 12, 10, 4, 0, 0, 6.283); g.fill(); g.fillStyle = '#f0e8d0'; g.fillRect(12, 18, 8, 6); }
     else { g.fillStyle = col; g.beginPath(); g.ellipse(16, 18, 10, 8, 0.3, 0, 6.283); g.fill(); g.fillStyle = shade(col.startsWith('#') ? col : '#6a8a4a', 0.7); g.fillRect(15, 6, 2, 10); }
     g.restore(); return c; }
-  return { build, uv, spriteCanvas, tileCanvas, ingredientCanvas, TILE, COLS, has: n => tiles[n] !== undefined, shade, mix };
+  // Stand-alone tiling water texture so the shader can scroll it along the flow.
+  function waterTexture() { const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'); g.fillStyle = '#3a7ac8'; g.fillRect(0, 0, 64, 64); const r = rng(77); for (let i = 0; i < 90; i++) { g.fillStyle = r() < 0.5 ? '#3270b8' : '#4486d2'; g.fillRect((r() * 64) | 0, (r() * 64) | 0, 3, 3); } g.fillStyle = '#8ac4f4'; for (let i = 0; i < 18; i++) { const x = (r() * 64) | 0, y = (r() * 64) | 0, l = 4 + ((r() * 8) | 0); g.fillRect(x, y, l, 1); if (x + l > 64) g.fillRect(0, y, x + l - 64, 1); } const t = new THREE.CanvasTexture(c); t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestFilter; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; return t; }
+  return { build, uv, spriteCanvas, tileCanvas, ingredientCanvas, waterTexture, TILE, COLS, has: n => tiles[n] !== undefined, shade, mix };
 })();

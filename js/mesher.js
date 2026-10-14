@@ -23,10 +23,12 @@ BC.Mesher = (function () {
   const AO_SHADE = [1, 0.8, 0.66, 0.52];
 
   class Builder {
-    constructor() { this.pos = []; this.nor = []; this.uv = []; this.col = []; this.idx = []; this.n = 0; }
+    constructor() { this.pos = []; this.nor = []; this.uv = []; this.col = []; this.idx = []; this.n = 0; this.flow = null; }
+    setFlow(fx, fz) { if (!this.flow) this.flow = []; this.pendingFlow = [fx, fz]; }
     quad(verts, normal, uvr, shades, tint) { // verts: 4 [x,y,z]; shades: 4 floats; uvr [u0,v0,u1,v1]
       const [u0, v0, u1, v1] = uvr; const uvs = [[u0, v1], [u1, v1], [u1, v0], [u0, v0]];
       for (let i = 0; i < 4; i++) { this.pos.push(verts[i][0], verts[i][1], verts[i][2]); this.nor.push(normal[0], normal[1], normal[2]); this.uv.push(uvs[i][0], uvs[i][1]); const s = shades[i]; this.col.push(s * (tint ? tint[0] : 1), s * (tint ? tint[1] : 1), s * (tint ? tint[2] : 1)); }
+      if (this.flow) { const f = this.pendingFlow || [0, 0]; for (let i = 0; i < 4; i++) this.flow.push(f[0], f[1]); }
       const b = this.n; if (shades[0] + shades[2] > shades[1] + shades[3]) this.idx.push(b, b + 1, b + 2, b, b + 2, b + 3); else this.idx.push(b + 1, b + 2, b + 3, b + 1, b + 3, b);
       this.n += 4;
     }
@@ -38,19 +40,20 @@ BC.Mesher = (function () {
     geometry() {
       if (!this.n) return null; const g = new THREE.BufferGeometry();
       g.setAttribute('position', new THREE.Float32BufferAttribute(this.pos, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(this.nor, 3));
-      g.setAttribute('uv', new THREE.Float32BufferAttribute(this.uv, 2)); g.setAttribute('color', new THREE.Float32BufferAttribute(this.col, 3));
+      g.setAttribute('uv', new THREE.Float32BufferAttribute(this.uv, 2)); g.setAttribute('color', new THREE.Float32BufferAttribute(this.col, 3)); if (this.flow) g.setAttribute('flow', new THREE.Float32BufferAttribute(this.flow, 2));
       g.setIndex(this.idx); g.computeBoundingSphere(); return g;
     }
   }
 
   function buildChunk(world, cx, cz) {
-    const solid = new Builder(), water = new Builder(), cutout = new Builder();
+    const solid = new Builder(), water = new Builder(), cutout = new Builder(); water.flow = [];
     const x0 = cx * 16, z0 = cz * 16, x1 = Math.min(world.W, x0 + 16), z1 = Math.min(world.D, z0 + 16);
     for (let z = z0; z < z1; z++) for (let x = x0; x < x1; x++) for (let y = 0; y < world.H; y++) {
       const id = world.blocks[world.idx(x, y, z)]; if (id === 0) continue; const b = BC.BLOCKS[id]; if (!b) continue;
       if (b.liquid) {
-        if (world.get(x, y + 1, z) === 0) { const f = FACES[0]; const uvr = BC.Atlas.uv('water'); solid; water.quad(f.v.map(v => [x + v[0], y + v[1] - 0.12, z + v[2]]), f.n, uvr, [1, 1, 1, 1]); }
-        for (let fi = 2; fi < 6; fi++) { const f = FACES[fi]; if (world.get(x + f.n[0], y + f.n[1], z + f.n[2]) === 0) water.quad(f.v.map(v => [x + v[0], y + v[1] * 0.88, z + v[2]]), f.n, BC.Atlas.uv('water'), [f.s, f.s, f.s, f.s]); }
+        { const ci = x + z * world.W; const d = world.flowDir[ci]; const flowing = world.isFlowing(x, z) && y > world.WL; const dv = d >= 0 && flowing ? world.FLOW_DIRS[d] : null; const sp = flowing ? 0.9 : 0.12; water.setFlow(dv ? dv[0] * sp : 0.06, dv ? dv[1] * sp : 0.04); const lvl = world.levelOf(world.idx(x, y, z)); const drop = lvl ? 0.12 + (7 - lvl) * 0.09 : 0.12;
+          if (world.get(x, y + 1, z) === 0) { const f = FACES[0]; water.quad(f.v.map(v => [x + v[0], y + v[1] - drop, z + v[2]]), f.n, [x, z, x + 1, z + 1], [1, 1, 1, 1]); }
+          for (let fi = 2; fi < 6; fi++) { const f = FACES[fi]; if (world.get(x + f.n[0], y + f.n[1], z + f.n[2]) === 0) { const horiz = f.n[0] !== 0 ? z : x; water.quad(f.v.map(v => [x + v[0], y + v[1] * (1 - drop), z + v[2]]), f.n, [horiz, y, horiz + 1, y + 1], [f.s, f.s, f.s, f.s]); } } }
         continue;
       }
       if (b.shape) { const dst = b.cutout ? cutout : solid; const lit = b.lit ? 1.25 : 1; b.shape.forEach(bx => dst.box(x + bx[0], y + bx[1], z + bx[2], x + bx[3], y + bx[4], z + bx[5], bx[6], lit)); continue; }

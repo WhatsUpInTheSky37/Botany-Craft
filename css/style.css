@@ -195,3 +195,5 @@ body.touch #compass { top: calc(104px + env(safe-area-inset-top, 0px)); } @media
 .chest-grid { padding: 10px; border-radius: 10px; background: rgba(120,80,30,0.12); border: 1px solid var(--rule); min-height: 60px; }
 .recipe .btns { display: flex; flex-direction: column; gap: 4px; } .recipe .btns button { padding: 6px 10px; font-size: 13px; }
 #npc-answer { margin-top: 10px; }
+#breath { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(118px + env(safe-area-inset-bottom, 0px)); width: 220px; background: var(--hud-bg); border-radius: 12px; padding: 6px 10px; color: #fff; font-size: 12px; pointer-events: none; } #breath .bar { height: 8px; margin-top: 4px; }
+#fishbar { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(150px + env(safe-area-inset-bottom, 0px)); width: 260px; background: var(--hud-bg); border-radius: 12px; padding: 8px 12px; color: #fff; font-size: 13px; pointer-events: none; text-align: center; } #fishbar .bar { height: 10px; margin: 6px 0 4px; } #fishbar .bar i { transition: none; } #fishbar small { opacity: 0.8; }

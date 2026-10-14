@@ -60,8 +60,10 @@ BC.Sim = (function () {
     const w = game.world;
     // moisture relaxes toward biome base; rain raises it
     const rain = game.weather.raining; const n = w.moisture.length;
-    for (let i = 0; i < n; i += 1) { const base = BC.BIOMES[BC.BIOME_LIST[w.biome[i]]].baseMoisture; let m = w.moisture[i]; if (rain) m += dt * 0.03 * (BC.BIOMES[BC.BIOME_LIST[w.biome[i]]].rainChance + 0.1); const rate = m > base ? 0.01 * (1 - 0.6 * w.mulch[i]) : 0.01; m += (base - m) * Math.min(1, dt * rate); w.moisture[i] = BC.util.clamp(m, 0, 1); }
-    game.soilAcc = (game.soilAcc || 0) + dt; if (game.soilAcc >= 10) { const T = game.soilAcc; game.soilAcc = 0; for (let i = 0; i < n; i++) { const nb = BC.SOIL_NUTR[BC.BIOMES[BC.BIOME_LIST[w.biome[i]]].soil]; for (let k = 0; k < 3; k++) { const v = w.nutr[i * 3 + k]; if (v < nb[k]) w.nutr[i * 3 + k] = Math.min(nb[k], v + T * 0.0004 * (1 + w.om[i])); } if (w.mulch[i] > 0) w.mulch[i] = Math.max(0, w.mulch[i] - T * 0.0005); } }
+    for (let i = 0; i < n; i += 1) { const base = Math.min(1, BC.BIOMES[BC.BIOME_LIST[w.biome[i]]].baseMoisture + w.wetBonus[i]); let m = w.moisture[i]; if (rain) m += dt * 0.03 * (BC.BIOMES[BC.BIOME_LIST[w.biome[i]]].rainChance + 0.1); const rate = m > base ? 0.01 * (1 - 0.6 * w.mulch[i]) : 0.01; m += (base - m) * Math.min(1, dt * rate); w.moisture[i] = BC.util.clamp(m, 0, 1); }
+    game.soilAcc = (game.soilAcc || 0) + dt; if (game.soilAcc >= 10) { const T = game.soilAcc; game.soilAcc = 0; for (let i = 0; i < n; i++) { const nb = w.nutrBase ? [w.nutrBase[i * 3], w.nutrBase[i * 3 + 1], w.nutrBase[i * 3 + 2]] : BC.SOIL_NUTR[BC.BIOMES[BC.BIOME_LIST[w.biome[i]]].soil]; for (let k = 0; k < 3; k++) { const v = w.nutr[i * 3 + k]; if (v < nb[k]) w.nutr[i * 3 + k] = Math.min(nb[k], v + T * 0.0004 * (1 + w.om[i])); } if (w.mulch[i] > 0) w.mulch[i] = Math.max(0, w.mulch[i] - T * 0.0005);
+        // leaching: saturated soil loses nitrogen downhill to wherever it drains (nitrate is mobile, phosphorus is not)
+        if (w.moisture[i] > 0.85 && w.flowDir[i] >= 0 && w.nutr[i * 3] > nb[0]) { const d = w.FLOW_DIRS[w.flowDir[i]]; const x = i % w.W, z = (i / w.W) | 0; const j = (x + d[0]) + (z + d[1]) * w.W; const move = (w.nutr[i * 3] - nb[0]) * 0.02 * T / 10; w.nutr[i * 3] -= move; w.nutr[j * 3] = Math.min(1.2, w.nutr[j * 3] + move * 0.6); } } }
     const toRemove = [];
     w.plants.forEach(p => {
       const def = defFor(p); if (!def) { toRemove.push(p); return; }

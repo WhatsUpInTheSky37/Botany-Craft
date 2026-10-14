@@ -109,7 +109,7 @@ window.BC = window.BC || {};
 
     { id: 'carpenter', role: 'Carpenter', shop: 'Sawmill & Joinery', names: ['Walt', 'Dee', 'Ignacio', 'Hazel'], color: '#5a5a6a', hat: '#c04a30',
       greet: ['Measure twice. Wood remembers every mistake.', 'Oak for strength, cedar for weather, pine for cheap. Each tree has its job.'],
-      sells: [blk(19, 1, 4), blk(118, 5), blk(86, 3), blk(90, 2, 2), blk(73, 6), blk(78, 3), blk(94, 2), blk(80, 4), blk(74, 1, 4)], buys: [{ match: it => it.type === 'block' && BC.BLOCKS[it.id] && BC.BLOCKS[it.id].log, label: 'logs', price: 2 }, { match: it => it.type === 'block' && BC.BLOCKS[it.id] && BC.BLOCKS[it.id].plank, label: 'planks', price: 1 }],
+      sells: [blk(19, 1, 4), blk(118, 5), blk(86, 3), blk(90, 2, 2), blk(73, 6), blk(78, 3), blk(94, 2), blk(80, 4), blk(74, 1, 4), { item: { type: 'boat' }, price: 12 }], buys: [{ match: it => it.type === 'block' && BC.BLOCKS[it.id] && BC.BLOCKS[it.id].log, label: 'logs', price: 2 }, { match: it => it.type === 'block' && BC.BLOCKS[it.id] && BC.BLOCKS[it.id].plank, label: 'planks', price: 1 }],
       service: { id: 'lumber', name: 'Lumber delivery', desc: 'Four planks dropped in your bag every couple of minutes.', cost: 10, minutes: 5 },
       topics: [
         ['How wood grows', 'A tree adds one ring a year just under the bark: wide in wet years, narrow in drought. Count them on a stump and you read its life. The heartwood in the middle is dead and strong; only the outer sapwood carries water.'],
@@ -161,14 +161,14 @@ window.BC = window.BC || {};
 
     { id: 'fisher', role: 'Bait & tackle', shop: 'Bait Shop', names: ['Dell', 'Marguerite', 'Tran', 'Sully'], color: '#3a6a8a', hat: '#e8d090',
       greet: ['Fish are fertiliser with fins. The Wampanoag taught the Pilgrims to bury one under each corn hill.', 'Kelp, fish, crab shells: everything from the water feeds the land.'],
-      sells: [ing('fish', 3), ing('kelp', 2), ing('fish_emulsion', 5), ing('kelp_meal', 6), ing('crab', 4), ing('pond_algae', 1), seed('wild_rice', 2), seed('cattail', 1)], buys: [buyIng('fish', 3), buyIng('crab', 4), buyIng('kelp', 1), buyIng('pond_algae', 1), buyIng('duckweed', 1)],
+      sells: [{ item: { type: 'tool', id: 'rod' }, price: 8 }, { item: { type: 'boat' }, price: 14 }, ing('fish', 3), ing('kelp', 2), ing('fish_emulsion', 5), ing('kelp_meal', 6), ing('crab', 4), ing('pond_algae', 1), seed('wild_rice', 2), seed('cattail', 1)], buys: [{ match: it => it.type === 'fish', label: 'any fish you catch', price: 'fish' }, buyIng('fish', 3), buyIng('crab', 4), buyIng('kelp', 1), buyIng('pond_algae', 1), buyIng('duckweed', 1)],
       service: { id: 'fish', name: 'Catch of the day', desc: 'A fresh fish in your bag every couple of minutes. Bury it under a hungry plant.', cost: 8, minutes: 5 },
       topics: [
         ['Why fish feeds plants', 'Fish is nitrogen, phosphorus and every trace mineral the sea has, in a form microbes break down in weeks. Emulsion is the quick drink; a buried whole fish is the slow meal. Bury it deep or the raccoons dig it up.'],
         ['Seaweed', 'Kelp has little N-P-K but sixty trace elements and growth hormones that make seedlings root faster and tolerate frost. Coastal farms have spread storm wrack for a thousand years. Rinse the salt off first.'],
         ['Wetlands work', 'A hectare of marsh filters the runoff of a town, holds flood water like a sponge and nurses most of the fish you will ever eat. Cattail roots pull nitrogen and even heavy metals out of water.']],
       story: [
-        { intro: 'Catch a fish with your bare hands. Shallow water, be patient, grab.', need: journal('ingredient:fish'), reward: { coins: 6, items: [{ type: 'ingredient', id: 'kelp', count: 3 }] }, done: 'Ha! Kelp for your trouble. Dig it in or steep it.' },
+        { intro: 'Catch a fish. Grab a bluegill by hand in the shallows, or better, craft a rod (a plank and a rope) and cast it.', need: { kind: 'journal_any', keys: ['ingredient:fish'].concat(BC.FISH ? BC.FISH.map(f => 'fish:' + f.id) : []) }, reward: { coins: 6, items: [{ type: 'ingredient', id: 'kelp', count: 3 }] }, done: 'Ha! Kelp for your trouble. Dig it in or steep it.' },
         { intro: 'Scoop two lots of algae or kelp out of the water for me. Free nitrogen, just floating there.', need: { kind: 'items_any', ids: ['pond_algae', 'kelp', 'duckweed'], type: 'ingredient', n: 2 }, reward: { coins: 10, items: [{ type: 'ingredient', id: 'fish_emulsion', count: 3 }] }, done: 'Pond scum is the most underrated fertiliser there is. Emulsion in return.' },
         { intro: 'Plant something in the water: cattail, wild rice, pickerelweed, arrowhead. The wetland crops.', need: stat('aquaticPlanted', 1), reward: { coins: 25, items: [{ type: 'seed', id: 'wild_rice', count: 3 }] }, done: 'You are a wetland farmer. Wild rice: the Ojibwe harvest it from canoes and it is the only grain native to this continent that is still gathered that way.' }] },
 
@@ -187,7 +187,7 @@ window.BC = window.BC || {};
 
     { id: 'cook', role: 'Farm-stand cook', shop: 'Farm Stand & Cannery', names: ['Rosalind', 'Benny', 'Odette', 'Marcus'], color: '#c0504a', hat: '#f8f0e0',
       greet: ['Fresh picked this morning beats shipped last week, every time. Bring me what you grow.', 'I pay best for what is in season. That is how a farm stand works.'],
-      sells: [ing('kitchen_scraps', 1), ing('banana_tea', 2), seed('tomato', 3), seed('chili', 3), seed('basil', 2), ing('honey', 5)], buys: [buySeeds(2), buyIng('honey', 5), buyIng('fish', 4), buyIng('chili_peppers', 2), buyIng('banana_peel', 1)],
+      sells: [ing('kitchen_scraps', 1), ing('banana_tea', 2), seed('tomato', 3), seed('chili', 3), seed('basil', 2), ing('honey', 5)], buys: [buySeeds(2), buyIng('honey', 5), { match: it => it.type === 'fish', label: 'fresh fish', price: 'fish+' }, buyIng('fish', 4), buyIng('chili_peppers', 2), buyIng('banana_peel', 1)],
       service: { id: 'market', name: 'Market day', desc: 'I set up your stall: everyone in the village pays you double for whatever you sell while it runs.', cost: 10, minutes: 5 },
       topics: [
         ['Eating in season', 'A tomato in January travelled 3,000 km and was picked green. Food grown within a day of you was picked ripe, which is when the sugars and vitamins peak. Seasonal eating is the cheapest way to eat well.'],

@@ -4,7 +4,7 @@ BC.Player = class Player {
   constructor(game) {
     this.game = game; this.pos = new THREE.Vector3(); this.vel = new THREE.Vector3();
     this.yaw = 0; this.pitch = 0; this.onGround = false; this.inWater = false; this.keys = {}; this.joy = { x: 0, y: 0 };
-    this.radius = 0.3; this.height = 1.75; this.eye = 1.62; this.locked = false; this.touch = BC.util.isTouch();
+    this.radius = 0.3; this.height = 1.75; this.eye = 1.62; this.locked = false; this.breath = 60; this.MAX_BREATH = 60; this.riding = null; this.touch = BC.util.isTouch();
     this.jumpQueued = false; this.sprint = false;
   }
   spawn(x, y, z) { this.pos.set(x + 0.5, y + 1.01, z + 0.5); this.vel.set(0, 0, 0); }
@@ -52,23 +52,25 @@ BC.Player = class Player {
   }
   update(dt) {
     const w = this.game.world; const k = this.keys; let mx = this.joy.x, mz = this.joy.y;
+    if (this.riding) { this.inWater = false; this.headInWater = false; this.onGround = true; if (this.jumpQueued) { this.jumpQueued = false; this.game.leaveBoat(); } this.breath = Math.min(this.MAX_BREATH, this.breath + dt * 4); const cam = this.game.camera; cam.position.set(this.pos.x, this.pos.y + this.eye, this.pos.z); cam.rotation.set(0, 0, 0, 'YXZ'); cam.rotation.y = this.yaw; cam.rotation.x = this.pitch; return; }
     if (k.KeyW || k.ArrowUp) mz += 1; if (k.KeyS || k.ArrowDown) mz -= 1; if (k.KeyA || k.ArrowLeft) mx -= 1; if (k.KeyD || k.ArrowRight) mx += 1;
     const l = Math.hypot(mx, mz); if (l > 1) { mx /= l; mz /= l; }
     const head = w.get(Math.floor(this.pos.x), Math.floor(this.pos.y + 1.2), Math.floor(this.pos.z)); const feet = w.get(Math.floor(this.pos.x), Math.floor(this.pos.y + 0.3), Math.floor(this.pos.z));
     this.inWater = feet === 15; this.headInWater = head === 15;
+    if (this.headInWater) { this.breath -= dt; if (this.breath <= 0) { this.breath = this.MAX_BREATH; this.game.blackout(); return; } } else this.breath = Math.min(this.MAX_BREATH, this.breath + dt * 4);
     const speed = (this.sprint ? 7 : 4.3) * (this.inWater ? 0.55 : 1);
     const sy = Math.sin(this.yaw), cy = Math.cos(this.yaw);
     const vx = (mx * cy - mz * sy) * speed, vz = (-mx * sy - mz * cy) * speed;
     const accel = this.onGround ? 14 : 5; this.vel.x += (vx - this.vel.x) * Math.min(1, accel * dt); this.vel.z += (vz - this.vel.z) * Math.min(1, accel * dt);
     const onLadder = (BC.BLOCKS[feet] && BC.BLOCKS[feet].climb) || (BC.BLOCKS[head] && BC.BLOCKS[head].climb);
     if (onLadder) { const up = this.jumpQueued || k.Space || mz > 0.3; const down = k.ShiftLeft || mz < -0.3; this.vel.y = up ? 3 : down ? -3 : -0.6; this.vel.x *= 0.5; this.vel.z *= 0.5; }
-    else if (this.inWater) { this.vel.y += (-2 - this.vel.y) * Math.min(1, 3 * dt); if (this.jumpQueued || k.Space) this.vel.y = 3.2; } else { this.vel.y -= 22 * dt; if (this.jumpQueued && this.onGround) { this.vel.y = 7.6; this.onGround = false; } }
+    else if (this.inWater) { const up = this.jumpQueued || k.Space; const down = k.ShiftLeft && !this.sprint; const want = this.headInWater ? (up ? 2.6 : down ? -2.6 : -0.7) : (up ? 3.4 : -0.5); this.vel.y += (want - this.vel.y) * Math.min(1, 4 * dt); } else { this.vel.y -= 22 * dt; if (this.jumpQueued && this.onGround) { this.vel.y = 7.6; this.onGround = false; } }
     this.jumpQueued = false; if (this.vel.y < -40) this.vel.y = -40;
     // move per axis with collision
     const step = (axis, d) => {
       const p = this.pos.clone(); p[axis] += d;
       if (!this.collides(p.x, p.y, p.z)) { this.pos.copy(p); return true; }
-      if (axis !== 'y' && this.onGround) { const up = p.clone(); up.y += 1.05; if (!this.collides(up.x, up.y, up.z) && !this.collides(this.pos.x, this.pos.y + 1.05, this.pos.z)) { this.pos.copy(up); return true; } }
+      if (axis !== 'y' && (this.onGround || this.inWater)) { const up = p.clone(); up.y += 1.05; if (!this.collides(up.x, up.y, up.z) && !this.collides(this.pos.x, this.pos.y + 1.05, this.pos.z)) { this.pos.copy(up); return true; } }
       return false;
     };
     let steps = Math.ceil(Math.abs(this.vel.y * dt) / 0.4) || 1;
