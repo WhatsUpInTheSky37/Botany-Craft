@@ -20,7 +20,7 @@ BC.Game = class Game {
   }
   resetStats() {
     this.stats = { inspected: new Set(), seedSpecies: new Set(), maxDig: 0, plantedGood: 0, watered: 0, matured: 0, legumesPlanted: 0, threeSisters: false, pollinated: false, blueberryAcid: false, cactusInSand: false, compostMade: 0, compostUsed: false, biomesVisited: new Set(), treeGrown: false, fenced: false, invasiveRemoved: 0, journal: new Set(), questsDone: new Set(), harvests: 0, compostMaterial: 0, planted: 0 };
-    this.inventory = [{ type: 'tool', id: 'hand' }, { type: 'tool', id: 'trowel' }, { type: 'tool', id: 'can' }, null, null, null, null, null, null]; this.selected = 0; this.points = 0;
+    this.inventory = [{ type: 'tool', id: 'hand' }, { type: 'tool', id: 'trowel' }, { type: 'tool', id: 'axe' }, { type: 'tool', id: 'can' }, null, null, null, null, null]; this.selected = 0; this.points = 0;
   }
   setupScene() {
     const atlas = BC.Atlas.build(); this.atlas = atlas.texture;
@@ -29,7 +29,7 @@ BC.Game = class Game {
     this.matWater = new THREE.MeshLambertMaterial({ map: this.atlas, vertexColors: true, transparent: true, opacity: 0.7, depthWrite: false });
     this.hemi = new THREE.HemisphereLight(0xcfe3ff, 0x6a5a40, 1.05); this.scene.add(this.hemi);
     this.sun = new THREE.DirectionalLight(0xfff4e0, 1.25); this.scene.add(this.sun); this.scene.add(this.sun.target);
-    this.scene.fog = new THREE.Fog(0x8fc4ea, 40, 150); this.scene.background = new THREE.Color(0x8fc4ea);
+    this.scene.fog = new THREE.Fog(0x8fc4ea, 40, 104); this.scene.background = new THREE.Color(0x8fc4ea);
     this.sunMesh = new THREE.Mesh(new THREE.SphereGeometry(4, 12, 12), new THREE.MeshBasicMaterial({ color: 0xfff1c0, fog: false })); this.scene.add(this.sunMesh);
     this.moonMesh = new THREE.Mesh(new THREE.SphereGeometry(2.5, 12, 12), new THREE.MeshBasicMaterial({ color: 0xdde6f5, fog: false })); this.scene.add(this.moonMesh);
     this.clouds = new THREE.Group(); const cm = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 });
@@ -42,13 +42,13 @@ BC.Game = class Game {
   isAuthority() { return this.mode === 'solo' || !this.net.live || this.net.isHost; }
   // ---------- lifecycle ----------
   newGame(region) {
-    this.mode = 'solo'; this.playerName = 'me'; this.resetStats(); this.time = { t: this.DAY * 0.3, day: 1, dayFrac: 0.3 }; this.region = region;
+    this.worldW = this.worldD = undefined; this.mode = 'solo'; this.playerName = 'me'; this.resetStats(); this.time = { t: this.DAY * 0.3, day: 1, dayFrac: 0.3 }; this.region = region;
     this.seed = (Math.random() * 4294967295) >>> 0; this.startWorld(() => { const s = this.world.findSpawn(region); this.player.spawn(s[0], s[1], s[2]); this.player.yaw = Math.PI; this.spawnAnimals(this.world.spawnAnimals); this.begin(); this.welcome(region); });
   }
   welcome(region) { const b = BC.BIOMES[region]; this.toast(`Welcome to the ${b.name.toLowerCase()}. Walk up to a plant and tap it to collect seeds.`, 'good'); setTimeout(() => this.toast(this.player.touch ? 'Drag left to move, right to look. Press and hold to inspect anything.' : 'Click the world to look around. Right-click inspects anything.', ''), 5000); }
   startWorld(then) {
     const loading = document.getElementById('loading'); loading.hidden = false;
-    setTimeout(() => { this.world = new BC.World(this.seed); this.world.generate(); this.hookWorld(); this.clearChunks(); this.buildAllChunks(); loading.hidden = true; then(); }, 30);
+    setTimeout(() => { this.world = new BC.World(this.seed, this.worldW, this.worldD); this.world.generate(); this.hookWorld(); this.clearChunks(); this.clearAnimals(); loading.hidden = true; then(); }, 30);
   }
   hookWorld() {
     const w = this.world;
@@ -57,9 +57,18 @@ BC.Game = class Game {
     w.onPlant = (p, removed) => { if (this.mode === 'shared') this.net.send('plant', removed ? { key: p.key, rm: true } : { key: p.key, p: this.packPlant(p) }); };
   }
   packPlant(p) { return { id: p.id, x: p.x, y: p.y, z: p.z, wild: p.wild, progress: p.progress, health: p.health, pollinated: p.pollinated, withered: p.withered, onBark: p.onBark, owner: p.owner }; }
-  begin() { this.ui.hideStart(); this.ui.renderHotbar(); this.ui.updateQuestTracker(); this.ui.setLockHint(true); this.ui.updateShared(); this.ui.updateHUD(); this.running = true; this.last = performance.now(); if (!this.loopStarted) { this.loopStarted = true; requestAnimationFrame(t => this.loop(t)); } }
-  clearChunks() { this.chunks.forEach(c => ['solid', 'water', 'plants'].forEach(k => { if (c[k]) { this.scene.remove(c[k]); c[k].geometry.dispose(); } })); this.chunks.clear(); this.animals.list.forEach(e => this.scene.remove(e.mesh)); this.animals.list = []; }
-  buildAllChunks() { for (let cz = 0; cz < this.world.CZ; cz++) for (let cx = 0; cx < this.world.CX; cx++) this.rebuildChunk(cx + cz * this.world.CX); this.world.dirty.clear(); }
+  begin() { this.clearChunks(); this.world.dirty.clear(); this.streamChunks(true); this.ui.hideStart(); this.ui.renderHotbar(); this.ui.updateQuestTracker(); this.ui.setLockHint(true); this.ui.updateShared(); this.ui.updateHUD(); this.running = true; this.last = performance.now(); if (!this.loopStarted) { this.loopStarted = true; requestAnimationFrame(t => this.loop(t)); } }
+  clearChunks() { this.chunks.forEach((c, ci) => this.unloadChunk(ci)); this.chunks.clear(); }
+  clearAnimals() { this.animals.list.forEach(e => { this.scene.remove(e.mesh); if (e.line) this.scene.remove(e.line); }); this.animals.list = []; }
+  unloadChunk(ci) { const c = this.chunks.get(ci); if (!c) return; ['solid', 'water', 'plants'].forEach(k => { if (c[k]) { this.scene.remove(c[k]); c[k].geometry.dispose(); } }); this.chunks.delete(ci); }
+  // Only chunks near the player are meshed. `initial` builds the nearest ring synchronously so the world is never empty on arrival.
+  streamChunks(initial) {
+    const w = this.world; const R = this.RADIUS || 7; const pcx = Math.floor(this.player.pos.x / 16), pcz = Math.floor(this.player.pos.z / 16);
+    this.chunks.forEach((c, ci) => { const cx = ci % w.CX, cz = Math.floor(ci / w.CX); if (Math.max(Math.abs(cx - pcx), Math.abs(cz - pcz)) > R + 2) this.unloadChunk(ci); });
+    const want = []; for (let dz = -R; dz <= R; dz++) for (let dx = -R; dx <= R; dx++) { const cx = pcx + dx, cz = pcz + dz; if (cx < 0 || cz < 0 || cx >= w.CX || cz >= w.CZ) continue; const ci = cx + cz * w.CX; if (!this.chunks.has(ci)) want.push([dx * dx + dz * dz, ci]); }
+    if (!want.length) return; want.sort((a, b) => a[0] - b[0]);
+    const budget = initial ? want.filter(x => x[0] <= 9).length : 2; for (let i = 0; i < Math.min(budget, want.length); i++) { this.rebuildChunk(want[i][1]); w.dirty.delete(want[i][1]); }
+  }
   rebuildChunk(ci) {
     const cx = ci % this.world.CX, cz = Math.floor(ci / this.world.CX); let c = this.chunks.get(ci); if (!c) { c = {}; this.chunks.set(ci, c); }
     const res = BC.Mesher.buildChunk(this.world, cx, cz); const pg = BC.Mesher.buildPlants(this.world, cx, cz);
@@ -91,9 +100,9 @@ BC.Game = class Game {
         status('Saving it to the cloud…'); const res = await this.net.createWorld(opts.world, opts.pin, this.seed, this.region, this.sharedState()); this.worldVersion = res.version; this.net.creds.world = res.id;
       } else {
         status('Looking up that world…'); data = await this.net.loadWorld(opts.world, opts.pin); this.net.creds.world = data.id;
-        status('Growing the world…'); await new Promise(r => setTimeout(r, 30)); this.seed = Number(data.seed); this.region = data.region; this.world = new BC.World(this.seed); this.world.generate(); this.hookWorld(); this.applySharedState(data.state); this.worldVersion = data.version;
+        status('Growing the world…'); await new Promise(r => setTimeout(r, 30)); this.seed = Number(data.seed); this.region = data.region; const ws = (data.state && data.state.world) || {}; this.world = new BC.World(this.seed, ws.W || 224, ws.D || 224, ws.H || 44); this.world.generate(); this.hookWorld(); this.applySharedState(data.state); this.worldVersion = data.version;
       }
-      this.mode = 'shared'; this.playerName = player.toLowerCase(); this.clearChunks(); this.buildAllChunks(); this.world.dirty.clear();
+      this.mode = 'shared'; this.playerName = player.toLowerCase(); this.clearChunks(); this.clearAnimals();
       status('Loading your journal…'); this.resetStats(); const ps = await this.net.loadPlayer();
       if (ps && ps.inventory) { this.applyPlayerState(ps); } else { const s = this.world.findSpawn(this.region); this.player.spawn(s[0], s[1], s[2]); this.player.yaw = Math.PI; }
       this.spawnAnimals((this.sharedAnimals && this.sharedAnimals.length) ? this.sharedAnimals : this.world.spawnAnimals);
@@ -108,7 +117,7 @@ BC.Game = class Game {
   sharedState() { return { world: this.world.serialize(), time: this.time, weather: this.weather, animals: this.animals.list.length ? this.animals.serialize() : (this.world.spawnAnimals || []) }; }
   applySharedState(state) { if (!state || !state.world) return; this.world.restore(state.world); if (state.time) this.time = state.time; if (state.weather) { this.weather = state.weather; this.rain.visible = !!this.weather.raining; } this.sharedAnimals = state.animals; }
   playerState() { const st = this.stats; const S = o => Array.from(o); return { inventory: this.inventory, selected: this.selected, points: this.points, pos: { x: this.player.pos.x, y: this.player.pos.y, z: this.player.pos.z, yaw: this.player.yaw, pitch: this.player.pitch }, stats: Object.assign({}, st, { inspected: S(st.inspected), seedSpecies: S(st.seedSpecies), biomesVisited: S(st.biomesVisited), journal: S(st.journal), questsDone: S(st.questsDone) }) }; }
-  applyPlayerState(ps) { const st = ps.stats; this.stats = Object.assign(this.stats, st, { inspected: new Set(st.inspected), seedSpecies: new Set(st.seedSpecies), biomesVisited: new Set(st.biomesVisited), journal: new Set(st.journal), questsDone: new Set(st.questsDone) }); this.inventory = ps.inventory || []; while (this.inventory.length < 9) this.inventory.push(null); this.selected = Math.min(ps.selected || 0, 8); this.points = ps.points || 0; if (ps.pos) { this.player.pos.set(ps.pos.x, ps.pos.y, ps.pos.z); this.player.yaw = ps.pos.yaw; this.player.pitch = ps.pos.pitch; } }
+  applyPlayerState(ps) { const st = ps.stats; this.stats = Object.assign(this.stats, st, { inspected: new Set(st.inspected), seedSpecies: new Set(st.seedSpecies), biomesVisited: new Set(st.biomesVisited), journal: new Set(st.journal), questsDone: new Set(st.questsDone) }); this.inventory = ps.inventory || []; while (this.inventory.length < 9) this.inventory.push(null); if (!this.inventory.some(i => i && i.type === 'tool' && i.id === 'axe')) this.give({ type: 'tool', id: 'axe' }); this.selected = Math.min(ps.selected || 0, 8); this.points = ps.points || 0; if (ps.pos) { this.player.pos.set(ps.pos.x, ps.pos.y, ps.pos.z); this.player.yaw = ps.pos.yaw; this.player.pitch = ps.pos.pitch; } }
   bindNetEvents() {
     const n = this.net, w = () => this.world;
     const remote = fn => { const W = w(); const prev = W.remote; W.remote = true; try { fn(W); } finally { W.remote = prev; } };
@@ -165,7 +174,8 @@ BC.Game = class Game {
     requestAnimationFrame(t => this.loop(t)); if (!this.running) return;
     let dt = Math.min(0.05, (now - this.last) / 1000); this.last = now; if (this.ui.modalOpen() && this.mode === 'solo') dt = 0;
     const auth = this.isAuthority();
-    this.player.update(this.ui.modalOpen() ? 0 : dt); if (auth) this.animals.update(dt); else this.animals.updateGuest(dt);
+    this.player.update(this.ui.modalOpen() ? 0 : dt);
+    if (this.holdPrimary && !this.ui.modalOpen() && now - (this.lastPrimary || 0) > 320) { const it = this.cur(); if (this.isDigTool(it)) { const h = this.raycast(); if (h && h.type === 'block') this.primary(); } } if (auth) this.animals.update(dt); else this.animals.updateGuest(dt);
     this.time.t += dt; this.time.dayFrac = (this.time.t / this.DAY) % 1; this.time.day = Math.floor(this.time.t / this.DAY) + 1;
     if (this.ffTimer > 0) { this.ffTimer -= dt; if (this.ffTimer <= 0) { this.growthMult = 1; this.toast('Fast-forward finished.', ''); } }
     this.simAcc += dt; if (this.simAcc >= 0.5) { if (auth) { BC.Sim.tick(this, this.simAcc); this.updateWeather(this.simAcc); } this.simAcc = 0; }
@@ -176,13 +186,13 @@ BC.Game = class Game {
     this.updateSky(); this.updateDirtyChunks(); this.updateTarget();
     this.renderer.render(this.scene, this.camera);
   }
-  updateDirtyChunks() { if (!this.world.dirty.size) return; const px = this.player.pos.x, pz = this.player.pos.z; const arr = Array.from(this.world.dirty); arr.sort((a, b) => { const da = ((a % this.world.CX) * 16 - px) ** 2 + (Math.floor(a / this.world.CX) * 16 - pz) ** 2; const db = ((b % this.world.CX) * 16 - px) ** 2 + (Math.floor(b / this.world.CX) * 16 - pz) ** 2; return da - db; }); for (let i = 0; i < Math.min(3, arr.length); i++) { this.rebuildChunk(arr[i]); this.world.dirty.delete(arr[i]); } }
+  updateDirtyChunks() { this.streamChunks(false); if (!this.world.dirty.size) return; this.world.dirty.forEach(ci => { if (!this.chunks.has(ci)) this.world.dirty.delete(ci); }); if (!this.world.dirty.size) return; const px = this.player.pos.x, pz = this.player.pos.z; const arr = Array.from(this.world.dirty); arr.sort((a, b) => { const da = ((a % this.world.CX) * 16 - px) ** 2 + (Math.floor(a / this.world.CX) * 16 - pz) ** 2; const db = ((b % this.world.CX) * 16 - px) ** 2 + (Math.floor(b / this.world.CX) * 16 - pz) ** 2; return da - db; }); for (let i = 0; i < Math.min(3, arr.length); i++) { this.rebuildChunk(arr[i]); this.world.dirty.delete(arr[i]); } }
   updateSky() {
     const f = this.time.dayFrac; const ang = (f - 0.25) * Math.PI * 2; const elev = Math.sin(ang); const day = BC.util.clamp(elev * 1.6 + 0.15, 0, 1);
     const biome = BC.BIOMES[this.world.biomeAt(this.player.pos.x, this.player.pos.z)]; const skyDay = new THREE.Color(biome.sky), dusk = new THREE.Color(0xe8955a), night = new THREE.Color(0x0b1026);
     const col = elev > 0.15 ? skyDay.clone().lerp(dusk, BC.util.clamp(1 - (elev - 0.15) / 0.25, 0, 1) * 0.6) : night.clone().lerp(dusk, BC.util.clamp((elev + 0.15) / 0.3, 0, 1));
     if (this.weather.raining) col.lerp(new THREE.Color(0x6a7a86), 0.6);
-    this.scene.background.copy(col); this.scene.fog.color.copy(col); this.scene.fog.near = this.weather.raining ? 20 : 40; this.scene.fog.far = this.weather.raining ? 90 : 150;
+    this.scene.background.copy(col); this.scene.fog.color.copy(col); this.scene.fog.near = this.weather.raining ? 20 : 40; this.scene.fog.far = this.weather.raining ? 80 : 104;
     this.sun.intensity = 0.25 + day * (this.weather.raining ? 0.6 : 1.1); this.hemi.intensity = 0.4 + day * 0.75;
     const p = this.player.pos; const sx = Math.cos(ang) * 120, sy = Math.sin(ang) * 120; this.sun.position.set(p.x + sx, p.y + Math.max(sy, 10), p.z + 40); this.sun.target.position.set(p.x, p.y, p.z);
     this.sunMesh.position.set(p.x + sx * 1.6, p.y + sy * 1.6, p.z + 60); this.moonMesh.position.set(p.x - sx * 1.6, p.y - sy * 1.6, p.z - 60); this.sunMesh.visible = elev > -0.1; this.moonMesh.visible = elev < 0.1;
@@ -242,40 +252,54 @@ BC.Game = class Game {
     const h = this.raycast(); let info = null; const it = this.cur();
     if (h) {
       if (h.type === 'plant') { const def = BC.Sim.defFor(h.plant); const p = h.plant; const mine = !p.wild && (this.mode !== 'shared' || !p.owner || p.owner === this.playerName); const whose = p.wild ? '' : (mine ? 'Your crop' : `${p.owner}'s crop`); const st = p.withered ? 'Withered' : p.wild ? (p.progress >= 1 ? 'Wild, mature' : 'Wild, regrowing') : p.progress >= 1 ? `${whose}: ready to harvest` : `${whose}: ${Math.round(p.progress * 100)}% grown`; info = { name: def.name, sub: def.sci + ' · ' + st, hint: it.type === 'tool' && it.id === 'hand' ? (p.wild ? (p.progress >= 1 ? (def.invasive ? 'Tap to pull it out' : 'Tap to collect seeds') : 'Regrowing: come back soon') : p.progress >= 1 ? 'Tap to harvest' : 'Tap to check its health') : 'Inspect: right-click or long-press' }; }
-      else if (h.type === 'block') { const b = BC.BLOCKS[h.id]; const tree = (b.log || b.leaves) ? BC.TREE_BY_ID[this.world.treeAt.get(this.world.idx(h.x, h.y, h.z))] : null; const soil = b.soil ? BC.SOILS[b.soil] : null; info = { name: tree ? tree.name : b.name, sub: tree ? tree.sci + (b.leaves ? ' · leaves' : ' · trunk') : soil ? `${soil.name} (${soil.order}) · pH ${soil.ph}` : '', hint: this.hintFor(it, b, tree, h) }; }
+      else if (h.type === 'block') { const b = BC.BLOCKS[h.id]; const tree = (b.log || b.leaves) ? BC.TREE_BY_ID[this.world.treeAt.get(this.world.idx(h.x, h.y, h.z))] : null; const soil = b.soil ? BC.SOILS[b.soil] : null; let hint = this.hintFor(it, b, tree, h); if (this.isDigTool(it)) { const key = h.x + ',' + h.y + ',' + h.z + ':' + it.id; const m = this.mining && this.mining.key === key ? this.mining : null; const need = this.hitsFor(it.id, b); hint = (m ? `${m.hits}/${need}` : `${need} ${need === 1 ? 'hit' : 'hits'}`) + ' · ' + hint; } info = { name: tree ? tree.name : b.name, sub: tree ? tree.sci + (b.leaves ? ' · leaves' : ' · trunk') : soil ? `${soil.name} (${soil.order}) · pH ${soil.ph}` : '', hint }; }
       else if (h.type === 'water') info = { name: 'Shallow water', sub: 'Tap to plant here', hint: '' };
       else if (h.type === 'animal') { const d = h.entity.def; const e = h.entity; const small = BC.isSmallAnimal(d); const rope = it.type === 'material' && it.id === 'rope'; info = { name: d.name, sub: d.sci + (e.leash ? ` · on ${e.leash}'s rope` : ''), hint: rope ? (small ? 'Small enough to catch by hand' : e.leash ? 'Tap to let go' : 'Tap to lead it with the rope') : small ? 'Tap to catch · hold to read about it' : 'Hold to read about it · craft a rope to lead it' }; }
     }
     const s = JSON.stringify(info); if (s !== this.lastTargetStr) { this.lastTargetStr = s; this.ui.setTarget(info); }
   }
   hintFor(it, b, tree, h) {
-    if (it.type === 'tool') { if (it.id === 'trowel') return b.unbreakable ? 'Bedrock cannot be dug' : b.log ? 'Tap to chop: fence posts' : b.leaves ? 'Tap to shake out seeds' : 'Tap to dig'; if (it.id === 'can') return b.soil ? 'Tap to water this spot' : ''; return b.soil ? 'Tap to read the soil' : tree ? 'Tap to read about this tree' : ''; }
+    if (it.type === 'tool') { if (it.id === 'can') return b.soil ? 'Tap to water this spot' : ''; if (b.unbreakable || (b.id === BC.BLOCK.STONE && h.y <= 1)) return 'Bedrock cannot be dug'; const verb = b.log ? 'chop' : b.leaves ? 'shake out seeds' : 'dig'; return `${this.player.touch ? 'tap' : 'hold click'} to ${verb} · ${this.player.touch ? 'hold' : 'right-click'} to read`; }
     if (it.type === 'seed') { const def = BC.Sim.defFor({ id: it.id }); if (def.epiphyte) return b.log ? 'Tap the trunk side to attach it' : 'Epiphytes need a tree trunk'; return h.normal[1] === 1 && b.soil ? 'Tap to plant here' : 'Aim at the top of a soil block'; }
     if (it.type === 'compost') return b.soil ? 'Tap to amend this soil' : ''; if (it.type === 'block') return 'Tap to place'; if (it.type === 'animal') return 'Tap to release it here'; return '';
+  }
+  // ---------- digging & chopping ----------
+  // Hits needed to break a block with a tool. Category: wood (logs, planks, fences), soil, stone, soft (leaves).
+  hitsFor(toolId, b) {
+    const cat = b.leaves ? 'soft' : (b.log || b.fence || b.id === BC.BLOCK.PLANKS) ? 'wood' : (b.id === BC.BLOCK.STONE || b.id === BC.BLOCK.GRAVEL || b.id === BC.BLOCK.CALICHE) ? 'stone' : 'soil';
+    const T = { hand: { wood: 5, soil: 4, stone: 8, soft: 1 }, trowel: { wood: 4, soil: 2, stone: 3, soft: 1 }, axe: { wood: 2, soil: 2, stone: 4, soft: 1 } };
+    return (T[toolId] || T.hand)[cat];
+  }
+  isDigTool(it) { return it.type === 'tool' && (it.id === 'hand' || it.id === 'trowel' || it.id === 'axe'); }
+  mineHit(h, it) {
+    const b = BC.BLOCKS[h.id]; if (b.unbreakable || (b.id === BC.BLOCK.STONE && h.y <= 1)) { this.toast('Bedrock. The world ends here.', ''); return; }
+    const key = h.x + ',' + h.y + ',' + h.z + ':' + it.id; const need = this.hitsFor(it.id, b); const now = performance.now();
+    if (!this.mining || this.mining.key !== key || now - this.mining.t > 3000) this.mining = { key, hits: 0, need, t: now };
+    this.mining.hits++; this.mining.t = now; this.lastTargetStr = null;
+    if (this.mining.hits < need) return;
+    this.mining = null; this.breakBlock(h, b);
+  }
+  breakBlock(h, b) {
+    const w = this.world, st = this.stats;
+    const above = w.plantAt(h.x, h.y + 1, h.z); if (above) w.removePlant(above);
+    w.set(h.x, h.y, h.z, 0);
+    if (b.log) { this.give({ type: 'block', id: h.id, count: 1 }); const tid = w.treeAt.get(w.idx(h.x, h.y, h.z)); if (tid) { this.lastInspect = null; this.discover('tree:' + tid, 'chopped'); } this.toast(`Chopped: 1 ${b.name.toLowerCase()}. Craft it into planks in your Bag (E).`, 'good'); }
+    else if (b.leaves) { const tid = w.treeAt.get(w.idx(h.x, h.y, h.z)); if (tid && Math.random() < 0.4) { this.give({ type: 'seed', id: 'tree:' + tid, count: 1 }); this.toast(`Found ${BC.TREE_BY_ID[tid].seed}!`, 'good'); st.seedSpecies.add('tree:' + tid); } else this.toast('Just leaves. Shake another branch for seeds.', ''); if (tid) this.discover('tree:' + tid, 'leaves'); }
+    else if (b.soil) {
+      this.give({ type: 'block', id: h.id, count: 1 }); const depth = Math.max(1, w.height[h.x + h.z * w.W] - h.y + 1); if (h.y <= w.height[h.x + h.z * w.W]) st.maxDig = Math.max(st.maxDig, depth);
+      this.lastInspect = { x: h.x, y: h.y, z: h.z };
+      if (!this.discover('soil:' + b.soil, 'dug')) { const below = BC.BLOCKS[w.get(h.x, h.y - 1, h.z)]; if (below && below.soil && below.soil !== b.soil) this.toast(`Dug through ${b.name.toLowerCase()} (${b.horizon} horizon). Below: ${below.name.toLowerCase()}.`, ''); }
+      if (b.soil !== 'stone' && Math.random() < 0.12 && ['alfisol', 'mollisol', 'histosol', 'compost'].includes(b.soil)) { this.discover('animal:earthworm', 'dug'); }
+    } else this.give({ type: 'block', id: h.id, count: 1 });
   }
   // ---------- actions ----------
   applyWater(x, z, local) { const w = this.world; for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) { const xx = x + dx, zz = z + dz; if (xx >= 0 && zz >= 0 && xx < w.W && zz < w.D) w.moisture[xx + zz * w.W] = Math.min(1, w.moisture[xx + zz * w.W] + (dx === 0 && dz === 0 ? 1 : 0.5)); } w.markDirty(x, z); if (local && this.mode === 'shared') this.net.send('water', { x, z }); }
   primary() {
     if (this.ui.modalOpen()) return; const h = this.raycast(); if (!h) return; const it = this.cur(); const w = this.world; const st = this.stats;
     if (h.type === 'animal') return this.animalAction(h.entity, it);
-    if (it.type === 'tool' && it.id === 'hand') {
-      if (h.type === 'plant') return this.handOnPlant(h.plant);
-      return this.inspect(h);
-    }
-    if (it.type === 'tool' && it.id === 'trowel') {
-      if (h.type === 'plant') { w.removePlant(h.plant); this.toast('Plant removed.', ''); return; }
-      if (h.type !== 'block') return; const b = BC.BLOCKS[h.id]; if (b.unbreakable || (b.id === BC.BLOCK.STONE && h.y <= 1)) { this.toast('Bedrock. The world ends here.', ''); return this.inspect(h); }
-      const above = w.plantAt(h.x, h.y + 1, h.z); if (above) w.removePlant(above);
-      w.set(h.x, h.y, h.z, 0);
-      if (b.log) { this.give({ type: 'block', id: h.id, count: 1 }); const tid = w.treeAt.get(w.idx(h.x, h.y, h.z)); if (tid) { this.lastInspect = null; this.discover('tree:' + tid, 'chopped'); } this.toast(`Chopped: 1 ${b.name.toLowerCase()}. Craft it into planks in your Bag (E).`, 'good'); }
-      else if (b.leaves) { const tid = w.treeAt.get(w.idx(h.x, h.y, h.z)); if (tid && Math.random() < 0.4) { this.give({ type: 'seed', id: 'tree:' + tid, count: 1 }); this.toast(`Found ${BC.TREE_BY_ID[tid].seed}!`, 'good'); st.seedSpecies.add('tree:' + tid); } else this.toast('Just leaves. Shake another branch for seeds.', ''); if (tid) this.discover('tree:' + tid, 'leaves'); }
-      else if (b.soil) {
-        this.give({ type: 'block', id: h.id, count: 1 }); const depth = Math.max(1, w.height[h.x + h.z * w.W] - h.y + 1); if (h.y <= w.height[h.x + h.z * w.W]) st.maxDig = Math.max(st.maxDig, depth);
-        this.lastInspect = { x: h.x, y: h.y, z: h.z };
-        if (!this.discover('soil:' + b.soil, 'dug')) { const below = BC.BLOCKS[w.get(h.x, h.y - 1, h.z)]; if (below && below.soil && below.soil !== b.soil) this.toast(`Dug through ${b.name.toLowerCase()} (${b.horizon} horizon). Below: ${below.name.toLowerCase()}.`, ''); }
-        if (b.soil !== 'stone' && Math.random() < 0.12 && ['alfisol', 'mollisol', 'histosol', 'compost'].includes(b.soil)) { this.discover('animal:earthworm', 'dug'); }
-      } else this.give({ type: 'block', id: h.id, count: 1 });
-      return;
+    if (this.isDigTool(it)) {
+      if (h.type === 'plant') { if (it.id === 'hand') return this.handOnPlant(h.plant); w.removePlant(h.plant); this.toast('Plant removed.', ''); return; }
+      if (h.type !== 'block') return; this.lastPrimary = performance.now(); return this.mineHit(h, it);
     }
     if (it.type === 'tool' && it.id === 'can') { if (h.type !== 'block' && h.type !== 'plant') return; this.applyWater(h.x, h.z, true); st.watered++; this.toast(`Watered. Moisture here is now ${Math.round(w.moisture[h.x + h.z * w.W] * 100)}%.`, 'good'); return; }
     if (it.type === 'seed') return this.plantSeed(it, h);
@@ -287,6 +311,7 @@ BC.Game = class Game {
     const d = e.def; const small = BC.isSmallAnimal(d); const rope = it.type === 'material' && it.id === 'rope';
     if (rope) {
       if (small) return this.toast(`A ${d.name.toLowerCase()} is small enough to catch by hand.`, '');
+      if (d.noLeash) return this.toast(`Nobody puts a rope on a ${d.name.toLowerCase()}. Keep your distance.`, 'bad');
       if (e.leash && e.leash !== this.playerName) return this.toast(`${e.leash} is already leading that ${d.name.toLowerCase()}.`, '');
       e.leash = e.leash ? null : this.playerName; if (this.mode === 'shared') this.net.send('leash', { uid: e.uid, by: e.leash }); this.stats.inspected.add('animal:' + d.id); this.discover('animal:' + d.id, 'inspected');
       this.toast(e.leash ? `The ${d.name.toLowerCase()} is on your rope and will follow you. Tap it again to let go.` : `You let the ${d.name.toLowerCase()} go.`, 'good'); return;
@@ -348,7 +373,7 @@ BC.Game = class Game {
   moveToBag(slot) { const it = this.inventory[slot]; if (!it || it.type === 'tool') return; this.inventory[slot] = null; this.inventory.push(it); this.ui.renderHotbar(); }
   select(i) { if (i < 0 || i > 8) return; this.selected = i; this.ui.renderHotbar(); }
   scrollHotbar(d) { this.select((this.selected + d + 9) % 9); }
-  itemName(it) { if (!it) return 'Empty slot'; if (it.type === 'tool') return { hand: 'Hand: collect, harvest, inspect, catch small animals', trowel: 'Trowel: dig soil and stone, chop logs, shake leaves', can: 'Watering can' }[it.id]; if (it.type === 'seed') { const d = BC.Sim.defFor({ id: it.id }); return `${d.seed} (${d.name})`; } if (it.type === 'compost') return 'Compost: tap a soil block to amend it'; if (it.type === 'block') { const b = BC.BLOCKS[it.id]; return b.fence ? 'Fence post: place around crops' : b.name + ' (block)'; } if (it.type === 'material') { const m = BC.MATERIALS[it.id]; return m ? `${m.name}: ${m.desc}` : it.id; } if (it.type === 'animal') { const d = BC.ANIMAL_BY_ID[it.id]; return d ? `${d.name} (caught): tap the ground to release` : 'Animal'; } return ''; }
+  itemName(it) { if (!it) return 'Empty slot'; if (it.type === 'tool') return { hand: 'Hand: collect, harvest, catch small animals (digs slowly)', trowel: 'Shovel: digs soil in 2 hits', axe: 'Axe: chops wood in 2 hits', can: 'Watering can' }[it.id]; if (it.type === 'seed') { const d = BC.Sim.defFor({ id: it.id }); return `${d.seed} (${d.name})`; } if (it.type === 'compost') return 'Compost: tap a soil block to amend it'; if (it.type === 'block') { const b = BC.BLOCKS[it.id]; return b.fence ? 'Fence post: place around crops' : b.name + ' (block)'; } if (it.type === 'material') { const m = BC.MATERIALS[it.id]; return m ? `${m.name}: ${m.desc}` : it.id; } if (it.type === 'animal') { const d = BC.ANIMAL_BY_ID[it.id]; return d ? `${d.name} (caught): tap the ground to release` : 'Animal'; } return ''; }
   itemIcon(it, size) {
     if (!it) return null;
     if (it.type === 'animal') { const d = BC.ANIMAL_BY_ID[it.id]; return d ? this.ui.imgFor('animal', d) : null; }
@@ -359,6 +384,7 @@ BC.Game = class Game {
     const c = document.createElement('canvas'); c.width = c.height = size; const g = c.getContext('2d'); const s = size / 32;
     if (it.id === 'hand') { g.fillStyle = '#e8b890'; g.fillRect(9 * s, 12 * s, 14 * s, 14 * s); for (let i = 0; i < 4; i++) g.fillRect((9 + i * 3.6) * s, (4 + (i === 0 || i === 3 ? 3 : 0)) * s, 2.8 * s, 10 * s); g.fillRect(4 * s, 14 * s, 6 * s, 3 * s); }
     else if (it.id === 'trowel') { g.fillStyle = '#7a4a2a'; g.fillRect(14 * s, 2 * s, 4 * s, 12 * s); g.fillStyle = '#b8b8c0'; g.beginPath(); g.moveTo(9 * s, 14 * s); g.lineTo(23 * s, 14 * s); g.lineTo(16 * s, 30 * s); g.closePath(); g.fill(); }
+    else if (it.id === 'axe') { g.fillStyle = '#7a4a2a'; g.save(); g.translate(16 * s, 16 * s); g.rotate(-0.6); g.fillRect(-2 * s, -4 * s, 4 * s, 20 * s); g.restore(); g.fillStyle = '#b8b8c0'; g.beginPath(); g.moveTo(14 * s, 4 * s); g.lineTo(26 * s, 8 * s); g.lineTo(24 * s, 16 * s); g.lineTo(12 * s, 12 * s); g.closePath(); g.fill(); g.fillStyle = '#e8e8f0'; g.fillRect(24 * s, 8 * s, 2 * s, 7 * s); }
     else if (it.id === 'can') { g.fillStyle = '#5a7a9a'; g.fillRect(8 * s, 12 * s, 14 * s, 14 * s); g.fillRect(20 * s, 10 * s, 8 * s, 3 * s); g.fillStyle = '#4a6a8a'; g.fillRect(10 * s, 8 * s, 10 * s, 4 * s); g.strokeStyle = '#5a7a9a'; g.lineWidth = 2 * s; g.beginPath(); g.arc(15 * s, 10 * s, 6 * s, Math.PI, 0); g.stroke(); g.fillStyle = '#8ac0f0'; for (let i = 0; i < 4; i++) g.fillRect((26 + i) * s, (14 + i * 3) * s, 1.5 * s, 2 * s); }
     return c;
   }
@@ -380,8 +406,9 @@ BC.Game = class Game {
   load() {
     let data = null; try { data = JSON.parse(localStorage.getItem(this.SAVE_KEY)); } catch (e) { } if (!data || data.v !== 1) return false;
     this.mode = 'solo'; this.playerName = 'me'; this.seed = data.seed; this.region = data.region; this.time = data.time; this.weather = data.weather || this.weather; this.rain.visible = this.weather.raining;
+    this.worldW = data.world.W || 224; this.worldD = data.world.D || 224;
     this.startWorld(() => {
-      this.world.restore(data.world); this.world.dirty.forEach(ci => this.rebuildChunk(ci)); this.world.dirty.clear();
+      this.worldW = this.worldD = undefined; this.world.restore(data.world);
       this.resetStats(); const ps = (data.player && data.player.inventory) ? data.player : { inventory: data.inventory, selected: data.selected, points: data.points, pos: data.player, stats: data.stats }; this.applyPlayerState(ps);
       this.spawnAnimals(data.animals && data.animals.length ? data.animals : this.world.spawnAnimals);
       this.begin(); this.toast('Welcome back. Time here passes only while you play, so your garden is just as you left it.', '');

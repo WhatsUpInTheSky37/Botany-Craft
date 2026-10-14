@@ -2,7 +2,7 @@ window.BC = window.BC || {};
 // World storage + procedural generation.
 BC.World = class World {
   constructor(seed, W, D, H) {
-    this.W = W || 224; this.D = D || 224; this.H = H || 44; this.seed = seed >>> 0;
+    this.W = W || 448; this.D = D || 448; this.H = H || 44; this.seed = seed >>> 0; this.scale = this.W / 224;
     this.WL = 12; // water level
     this.blocks = new Uint8Array(this.W * this.D * this.H);
     this.biome = new Uint8Array(this.W * this.D);
@@ -44,8 +44,8 @@ BC.World = class World {
     for (let z = 0; z < D; z++) for (let x = 0; x < W; x++) {
       const ci = x + z * W;
       // climate: north (z=0) cold, south hot; west dry, east wet
-      const temp = BC.util.clamp(z / D + (n(x / 70, z / 70) - 0.5) * 0.35, 0, 1);
-      const moist = BC.util.clamp(x / W + (n(x / 60 + 100, z / 60) - 0.5) * 0.5, 0, 1);
+      const sc = this.scale; const temp = BC.util.clamp(z / D + (n(x / (70 * sc), z / (70 * sc)) - 0.5) * 0.35, 0, 1);
+      const moist = BC.util.clamp(x / W + (n(x / (60 * sc) + 100, z / (60 * sc)) - 0.5) * 0.5, 0, 1);
       let h = 13 + (n(x / 38, z / 38 + 50) - 0.5) * 14 + (n(x / 12, z / 12 + 80) - 0.5) * 3;
       const edge = Math.min(x, z, W - 1 - x, D - 1 - z) / 14; if (edge < 1) h -= (1 - smooth(edge)) * 7;
       let biome;
@@ -60,6 +60,7 @@ BC.World = class World {
     }
     this.placeTrees(); this.placePlants(); this.pickAnimals();
     this.diffs.clear(); this.generating = false;
+    this.genPlantKeys = new Set(this.plants.keys()); this.genTreeKeys = new Set(this.treeAt.keys());
   }
   fillColumn(x, z, h, biome) {
     const B = BC.BLOCK, WL = this.WL; const under = h < WL;
@@ -113,6 +114,7 @@ BC.World = class World {
       case 'saguaro': trunk(hgt); for (let a = 0; a < 2; a++) { if (hgt < 7 && a === 1) break; const dx = a ? -1 : 1; const ay = y0 + 2 + Math.floor(R() * 2) + a; put(x + dx, ay, z, log); for (let k = 1; k <= 2 + (a ? 0 : 1); k++) put(x + dx, ay + k, z, log); } break;
       case 'kapok': trunk(hgt); for (let a = 0; a < 4; a++) { const dx = [1, -1, 0, 0][a], dz = [0, 0, 1, -1][a]; put(x + dx, y0, z + dz, log); if (R() < 0.6) put(x + dx, y0 + 1, z + dz, log); } blob(x, y0 + hgt, z, 4, true); blob(x, y0 + hgt + 1, z, 2, true); break;
       case 'cypress': trunk(hgt); for (let a = 0; a < 4; a++) { const dx = [1, -1, 0, 0][a], dz = [0, 0, 1, -1][a]; if (R() < 0.7) put(x + dx, y0, z + dz, log); if (R() < 0.5) put(x + dx * 2, y0 - 1, z + dz, log); } blob(x, y0 + hgt - 1, z, 2); blob(x, y0 + hgt + 1, z, 1); put(x, y0 + hgt + 2, z, leaf); break;
+      case 'palm': trunk(hgt); put(x, y0 + hgt, z, leaf); for (let a = 0; a < 4; a++) { const dx = [1, -1, 0, 0][a], dz = [0, 0, 1, -1][a]; put(x + dx, y0 + hgt, z + dz, leaf); put(x + dx * 2, y0 + hgt, z + dz * 2, leaf); put(x + dx * 3, y0 + hgt - 1, z + dz * 3, leaf); if (R() < 0.6) put(x + dx * 4, y0 + hgt - 2, z + dz * 4, leaf); } for (const [dx, dz] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) { put(x + dx, y0 + hgt, z + dz, leaf); put(x + dx * 2, y0 + hgt - 1, z + dz * 2, leaf); } break;
       case 'willow': trunk(hgt - 2); blob(x, y0 + hgt - 1, z, 3, true); for (let dz = -3; dz <= 3; dz++) for (let dx = -3; dx <= 3; dx++) if (Math.abs(dx) + Math.abs(dz) >= 3 && Math.abs(dx) + Math.abs(dz) <= 4 && R() < 0.7) for (let k = 0; k < 2 + Math.floor(R() * 3); k++) put(x + dx, y0 + hgt - 2 - k, z + dz, leaf); break;
     }
     if (!gen) { this.remote = prevRemote; if (this.onBlocks && !prevRemote) this.onBlocks(placed, t.id); }
@@ -140,7 +142,7 @@ BC.World = class World {
   }
   pickAnimals() {
     const perBiome = {}; for (let z = 4; z < this.D - 4; z += 3) for (let x = 4; x < this.W - 4; x += 3) { const b = this.biomeAt(x, z); const h = this.height[x + z * this.W]; if (h < this.WL) continue; (perBiome[b] = perBiome[b] || []).push([x, z]); }
-    BC.ANIMALS.forEach(a => { if (a.hidden) return; a.biomes.forEach((b, bi) => { const cells = perBiome[b]; if (!cells || !cells.length) return; const n = bi === 0 ? 4 : 2; for (let i = 0; i < n; i++) { const c = cells[Math.floor(this.rand() * cells.length)]; this.spawnAnimals.push({ id: a.id, x: c[0] + 0.5, z: c[1] + 0.5 }); } }); });
+    BC.ANIMALS.forEach(a => { if (a.hidden) return; a.biomes.forEach((b, bi) => { const cells = perBiome[b]; if (!cells || !cells.length) return; const n = Math.round((bi === 0 ? 4 : 2) * this.scale); for (let i = 0; i < n; i++) { const c = cells[Math.floor(this.rand() * cells.length)]; this.spawnAnimals.push({ id: a.id, x: c[0] + 0.5, z: c[1] + 0.5 }); } }); });
   }
   openAround(x, z, r) { for (let dz = -r; dz <= r; dz++) for (let dx = -r; dx <= r; dx++) { const h = this.height[(x + dx) + (z + dz) * this.W]; for (let y = h + 1; y <= h + 3; y++) if (this.get(x + dx, y, z + dz) !== 0) return false; } return true; }
   findSpawn(biome) {
@@ -150,14 +152,30 @@ BC.World = class World {
     return best || [this.W / 2 | 0, this.top(this.W / 2 | 0, this.D / 2 | 0), this.D / 2 | 0];
   }
   // save / load
-  serialize() { const diffs = []; this.diffs.forEach((v, k) => diffs.push(k, v)); const plants = []; this.plants.forEach(p => plants.push({ id: p.id, x: p.x, y: p.y, z: p.z, wild: p.wild, progress: p.progress, health: p.health, pollinated: p.pollinated, withered: p.withered, onBark: p.onBark, owner: p.owner })); const trees = []; this.treeAt.forEach((v, k) => trees.push(k, v)); const moist = Array.from(this.moisture, m => Math.round(m * 100)); return { diffs, plants, trees, moist }; }
-  coords(i) { const y = Math.floor(i / (this.W * this.D)); const r = i % (this.W * this.D); return [r % this.W, y, Math.floor(r / this.W)]; }
+  // Save only what differs from the deterministic generation: changed blocks, changed/added plants, removed wild plants, added tree blocks, moisture that drifted.
+  serialize() {
+    const diffs = []; this.diffs.forEach((v, k) => diffs.push(k, v));
+    const plants = [], removed = []; const gen = this.genPlantKeys || new Set();
+    this.plants.forEach(p => { if (p.wild && gen.has(p.key) && p.progress >= 1 && !p.withered) return; plants.push({ id: p.id, x: p.x, y: p.y, z: p.z, wild: p.wild, progress: p.progress, health: p.health, pollinated: p.pollinated, withered: p.withered, onBark: p.onBark, owner: p.owner }); });
+    gen.forEach(k => { if (!this.plants.has(k)) removed.push(k); });
+    const trees = []; const gt = this.genTreeKeys || new Set(); this.treeAt.forEach((v, k) => { if (!gt.has(k)) trees.push(k, v); });
+    const moist = []; for (let i = 0; i < this.moisture.length; i++) { const base = BC.BIOMES[BC.BIOME_LIST[this.biome[i]]].baseMoisture; if (Math.abs(this.moisture[i] - base) > 0.03) moist.push(i, Math.round(this.moisture[i] * 100)); }
+    return { v: 2, W: this.W, D: this.D, H: this.H, diffs, plants, removed, trees, moist };
+  }
   restore(s) {
     const prev = this.remote; this.remote = true;
     for (let i = 0; i < s.diffs.length; i += 2) { const k = s.diffs[i], v = s.diffs[i + 1]; if (this.blocks[k] !== v) { this.blocks[k] = v; const c = this.coords(k); this.markDirty(c[0], c[2]); } this.diffs.set(k, v); }
-    this.plants.forEach(p => this.markDirty(p.x, p.z)); this.plants.clear(); s.plants.forEach(p => this.addPlant(p));
-    this.treeAt.clear(); for (let i = 0; i < s.trees.length; i += 2) this.treeAt.set(s.trees[i], s.trees[i + 1]);
-    if (s.moist) for (let i = 0; i < s.moist.length; i++) this.moisture[i] = s.moist[i] / 100;
+    if (s.v === 2) {
+      (s.removed || []).forEach(k => { const p = this.plants.get(k); if (p) this.removePlant(p); });
+      s.plants.forEach(p => { const ex = this.plants.get(this.idx(p.x, p.y, p.z)); if (ex) this.removePlant(ex); this.addPlant(p); });
+      for (let i = 0; i < s.trees.length; i += 2) this.treeAt.set(s.trees[i], s.trees[i + 1]);
+      if (s.moist) for (let i = 0; i < s.moist.length; i += 2) this.moisture[s.moist[i]] = s.moist[i + 1] / 100;
+    } else {
+      this.plants.forEach(p => this.markDirty(p.x, p.z)); this.plants.clear(); s.plants.forEach(p => this.addPlant(p));
+      this.treeAt.clear(); for (let i = 0; i < s.trees.length; i += 2) this.treeAt.set(s.trees[i], s.trees[i + 1]);
+      if (s.moist) for (let i = 0; i < s.moist.length; i++) this.moisture[i] = s.moist[i] / 100;
+    }
     this.remote = prev;
   }
+  coords(i) { const y = Math.floor(i / (this.W * this.D)); const r = i % (this.W * this.D); return [r % this.W, y, Math.floor(r / this.W)]; }
 };

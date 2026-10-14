@@ -22,7 +22,7 @@ The backend is a Supabase project: two tables (`bc_worlds`, `bc_players`) behind
 | Topic | In the game |
 |---|---|
 | Soil science | 10 soil types based on USDA soil orders (Alfisol, Mollisol, Aridisol, Oxisol, Spodosol, Histosol, gley, compost, caliche, bedrock), each with real horizons, pH, texture, drainage and where on Earth it occurs. Dig down to see the profile. |
-| Plant requirements | 38 plants and 14 trees with real soil, pH, water, light and climate needs. The growth simulation scores all five every tick and explains exactly why a plant is thriving or withering. |
+| Plant requirements | 48 plants and 29 trees with real soil, pH, water, light and climate needs. The growth simulation scores all five every tick and explains exactly why a plant is thriving or withering. |
 | Biogeography | Six biomes with their real-world locations, climate and native species. A world map shows how temperature and rainfall decide the biome. |
 | Ecology | Nitrogen fixation (legumes), pollination (bees, butterflies, hummingbirds visit your flowers and double seed yield), herbivory (deer and hares eat unfenced crops), invasive species, epiphytes, carnivorous plants, succession, fire ecology, composting, the Three Sisters. |
 | Animals | 16 animals, each with its role in the ecosystem. |
@@ -35,7 +35,7 @@ Phone: left thumb drags to move, right thumb drags to look, tap to use, press an
 
 ## Code layout
 
-* `js/data/` botanical content: soils, biomes, plants, trees, animals, quests and quizzes.
+* `js/data/` botanical content (48 plants, 29 trees, 30 animals): soils, biomes, plants, trees, animals, quests and quizzes.
 * `js/textures.js` procedural pixel-art atlas (blocks and plant sprites), drawn at load time.
 * `js/world.js` terrain, climate map, soil horizons, trees and wild plants.
 * `js/mesher.js` chunk meshes with ambient occlusion, water and plant sprites.

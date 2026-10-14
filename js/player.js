@@ -14,7 +14,8 @@ BC.Player = class Player {
     document.addEventListener('mousemove', e => { if (!this.locked) return; this.yaw -= e.movementX * 0.0022; this.pitch = BC.util.clamp(this.pitch - e.movementY * 0.0022, -1.5, 1.5); });
     window.addEventListener('keydown', e => { if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return; this.keys[e.code] = true; if (e.code === 'Space') { this.jumpQueued = true; e.preventDefault(); } if (e.code === 'ShiftLeft') this.sprint = true; this.game.onKey(e); });
     window.addEventListener('keyup', e => { this.keys[e.code] = false; if (e.code === 'ShiftLeft') this.sprint = false; });
-    canvas.addEventListener('mousedown', e => { if (!this.locked || this.game.ui.modalOpen()) return; e.preventDefault(); if (e.button === 0) this.game.primary(); else if (e.button === 2) this.game.secondary(); });
+    canvas.addEventListener('mousedown', e => { if (!this.locked || this.game.ui.modalOpen()) return; e.preventDefault(); if (e.button === 0) { this.game.holdPrimary = true; this.game.primary(); } else if (e.button === 2) this.game.secondary(); });
+    window.addEventListener('mouseup', e => { if (e.button === 0) this.game.holdPrimary = false; }); window.addEventListener('blur', () => { this.game.holdPrimary = false; });
     canvas.addEventListener('contextmenu', e => e.preventDefault());
     window.addEventListener('wheel', e => { if (this.locked) this.game.scrollHotbar(Math.sign(e.deltaY)); }, { passive: true });
   }

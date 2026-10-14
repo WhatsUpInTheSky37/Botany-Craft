@@ -2,7 +2,7 @@ window.BC = window.BC || {};
 // Quests are checked against the game's stats object every second.
 // `check(stats, game)` returns a number 0..1 (progress) ; 1 = complete.
 BC.QUESTS = [
-  { id: 'look', title: 'Field Notes', goal: 'Inspect 3 different things with your hand (tap or click a plant, animal or soil).',
+  { id: 'look', title: 'Field Notes', goal: 'Read about 3 different things: right-click (or press and hold on a phone) a plant, animal, tree or soil.',
     lesson: 'A botanist starts by looking closely. Every plant, animal and soil you inspect is added to your Field Journal.',
     check: s => Math.min(1, s.inspected.size / 3), points: 10,
     quiz: { q: 'What are the three ingredients that give a soil its texture?', options: ['Sand, silt and clay', 'Rock, water and air', 'Humus, roots and worms', 'Peat, lime and salt'], answer: 0,

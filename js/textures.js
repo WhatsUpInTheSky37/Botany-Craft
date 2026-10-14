@@ -1,7 +1,7 @@
 window.BC = window.BC || {};
 // Procedural pixel-art texture atlas. Everything the game shows is drawn here at load time.
 BC.Atlas = (function () {
-  const TILE = 32, COLS = 16;
+  const TILE = 32, COLS = 32;
   const tiles = {}; let count = 0;
   let canvas, ctx;
   function rng(seed) { let s = seed >>> 0 || 1; return () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296; }
@@ -59,6 +59,7 @@ BC.Atlas = (function () {
     log_tropical: g => bark(g, '#8a7a68', '#5a4a3a', 60), log_top_tropical: g => rings(g, '#d8c0a0', '#9a8060'),
     log_cypress: g => bark(g, '#8a5a40', '#4a2e1c', 61), log_top_cypress: g => rings(g, '#d8a888', '#9a6a4a'),
     log_mesquite: g => bark(g, '#4a3428', '#20140c', 62), log_top_mesquite: g => rings(g, '#a06a4a', '#5a3a2a'),
+    log_palm: g => { noise(g, '#8a7a5a', 0.15, 65, 1); g.fillStyle = '#5a4a30'; for (let y = 0; y < TILE; y += 6) { g.fillRect(0, y, TILE, 2); for (let x = (y / 6) % 2 ? 4 : 0; x < TILE; x += 8) g.fillRect(x, y + 2, 1, 4); } }, log_top_palm: g => { noise(g, '#c8b080', 0.1, 66, 2); speck(g, '#8a7a5a', 60, 67); },
     log_paloverde: g => { noise(g, '#8ab05a', 0.1, 63, 1); const r = rng(64); g.fillStyle = '#6a904a'; for (let i = 0; i < 14; i++) g.fillRect((r() * TILE) | 0, (r() * TILE) | 0, 1, 6); }, log_top_paloverde: g => rings(g, '#c8d890', '#8aa060'),
   };
 
