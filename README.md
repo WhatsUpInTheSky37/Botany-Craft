@@ -1,6 +1,6 @@
-# Botany Craft
+# Botany World
 
-![Botany Craft](assets/botany-craft-hero.jpg)
+![Botany World](assets/botany-world-hero.jpg)
 
 A block-world game that teaches botany. Explore six real Earth biomes laid out on a climate map (cold north, hot south, dry west, wet east), dig into the soil to read its horizons, gather seeds from wild plants, and grow them where they belong. Everything you meet goes into a Field Journal, and 17 quests with quiz questions walk you through the science.
 

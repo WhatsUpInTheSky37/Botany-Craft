@@ -4,7 +4,7 @@ BC.Game = class Game {
   constructor() {
     this.canvas = document.getElementById('gl');
     this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: (window.devicePixelRatio || 1) < 1.5, powerPreference: 'high-performance' });
-    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace; this.renderer.toneMapping = THREE.ACESFilmicToneMapping; this.renderer.toneMappingExposure = 1.12;
     this.scene = new THREE.Scene(); this.camera = new THREE.PerspectiveCamera(72, 1, 0.1, 260);
     this.player = new BC.Player(this); this.ui = new BC.UI(this); this.animals = new BC.Animals(this); this.npcs = new BC.NPCs(this); this.boats = new BC.Boats(this); this.net = new BC.Net(this); this.hires = []; this.fishing = null;
     this.chunks = new Map(); this.time = { t: 0, day: 1, dayFrac: 0.3 }; this.weather = { raining: false, timer: 90 };
@@ -26,24 +26,28 @@ BC.Game = class Game {
     const atlas = BC.Atlas.build(); this.atlas = atlas.texture; try { this.atlas.anisotropy = Math.min(8, this.renderer.capabilities.getMaxAnisotropy()); } catch (e) { }
     this.matSolid = new THREE.MeshLambertMaterial({ map: this.atlas, vertexColors: true });
     this.matPlant = new THREE.MeshLambertMaterial({ map: this.atlas, vertexColors: true, alphaTest: 0.5, side: THREE.DoubleSide });
+    // wind: the top vertices of plants and grass tufts lean with slow overlapping waves
+    const wind = mat => { mat.onBeforeCompile = sh => { sh.uniforms.uTime = { value: 0 }; mat.userData.shader = sh; sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute float sway; uniform float uTime;').replace('#include <begin_vertex>', '#include <begin_vertex>\n{ float w = sway * (0.75 + 0.25 * sin(uTime * 0.7 + position.z * 0.05)); transformed.x += w * (sin(uTime * 1.7 + position.x * 0.8 + position.z * 0.6) * 0.07 + sin(uTime * 3.1 + position.z * 1.3) * 0.025); transformed.z += w * cos(uTime * 1.3 + position.x * 0.5 + position.z * 0.9) * 0.05; }'); }; };
+    wind(this.matPlant);
     this.waterTex = BC.Atlas.waterTexture(); this.matWater = new THREE.MeshPhongMaterial({ map: this.waterTex, vertexColors: true, transparent: true, opacity: 0.66, depthWrite: false, specular: new THREE.Color(0x9fc3e6), shininess: 120 });
     this.matWater.onBeforeCompile = sh => { sh.uniforms.uTime = { value: 0 }; sh.uniforms.uSky = { value: new THREE.Color(0x8fc4ea) }; this.matWater.userData.shader = sh;
-      sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec2 flow; uniform float uTime; varying vec2 vFlow;').replace('#include <uv_vertex>', '#include <uv_vertex>\nvMapUv += flow * uTime * 0.35; vFlow = flow;').replace('#include <begin_vertex>', '#include <begin_vertex>\ntransformed.y += sin(position.x * 1.9 + uTime * 2.2 + position.z * 1.3) * 0.035 * (1.0 + length(flow) * 2.0);');
-      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec2 vFlow; uniform vec3 uSky;').replace('#include <dithering_fragment>', '#include <dithering_fragment>\ngl_FragColor.rgb += vec3(0.08, 0.1, 0.1) * min(1.0, length(vFlow) * 1.2);\n{ vec3 vd = normalize(vViewPosition); float fr = pow(1.0 - clamp(dot(vd, normalize(vNormal)), 0.0, 1.0), 2.5); gl_FragColor.rgb = mix(gl_FragColor.rgb, uSky, fr * 0.6); gl_FragColor.a = mix(gl_FragColor.a, 0.97, fr * 0.85); }'); };
+      sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec2 flow; uniform float uTime; varying vec2 vFlow; varying vec3 vWp;').replace('#include <uv_vertex>', '#include <uv_vertex>\nvMapUv += flow * uTime * 0.35; vFlow = flow;').replace('#include <begin_vertex>', '#include <begin_vertex>\ntransformed.y += sin(position.x * 1.9 + uTime * 2.2 + position.z * 1.3) * 0.035 * (1.0 + length(flow) * 2.0); vWp = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec2 vFlow; varying vec3 vWp; uniform vec3 uSky; uniform float uTime;').replace('#include <normal_fragment_begin>', '#include <normal_fragment_begin>\nnormal = normalize(normal + vec3(sin(vWp.x * 2.3 + uTime * 1.6) * 0.07 + sin(vWp.z * 3.1 - uTime * 1.1) * 0.05, 0.0, cos(vWp.z * 2.1 + uTime * 1.3) * 0.07 + cos(vWp.x * 2.9 + uTime * 0.9) * 0.05));').replace('#include <dithering_fragment>', '#include <dithering_fragment>\ngl_FragColor.rgb += vec3(0.08, 0.1, 0.1) * min(1.0, length(vFlow) * 1.2);\n{ vec3 vd = normalize(vViewPosition); float fr = pow(1.0 - clamp(dot(vd, normalize(vNormal)), 0.0, 1.0), 2.5); gl_FragColor.rgb = mix(gl_FragColor.rgb, uSky, fr * 0.6); gl_FragColor.a = mix(gl_FragColor.a, 0.97, fr * 0.85); }'); };
     this.hemi = new THREE.HemisphereLight(0xc6dcff, 0x7a6244, 1.05); this.scene.add(this.hemi);
     this.sun = new THREE.DirectionalLight(0xffe6c2, 1.35); this.scene.add(this.sun); this.scene.add(this.sun.target);
     this.scene.fog = new THREE.Fog(0x8fc4ea, 44, 118); this.scene.background = new THREE.Color(0x8fc4ea);
     // gradient sky dome that follows the camera: haze at the horizon, deeper blue overhead
-    this.skyMat = new THREE.ShaderMaterial({ uniforms: { top: { value: new THREE.Color(0x3a74d0) }, bottom: { value: new THREE.Color(0x8fc4ea) } }, vertexShader: 'varying vec3 vW; void main(){ vW = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }', fragmentShader: 'uniform vec3 top; uniform vec3 bottom; varying vec3 vW; void main(){ float t = smoothstep(-0.03, 0.55, vW.y); gl_FragColor = vec4(mix(bottom, top, t), 1.0);\n#include <colorspace_fragment>\n}', side: THREE.BackSide, depthWrite: false, fog: false });
+    this.skyMat = new THREE.ShaderMaterial({ uniforms: { top: { value: new THREE.Color(0x3a74d0) }, bottom: { value: new THREE.Color(0x8fc4ea) } }, vertexShader: 'varying vec3 vW; void main(){ vW = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }', fragmentShader: 'uniform vec3 top; uniform vec3 bottom; varying vec3 vW; void main(){ float t = smoothstep(-0.03, 0.55, vW.y); gl_FragColor = vec4(mix(bottom, top, t), 1.0);\n#include <tonemapping_fragment>\n#include <colorspace_fragment>\n}', side: THREE.BackSide, depthWrite: false, fog: false });
     this.skyDome = new THREE.Mesh(new THREE.SphereGeometry(232, 24, 12), this.skyMat); this.skyDome.renderOrder = -10; this.skyDome.frustumCulled = false; this.scene.add(this.skyDome);
     // real sun shadows on desktop; phones keep the baked ambient occlusion only
     BC.PERK = this.character.id;
     this.shadows = !this.player.touch && (navigator.hardwareConcurrency || 4) >= 4; BC.SHADOWS = this.shadows;
-    if (this.shadows) { this.renderer.shadowMap.enabled = true; this.renderer.shadowMap.type = THREE.PCFSoftShadowMap; this.sun.castShadow = true; this.sun.shadow.mapSize.set(2048, 2048); const sc = this.sun.shadow.camera; sc.left = -46; sc.right = 46; sc.top = 46; sc.bottom = -46; sc.near = 1; sc.far = 330; sc.updateProjectionMatrix(); this.sun.shadow.bias = -0.0004; this.sun.shadow.normalBias = 0.05; this.depthPlant = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: this.atlas, alphaTest: 0.5 }); }
-    this.sunMesh = new THREE.Mesh(new THREE.SphereGeometry(4, 12, 12), new THREE.MeshBasicMaterial({ color: 0xfff1c0, fog: false })); this.scene.add(this.sunMesh);
+    if (this.shadows) { this.renderer.shadowMap.enabled = true; this.renderer.shadowMap.type = THREE.PCFSoftShadowMap; this.sun.castShadow = true; this.sun.shadow.mapSize.set(2048, 2048); const sc = this.sun.shadow.camera; sc.left = -46; sc.right = 46; sc.top = 46; sc.bottom = -46; sc.near = 1; sc.far = 330; sc.updateProjectionMatrix(); this.sun.shadow.bias = -0.0004; this.sun.shadow.normalBias = 0.05; this.depthPlant = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: this.atlas, alphaTest: 0.5 }); wind(this.depthPlant); }
+    this.sunMesh = new THREE.Mesh(new THREE.SphereGeometry(4, 12, 12), new THREE.MeshBasicMaterial({ color: 0xfff6d8, fog: false })); this.scene.add(this.sunMesh);
+    { const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d'); const gr = g.createRadialGradient(64, 64, 4, 64, 64, 64); gr.addColorStop(0, 'rgba(255,244,210,0.95)'); gr.addColorStop(0.25, 'rgba(255,220,150,0.45)'); gr.addColorStop(0.6, 'rgba(255,190,110,0.12)'); gr.addColorStop(1, 'rgba(255,170,90,0)'); g.fillStyle = gr; g.fillRect(0, 0, 128, 128); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; this.sunGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false, fog: false, transparent: true })); this.sunGlow.scale.set(60, 60, 1); this.sunGlow.renderOrder = -5; this.scene.add(this.sunGlow); }
     this.moonMesh = new THREE.Mesh(new THREE.SphereGeometry(2.5, 12, 12), new THREE.MeshBasicMaterial({ color: 0xdde6f5, fog: false })); this.scene.add(this.moonMesh);
-    this.clouds = new THREE.Group(); const cm = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 });
-    for (let i = 0; i < 26; i++) { const g = new THREE.BoxGeometry(6 + Math.random() * 14, 1.2, 4 + Math.random() * 8); const m = new THREE.Mesh(g, cm); m.position.set(Math.random() * 300 - 40, 46 + Math.random() * 6, Math.random() * 300 - 40); this.clouds.add(m); } this.scene.add(this.clouds);
+    this.clouds = new THREE.Group(); const cm = new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true, opacity: 0.88, emissive: 0x334455, emissiveIntensity: 0.35 });
+    { const parts = []; for (let i = 0; i < 22; i++) { const cx = Math.random() * 300 - 40, cy = 46 + Math.random() * 6, cz = Math.random() * 300 - 40; const n = 3 + Math.floor(Math.random() * 3); for (let k = 0; k < n; k++) { const w = 5 + Math.random() * 10, d = 4 + Math.random() * 7, h = 1.2 + Math.random() * 1.6; const g = new THREE.BoxGeometry(w, h, d); g.setAttribute('color', new THREE.Float32BufferAttribute(new Array(g.attributes.position.count * 3).fill(1), 3)); g.translate(cx + (Math.random() - 0.5) * 12, cy + (k === 0 ? 0 : Math.random() * 1.6), cz + (Math.random() - 0.5) * 8); parts.push(g); } } const merged = BC.mergeGeometries(parts); const m = new THREE.Mesh(merged, cm); m.frustumCulled = false; this.clouds.add(m); } this.scene.add(this.clouds);
     const rp = new Float32Array(900 * 3); for (let i = 0; i < 900; i++) { rp[i * 3] = Math.random() * 30 - 15; rp[i * 3 + 1] = Math.random() * 20; rp[i * 3 + 2] = Math.random() * 30 - 15; }
     const rg = new THREE.BufferGeometry(); rg.setAttribute('position', new THREE.BufferAttribute(rp, 3)); this.rain = new THREE.Points(rg, new THREE.PointsMaterial({ color: 0xbfd8ff, size: 0.12, transparent: true, opacity: 0.7 })); this.rain.visible = false; this.scene.add(this.rain);
   }
@@ -60,7 +64,14 @@ BC.Game = class Game {
     const loading = document.getElementById('loading'); loading.hidden = false;
     setTimeout(() => { this.world = new BC.World(this.seed, this.worldW, this.worldD); this.world.generate(); this.hookWorld(); this.clearChunks(); this.clearAnimals(); loading.hidden = true; then(); }, 30);
   }
-  hookWorld() {
+  // the open sea beyond the map: four water planes out to the horizon, so the world looks like an island in an ocean that wraps around
+  buildOcean() {
+    if (this.ocean) { this.ocean.forEach(m => { this.scene.remove(m); m.geometry.dispose(); }); } this.ocean = []; const w = this.world; const R = 460; const y = w.WL + 1 - 0.12;
+    const mk = (cx, cz, sx, sz) => { const g = new THREE.PlaneGeometry(sx, sz, 1, 1); g.rotateX(-Math.PI / 2); const uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * sx, uv.getY(i) * sz); const n = g.attributes.position.count; g.setAttribute('color', new THREE.Float32BufferAttribute(new Array(n * 3).fill(0.96), 3)); g.setAttribute('flow', new THREE.Float32BufferAttribute(new Array(n * 2).fill(0.03), 2)); const m = new THREE.Mesh(g, this.matWater); m.position.set(cx, y, cz); m.frustumCulled = true; this.scene.add(m); this.ocean.push(m); };
+    mk(-R / 2, w.D / 2, R, w.D + 2 * R); mk(w.W + R / 2, w.D / 2, R, w.D + 2 * R); mk(w.W / 2, -R / 2, w.W, R); mk(w.W / 2, w.D + R / 2, w.W, R);
+  }
+  onWrap() { const st = this.stats; st.wrapped = (st.wrapped || 0) + 1; this.toast(st.wrapped === 1 ? 'You crossed the ocean and came out on the far side of the world! The sea wraps all the way around.' : 'Around the world again.', 'good'); }
+  hookWorld() { this.buildOcean();
     const w = this.world;
     w.onBlock = (x, y, z, id) => { if (this.mode === 'shared') this.net.send('block', { x, y, z, id }); };
     w.onBlocks = (list, tid) => { if (this.mode === 'shared') this.net.send('blocks', { list, tid }); };
@@ -215,7 +226,7 @@ BC.Game = class Game {
     this.boats.update(this.ui.modalOpen() ? 0 : dt); this.player.update(this.ui.modalOpen() ? 0 : dt); this.tickFishing(dt); this.ui.updateWaterHUD();
     if (this.holdPrimary && !this.ui.modalOpen() && now - (this.lastPrimary || 0) > 320) { const it = this.cur(); if (this.isDigTool(it)) { const h = this.raycast(); if (h && h.type === 'block') this.primary(); } } if (auth) this.animals.update(dt); else this.animals.updateGuest(dt);
     this.npcs.update(dt); if (auth) { this.tickHives(dt); this.tickRespawns(); this.tickHires(dt); this.tickBlocks(dt); }
-    { const sh = this.matWater.userData.shader; if (sh) sh.uniforms.uTime.value = now / 1000; } if (this.world.waterQueue.length) this.world.tickWater(120);
+    { const sh = this.matWater.userData.shader; if (sh) sh.uniforms.uTime.value = now / 1000; const ps = this.matPlant.userData.shader; if (ps) ps.uniforms.uTime.value = now / 1000; const ds = this.depthPlant && this.depthPlant.userData.shader; if (ds) ds.uniforms.uTime.value = now / 1000; } if (this.world.waterQueue.length) this.world.tickWater(120);
     this.time.t += dt; this.time.dayFrac = (this.time.t / this.DAY) % 1; this.time.day = Math.floor(this.time.t / this.DAY) + 1;
     if (this.ffTimer > 0) { this.ffTimer -= dt; if (this.ffTimer <= 0) { this.growthMult = 1; this.toast('Fast-forward finished.', ''); } }
     this.simAcc += dt; if (this.simAcc >= 0.5) { if (auth) { BC.Sim.tick(this, this.simAcc); this.updateWeather(this.simAcc); } this.simAcc = 0; }
@@ -238,6 +249,7 @@ BC.Game = class Game {
     { const ov = this.ui.$('underwater'); const show = under || (this.player.inWater && this.camera.position.y < this.world.waterSurface(Math.floor(this.player.pos.x), Math.floor(this.player.pos.z)) + 1); if (ov.hidden === show) ov.hidden = !show; }
     this.sun.intensity = 0.25 + day * (this.weather.raining ? 0.6 : 1.2); this.hemi.intensity = 0.42 + day * 0.78; this.sun.color.setHex(elev < 0.3 ? 0xffc890 : 0xffe6c2);
     const p = this.player.pos; const sx = Math.cos(ang) * 120, sy = Math.sin(ang) * 120; this.sun.position.set(p.x + sx, p.y + Math.max(sy, 10), p.z + 40); this.sun.target.position.set(p.x, p.y, p.z);
+    if (this.sunGlow) { this.sunGlow.position.set(p.x + sx * 1.55, p.y + sy * 1.55, p.z + 58); this.sunGlow.visible = elev > -0.12 && !under; this.sunGlow.material.opacity = this.weather.raining ? 0.25 : 0.55 + 0.45 * BC.util.clamp(1 - elev * 2.5, 0, 1); }
     this.sunMesh.position.set(p.x + sx * 1.6, p.y + sy * 1.6, p.z + 60); this.moonMesh.position.set(p.x - sx * 1.6, p.y - sy * 1.6, p.z - 60); this.sunMesh.visible = elev > -0.1; this.moonMesh.visible = elev < 0.1;
     this.clouds.position.x = (this.time.t * 0.4) % 120 - 60; this.clouds.position.z = p.z - 150 + ((p.z + 150) % 1);
     if (this.rain.visible) { const a = this.rain.geometry.attributes.position; for (let i = 0; i < a.count; i++) { let y = a.getY(i) - 0.45; if (y < 0) y = 20; a.setY(i, y); } a.needsUpdate = true; this.rain.position.set(p.x, p.y, p.z); }
@@ -733,4 +745,4 @@ BC.Game = class Game {
     return true;
   }
 };
-window.addEventListener('DOMContentLoaded', () => { try { window.game = new BC.Game(); } catch (e) { console.error(e); const el = document.getElementById('fatal'); el.hidden = false; el.textContent = 'Botany Craft could not start: ' + e.message + '. This browser may not support WebGL.'; } });
+window.addEventListener('DOMContentLoaded', () => { try { window.game = new BC.Game(); } catch (e) { console.error(e); const el = document.getElementById('fatal'); el.hidden = false; el.textContent = 'Botany World could not start: ' + e.message + '. This browser may not support WebGL.'; } });

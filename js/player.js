@@ -80,7 +80,8 @@ BC.Player = class Player {
     this.onGround = hitGround || (this.vel.y <= 0 && this.collides(this.pos.x, this.pos.y - 0.05, this.pos.z));
     if (!step('x', this.vel.x * dt)) this.vel.x = 0; if (!step('z', this.vel.z * dt)) this.vel.z = 0;
     if (this.pos.y < -5) { const t = w.top(Math.floor(this.pos.x), Math.floor(this.pos.z)); this.pos.y = t + 1.1; this.vel.set(0, 0, 0); }
-    this.pos.x = BC.util.clamp(this.pos.x, 0.5, w.W - 0.5); this.pos.z = BC.util.clamp(this.pos.z, 0.5, w.D - 0.5);
+    // sail or swim past the edge of the map and you come out on the far side: the ocean wraps around the world
+    { let wrapped = false; if (this.pos.x < -1.5) { this.pos.x += w.W + 2; wrapped = true; } else if (this.pos.x > w.W + 1.5) { this.pos.x -= w.W + 2; wrapped = true; } if (this.pos.z < -1.5) { this.pos.z += w.D + 2; wrapped = true; } else if (this.pos.z > w.D + 1.5) { this.pos.z -= w.D + 2; wrapped = true; } if (wrapped) this.game.onWrap(); }
     // camera
     const cam = this.game.camera; cam.position.set(this.pos.x, this.pos.y + this.eye, this.pos.z);
     cam.rotation.set(0, 0, 0, 'YXZ'); cam.rotation.y = this.yaw; cam.rotation.x = this.pitch;

@@ -18,7 +18,8 @@ BC.World = class World {
   }
   idx(x, y, z) { return x + this.W * (z + this.D * y); }
   inBounds(x, y, z) { return x >= 0 && z >= 0 && y >= 0 && x < this.W && z < this.D && y < this.H; }
-  get(x, y, z) { if (!this.inBounds(x, y, z)) return y < 0 ? 14 : 0; return this.blocks[this.idx(x, y, z)]; }
+  // beyond the map edge lies open ocean: water up to the water line, bedrock below, air above
+  get(x, y, z) { if (!this.inBounds(x, y, z)) return y < 0 ? 14 : (y <= this.WL && y < this.H ? 15 : 0); return this.blocks[this.idx(x, y, z)]; }
   set(x, y, z, id, silent) {
     if (!this.inBounds(x, y, z)) return;
     const i = this.idx(x, y, z); if (this.blocks[i] === id) return;

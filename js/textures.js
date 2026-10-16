@@ -238,6 +238,7 @@ BC.Atlas = (function () {
     BC.PLANTS.forEach(p => { for (let s = 0; s < 3; s++) add(p.id + '_' + s, g => drawPlant(g, p, s, TILE), true); });
     const saps = [['sapling_broad', { id: 'sb', form: 'sapling', art: { leaf: '#4f8a32' } }], ['sapling_conifer', { id: 'sc', form: 'sapling_conifer', art: { leaf: '#2e5a3a' } }], ['sapling_cactus', { id: 'sx', form: 'sapling_cactus', art: { leaf: '#5a8a4a' } }]];
     saps.forEach(([n, p]) => { for (let s = 0; s < 3; s++) add(n + '_' + s, g => drawPlant(g, p, s, TILE), true); });
+    add('tuft', g => { clear(g); g.lineCap = 'round'; const r = rng(314); for (let i = 0; i < 11; i++) { const x0 = 11 + r() * 10, lean = (r() - 0.5) * 14, len = 14 + r() * 14, w = 1.1 + r() * 0.9; const k = 0.8 + r() * 0.5; g.strokeStyle = shade('#5ca238', k); g.lineWidth = w; g.beginPath(); g.moveTo(x0, 32); g.quadraticCurveTo(x0 + lean * 0.3, 32 - len * 0.6, x0 + lean, 32 - len); g.stroke(); g.strokeStyle = shade('#5ca238', k * 1.3); g.lineWidth = w * 0.4; g.beginPath(); g.moveTo(x0 + lean * 0.5, 32 - len * 0.75); g.lineTo(x0 + lean, 32 - len); g.stroke(); } }, false);
     add('withered', g => drawPlant(g, { id: 'w', form: 'flower', petals: 5, art: { stem: '#7a6a4a', leaf: '#9a8a6a' } }, 2, TILE, true));
     const tex = new THREE.CanvasTexture(canvas); tex.magFilter = THREE.LinearFilter; tex.minFilter = THREE.LinearMipmapLinearFilter; tex.generateMipmaps = true; tex.anisotropy = 4; tex.colorSpace = THREE.SRGBColorSpace;
     return { texture: tex, canvas };

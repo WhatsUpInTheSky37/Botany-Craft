@@ -25,10 +25,11 @@ BC.Mesher = (function () {
   class Builder {
     constructor() { this.pos = []; this.nor = []; this.uv = []; this.col = []; this.idx = []; this.n = 0; this.flow = null; }
     setFlow(fx, fz) { if (!this.flow) this.flow = []; this.pendingFlow = [fx, fz]; }
-    quad(verts, normal, uvr, shades, tint) { // verts: 4 [x,y,z]; shades: 4 floats; uvr [u0,v0,u1,v1]
+    quad(verts, normal, uvr, shades, tint, swayTop) { // verts: 4 [x,y,z]; shades: 4 floats; uvr [u0,v0,u1,v1]; swayTop: top two vertices move in the wind
       const [u0, v0, u1, v1] = uvr; const uvs = [[u0, v1], [u1, v1], [u1, v0], [u0, v0]];
       for (let i = 0; i < 4; i++) { this.pos.push(verts[i][0], verts[i][1], verts[i][2]); this.nor.push(normal[0], normal[1], normal[2]); this.uv.push(uvs[i][0], uvs[i][1]); const s = shades[i]; this.col.push(s * (tint ? tint[0] : 1), s * (tint ? tint[1] : 1), s * (tint ? tint[2] : 1)); }
       if (this.flow) { const f = this.pendingFlow || [0, 0]; for (let i = 0; i < 4; i++) this.flow.push(f[0], f[1]); }
+      if (this.sway) this.sway.push(0, 0, swayTop ? 1 : 0, swayTop ? 1 : 0);
       const b = this.n; if (shades[0] + shades[2] > shades[1] + shades[3]) this.idx.push(b, b + 1, b + 2, b, b + 2, b + 3); else this.idx.push(b + 1, b + 2, b + 3, b + 1, b + 3, b);
       this.n += 4;
     }
@@ -40,13 +41,13 @@ BC.Mesher = (function () {
     geometry() {
       if (!this.n) return null; const g = new THREE.BufferGeometry();
       g.setAttribute('position', new THREE.Float32BufferAttribute(this.pos, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(this.nor, 3));
-      g.setAttribute('uv', new THREE.Float32BufferAttribute(this.uv, 2)); g.setAttribute('color', new THREE.Float32BufferAttribute(this.col, 3)); if (this.flow) g.setAttribute('flow', new THREE.Float32BufferAttribute(this.flow, 2));
+      g.setAttribute('uv', new THREE.Float32BufferAttribute(this.uv, 2)); g.setAttribute('color', new THREE.Float32BufferAttribute(this.col, 3)); if (this.flow) g.setAttribute('flow', new THREE.Float32BufferAttribute(this.flow, 2)); if (this.sway) g.setAttribute('sway', new THREE.Float32BufferAttribute(this.sway, 1));
       g.setIndex(this.idx); g.computeBoundingSphere(); return g;
     }
   }
 
   function buildChunk(world, cx, cz) {
-    const solid = new Builder(), water = new Builder(), cutout = new Builder(); water.flow = [];
+    const solid = new Builder(), water = new Builder(), cutout = new Builder(); water.flow = []; cutout.sway = []; const TUFT = BC.Atlas.has('tuft') ? BC.Atlas.uv('tuft') : null; const GREEN = [0x5c / 255, 0xa2 / 255, 0x38 / 255];
     const x0 = cx * 16, z0 = cz * 16, x1 = Math.min(world.W, x0 + 16), z1 = Math.min(world.D, z0 + 16);
     for (let z = z0; z < z1; z++) for (let x = x0; x < x1; x++) for (let y = 0; y < world.H; y++) {
       const id = world.blocks[world.idx(x, y, z)]; if (id === 0) continue; const b = BC.BLOCKS[id]; if (!b) continue;
@@ -70,8 +71,17 @@ BC.Mesher = (function () {
         const tile = b.tex[f.t]; const uvr = BC.Atlas.uv(tile);
         const shades = [0, 1, 2, 3].map(vi => f.s * AO_SHADE[aoFor(world, x, y, z, f, vi)]);
         // subtle biome tint on grass tops
-        let tint = null; if (b.grassTop && fi === 0) { const bm = BC.BIOMES[world.biomeAt(x, z)]; const m = world.moisture[x + z * world.W]; const k = 0.92 + m * 0.1; tint = [k, k * (bm.id === 'desert' ? 1 : 1.02), k * 0.98]; }
+        let tint = null; const hv = BC.util.hash2(x * 3 + y, z * 5 + y, 31);
+        if (b.grassTop && fi === 0) { const bm = BC.BIOMES[world.biomeAt(x, z)]; const m = world.moisture[x + z * world.W]; const k = (0.92 + m * 0.1) * (0.95 + hv * 0.1); tint = [k, k * (bm.id === 'desert' ? 1 : 1.02), k * 0.98]; }
+        else if (b.leaves) { const k = 0.9 + hv * 0.2; tint = [k, k * (0.98 + hv * 0.04), k * 0.95]; }
         solid.quad(f.v.map(v => [x + v[0], y + v[1], z + v[2]]), f.n, uvr, shades, tint);
+        // grass tufts: a short crossed sprite on about half of all open grass tops, coloured by the region's grass
+        if (TUFT && b.grassTop && fi === 0 && world.get(x, y + 1, z) === 0 && !world.plantAt(x, y + 1, z) && hv < 0.55) {
+          const bm = BC.BIOMES[world.biomeAt(x, z)]; const gc = bm.grass ? bm.grass[0] : 0x5ca238; const tk = [Math.min(1.4, ((gc >> 16) & 255) / 255 / GREEN[0]), Math.min(1.4, ((gc >> 8) & 255) / 255 / GREEN[1]), Math.min(1.4, (gc & 255) / 255 / GREEN[2])];
+          const a = hv * 6.283, rr = 0.42 + BC.util.hash2(z, x, 17) * 0.1, hh = 0.5 + BC.util.hash2(x, z, 19) * 0.25; const ox = x + 0.5 + (BC.util.hash2(x, z, 23) - 0.5) * 0.3, oz = z + 0.5 + (BC.util.hash2(z, x, 29) - 0.5) * 0.3, c = Math.cos(a) * rr, s = Math.sin(a) * rr; const sh = (shades[0] + shades[1] + shades[2] + shades[3]) / 4; const ts = [sh, sh, sh * 1.08, sh * 1.08];
+          cutout.quad([[ox - c, y + 1, oz - s], [ox + c, y + 1, oz + s], [ox + c, y + 1 + hh, oz + s], [ox - c, y + 1 + hh, oz - s]], [-s, 0, c], TUFT, ts, tk, true);
+          cutout.quad([[ox + s, y + 1, oz - c], [ox - s, y + 1, oz + c], [ox - s, y + 1 + hh, oz + c], [ox + s, y + 1 + hh, oz - c]], [c, 0, s], TUFT, ts, tk, true);
+        }
       }
     }
     return { solid: solid.geometry(), water: water.geometry(), cutout: cutout.geometry() };
@@ -84,7 +94,7 @@ BC.Mesher = (function () {
     return p.id + '_' + stage;
   }
   function buildPlants(world, cx, cz) {
-    const b = new Builder(); const x0 = cx * 16, z0 = cz * 16;
+    const b = new Builder(); b.sway = []; const x0 = cx * 16, z0 = cz * 16;
     world.plants.forEach(p => {
       if (p.x < x0 || p.x >= x0 + 16 || p.z < z0 || p.z >= z0 + 16) return;
       const def = BC.PLANT_BY_ID[p.id]; const uvr = BC.Atlas.uv(plantTile(p));
@@ -92,10 +102,9 @@ BC.Mesher = (function () {
       const light = 0.75 + 0.25 * world.lightAt(p.x, p.y, p.z); const sh = [light, light, light * 1.05, light * 1.05];
       if (def && def.floating) { const y = p.y + 0.9; const s = 0.5 * (p.progress >= 1 ? 1 : 0.7); b.quad([[ox - s, y, oz + s], [ox + s, y, oz + s], [ox + s, y, oz - s], [ox - s, y, oz - s]], [0, 1, 0], uvr, [1, 1, 1, 1]); return; }
       const tall = def && (def.tall || def.form === 'corn' || def.form === 'banana' || def.form === 'cattail') ? 1.5 : 1.0; const scale = tall; const y = p.y + (def && def.water === 'aquatic' ? -0.05 : 0);
-      const r = 0.5 * (p.id.startsWith('tree:') ? 0.8 : 1); const a = (h - 0.5) * 0.6;
-      const c = Math.cos(a) * r, s = Math.sin(a) * r;
-      b.quad([[ox - c, y, oz - s], [ox + c, y, oz + s], [ox + c, y + scale, oz + s], [ox - c, y + scale, oz - s]], [-s, 0, c], uvr, sh);
-      b.quad([[ox + s, y, oz - c], [ox - s, y, oz + c], [ox - s, y + scale, oz + c], [ox + s, y + scale, oz - c]], [c, 0, s], uvr, sh);
+      const r = 0.5 * (p.id.startsWith('tree:') ? 0.8 : 1) * (0.92 + BC.util.hash2(p.x, p.z, 11) * 0.16); const a = h * 3.1416; const hgt = scale * (0.92 + BC.util.hash2(p.z, p.x, 13) * 0.16);
+      // three crossed quads at 60 degrees, each with its own yaw, so plants read as round from every side and sway in the wind
+      for (let k = 0; k < 3; k++) { const ang = a + k * 1.0472; const c = Math.cos(ang) * r, s = Math.sin(ang) * r; b.quad([[ox - c, y, oz - s], [ox + c, y, oz + s], [ox + c, y + hgt, oz + s], [ox - c, y + hgt, oz - s]], [-s, 0, c], uvr, sh, null, !(def && def.floating)); }
       if (p.pest && !p.wild) { const ps = BC.INSECT_BY_ID[p.pest.id]; const col = new THREE.Color(ps ? ps.color : '#ffffff'); const t = [col.r, col.g, col.b]; const pu = BC.Atlas.uv('pest'); const r2 = 0.42 * (0.5 + 0.5 * p.pest.level); const y2 = y + scale * 0.35; b.quad([[ox - r2, y2, oz], [ox + r2, y2, oz], [ox + r2, y2 + r2 * 2, oz], [ox - r2, y2 + r2 * 2, oz]], [0, 0, 1], pu, [1, 1, 1, 1], t); b.quad([[ox, y2, oz - r2], [ox, y2, oz + r2], [ox, y2 + r2 * 2, oz + r2], [ox, y2 + r2 * 2, oz - r2]], [1, 0, 0], pu, [1, 1, 1, 1], t); }
       if ((p.shaded || p.frostCover) && !p.wild) { const cu = BC.Atlas.uv(p.shaded ? 'bathouse' : 'straw_face'); const yc = y + scale * 0.95; const tn = p.shaded ? [0.5, 0.5, 0.55] : [1.7, 1.7, 1.7]; b.quad([[ox - 0.5, yc, oz + 0.5], [ox + 0.5, yc, oz + 0.5], [ox + 0.5, yc, oz - 0.5], [ox - 0.5, yc, oz - 0.5]], [0, 1, 0], cu, [1, 1, 1, 1], tn); }
       if (p.covered && !p.wild) { const cu = BC.Atlas.uv('trellis'); const yc = y + scale * 0.9; b.quad([[ox - 0.5, yc, oz + 0.5], [ox + 0.5, yc, oz + 0.5], [ox + 0.5, yc, oz - 0.5], [ox - 0.5, yc, oz - 0.5]], [0, 1, 0], cu, [1, 1, 1, 1], [1.6, 1.6, 1.6]); }
