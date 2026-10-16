@@ -104,6 +104,11 @@ window.BC = window.BC || {};
   def(192, { name: 'Tura casing stone', solid: true, rock: true, tex: ['casing', 'casing', 'casing'] });
   def(193, { name: 'Red granite', solid: true, rock: true, tex: ['granite', 'granite', 'granite'] });
   def(194, { name: 'Inca ashlar', solid: true, rock: true, tex: ['inca', 'inca', 'inca'] });
+  // ores in the deep stone, and the yellow brick of the roads
+  def(195, { name: 'Gold ore', solid: true, rock: true, ore: true, tex: ['ore_gold', 'ore_gold', 'ore_gold'] });
+  def(196, { name: 'Silver ore', solid: true, rock: true, ore: true, tex: ['ore_silver', 'ore_silver', 'ore_silver'] });
+  def(197, { name: 'Copper ore', solid: true, rock: true, ore: true, tex: ['ore_copper', 'ore_copper', 'ore_copper'] });
+  def(198, { name: 'Yellow brick', solid: true, rock: true, tex: ['yellowbrick', 'yellowbrick', 'yellowbrick'] });
   def(146, { name: 'Beehive', wood: true, solid: true, hive: true, tex: ['beehive_top', 'beehive', 'planks'] });
   // ---------- garden gear (25 essentials) ----------
   // tilled soil: one variant per topsoil, keeps that soil's chemistry

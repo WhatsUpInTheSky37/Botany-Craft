@@ -217,7 +217,7 @@ window.BC = window.BC || {};
 
     { id: 'toolkeeper', role: 'Tool librarian', shop: 'Tool Library & Co-op', names: ['Augie', 'Pilar', 'Hank Jr.', 'Rosalie'], color: '#8a6a2a', hat: '#4a3a2a',
       greet: ['Why own a pickaxe you use twice a year? Borrow it. Deposit back when it comes home clean.', 'Co-op rule: leave it better than you found it.'],
-      sells: [blk(19, 1, 4), { item: { type: 'material', id: 'rope' }, price: 3 }, { item: { type: 'tool', id: 'hammer' }, price: 6 }], buys: [{ match: it => it.type === 'block' && BC.BLOCKS[it.id] && BC.BLOCKS[it.id].log, label: 'logs', price: 2 }],
+      sells: [blk(19, 1, 4), { item: { type: 'material', id: 'rope' }, price: 3 }, { item: { type: 'tool', id: 'hammer' }, price: 6 }], buys: [{ match: it => it.type === 'block' && BC.BLOCKS[it.id] && BC.BLOCKS[it.id].log, label: 'logs', price: 2 }, { match: it => it.type === 'block' && BC.BLOCKS[it.id] && BC.BLOCKS[it.id].ore, label: 'ore (copper 3, silver 6, gold 12)', price: 'ore' }],
       loans: [{ item: { type: 'tool', id: 'pickaxe' }, deposit: 6 }, { item: { type: 'tool', id: 'hoe' }, deposit: 5 }, { item: { type: 'tool', id: 'shears' }, deposit: 4 }, { item: { type: 'tool', id: 'bucket' }, deposit: 4 }, { item: { type: 'tool', id: 'spreader' }, deposit: 6 }, { item: { type: 'tool', id: 'machete' }, deposit: 5 }],
       service: { id: 'lumber', name: 'Co-op lumber share', desc: 'Four planks from the co-op pile in your bag every couple of minutes.', cost: 9, minutes: 5 },
       trade: ['A tool library in Berkeley has lent 3,000 tools a month since 1979. Nobody in that town owns a tile saw, and nobody needs to.', 'Deposits teach care: you get it all back if the tool comes home, which is cheaper than owning and kinder than renting.'],
@@ -234,6 +234,7 @@ window.BC = window.BC || {};
       greet: ['No coins here. You bring something, I bring something, we both walk away better off. That is older than money.', 'Barter rule: trade what you have plenty of for what you have none of.'],
       sells: [], buys: [],
       barter: [
+        { give: { label: '3 gold ore', n: 3, match: it => it.type === 'block' && it.id === 195 }, get: { type: 'tool', id: 'super_axe' }, teach: 'Gold does nothing for a plant and everything for a trader. Three nuggets from the deep rock and the Old-Growth Axe is yours: one swing fells anything.' },
         { give: { label: 'any 3 seeds', n: 3, match: it => it.type === 'seed' && !it.id.startsWith('tree:') }, get: { type: 'ingredient', id: 'bone_meal', count: 1 }, teach: 'Seeds are the easiest surplus a gardener has and the hardest thing for a trader to keep fresh, so the exchange favours me a little. Fair is what both sides will repeat.' },
         { give: { label: '2 fish', n: 2, match: it => it.type === 'fish' }, get: { type: 'block', id: 19, count: 6 }, teach: 'Fish spoil by sundown; planks keep for years. Perishable goods always trade cheap at the end of the day: sell your fish in the morning.' },
         { give: { label: '4 kitchen scraps', n: 4, match: it => it.type === 'ingredient' && it.id === 'kitchen_scraps' }, get: { type: 'compost', count: 1 }, teach: 'Waste for value. A trader makes a living on turning one person\'s rubbish into another\'s need; so does a compost heap.' },

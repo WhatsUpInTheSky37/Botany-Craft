@@ -73,7 +73,7 @@ BC.World = class World {
       this.moisture[ci] = BC.BIOMES[biome].baseMoisture; const nb = BC.SOIL_NUTR[BC.BIOMES[biome].soil]; this.nutr[ci * 3] = nb[0]; this.nutr[ci * 3 + 1] = nb[1]; this.nutr[ci * 3 + 2] = nb[2];
       this.fillColumn(x, z, h, biome);
     }
-    this.placeWonders(); this.computeFlow(); this.carveStreams(); this.placeTrees(); this.placePlants(); if (this.reserved && this.reserved.size) { const gone = []; this.plants.forEach((p, k) => { if (this.reserved.has(p.x + p.z * this.W)) gone.push(k); }); gone.forEach(k => this.plants.delete(k)); } this.placeVillages(); this.computeWetness(); this.pickAnimals(); this.placeOrchards();
+    this.placeWonders(); this.computeFlow(); this.carveStreams(); this.placeTrees(); this.placePlants(); if (this.reserved && this.reserved.size) { const gone = []; this.plants.forEach((p, k) => { if (this.reserved.has(p.x + p.z * this.W)) gone.push(k); }); gone.forEach(k => this.plants.delete(k)); } this.placeVillages(); this.computeWetness(); this.pickAnimals(); this.placeOrchards(); this.placeRoads();
     this.pruneFloating(); this.diffs.clear(); this.generating = false;
     this.genPlantKeys = new Set(this.plants.keys()); this.genTreeKeys = new Set(this.treeAt.keys());
   }
@@ -82,7 +82,7 @@ BC.World = class World {
     const set = (y, id) => { this.blocks[this.idx(x, y, z)] = id; };
     for (let y = 0; y <= h; y++) {
       const d = h - y; let id = B.STONE;
-      if (d >= 5) id = y === 0 ? B.STONE : (d === 5 ? B.GRAVEL : B.STONE);
+      if (d >= 5) { id = y === 0 ? B.STONE : (d === 5 ? B.GRAVEL : B.STONE); if (y >= 1 && y <= 5 && id === B.STONE) { const r = BC.util.hash2((x >> 1) + y * 977, z >> 1, 919); const deep = y <= 2 ? 1.6 : 1; if (r < 0.004 * deep) id = 195; else if (r < 0.014 * deep) id = 196; else if (r < 0.036) id = 197; } }
       else switch (biome) {
         case 'temperate': id = d === 0 ? (under ? B.GLEY : B.GRASS_A) : d < 4 ? B.ALFISOL : B.GRAVEL; break;
         case 'prairie': id = d === 0 ? (under ? B.GLEY : B.GRASS_M) : d < 4 ? B.MOLLISOL : B.GRAVEL; break;
