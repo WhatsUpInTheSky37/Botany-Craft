@@ -113,9 +113,9 @@ BC.Animals = class Animals {
         }
       }
       // ground follow
-      const t = w.top(e.x | 0, e.z | 0); let gy = w.standY(e.x | 0, e.z | 0); if (w.get(e.x | 0, t + 1, e.z | 0) === 15) { if (d.aquatic) { const ws = w.waterSurface(e.x | 0, e.z | 0); const top = (ws < 0 ? t + 1 : ws); gy = Math.max(t + 0.9, top + 0.55 + Math.max(0, Math.sin(e.bob * 0.5)) * 0.45); } else gy = t + 1.6; } // fish cruise just under the surface and roll their backs out of it now and then
+      const t = w.top(e.x | 0, e.z | 0); let gy = w.standY(e.x | 0, e.z | 0); if (w.get(e.x | 0, t + 1, e.z | 0) === 15) { if (d.aquatic) { const ws = w.waterSurface(e.x | 0, e.z | 0); const top = (ws < 0 ? t + 1 : ws); gy = Math.max(t + 0.6, top - 0.35 + Math.sin(e.bob * 0.5) * 0.15); } else gy = t + 1.6; } // fish cruise about a block under the surface (water block ws spans ws..ws+1)
       const targetY = gy + (d.flies ? e.fly + Math.sin(e.bob * 2) * 0.2 : 0); e.y += (targetY - e.y) * Math.min(1, 8 * dt);
-      let jump = 0; if (JUMPERS.has(d.id)) { if (e.jt === undefined) e.jt = 3 + Math.random() * 10; if (!e.jumping) { e.jt -= dt; if (e.jt <= 0) { e.jumping = 0.001; e.jt = 7 + Math.random() * 14; this.splash(e.x, e.y + 0.3, e.z); } } else { e.jumping += dt / 0.9; if (e.jumping >= 1) { e.jumping = 0; this.splash(e.x, e.y + 0.3, e.z); } else jump = Math.sin(e.jumping * Math.PI) * 1.4; } }
+      let jump = 0; if (JUMPERS.has(d.id)) { if (e.jt === undefined) e.jt = 3 + Math.random() * 10; if (!e.jumping) { e.jt -= dt; const sw = w.waterSurface(e.x | 0, e.z | 0) + 0.98; if (e.jt <= 0) { e.jumping = 0.001; e.jt = 7 + Math.random() * 14; this.splash(e.x, sw, e.z); } } else { const sw = w.waterSurface(e.x | 0, e.z | 0) + 0.98; e.jumping += dt / 0.9; if (e.jumping >= 1) { e.jumping = 0; this.splash(e.x, sw, e.z); } else jump = Math.sin(e.jumping * Math.PI) * 2.2; } }
       const hop = jump + ((d.id === 'cottontail' || d.id === 'hare' || d.id === 'frog' || d.id === 'dart_frog') && e.target ? Math.abs(Math.sin(e.bob * 8)) * 0.25 : (e.target && !d.flies ? Math.abs(Math.sin(e.bob * 10)) * 0.04 : 0));
       this.pose(e, dt, hop, !!e.target, far);
     }
