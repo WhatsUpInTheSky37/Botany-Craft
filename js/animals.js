@@ -21,6 +21,14 @@ BC.Animals = class Animals {
     if (def.id === 'dart_frog' || def.id === 'lizard' || def.id === 'frog') box(bw * 0.9, bh * 0.4, bl * 0.4, 0, legH + bh * 0.9, -bl * 0.1, c.accent);
     const merged = BC.mergeGeometries(geos); merged.scale(s, s, s); const m = new THREE.Mesh(merged, this.mat); m.castShadow = !!BC.SHADOWS; return m;
   }
+  // Pose an animal: the articulated rig within 30 blocks of a player (built on demand), the merged mesh beyond. Both track the same position.
+  pose(e, dt, hop, moving, far2) {
+    const d = e.def; const g = this.game; const near = far2 < 30 * 30;
+    if (near && e.rig === undefined || (near && e.rig === null)) { try { e.rig = BC.Critters.build(d); g.scene.add(e.rig.root); e.mesh.visible = false; } catch (err) { console.warn('rig', d.id, err); e.rig = false; } }
+    else if (!near && e.rig) { g.scene.remove(e.rig.root); e.rig = null; e.mesh.visible = true; }
+    e.mesh.position.set(e.x, e.y + hop, e.z); e.mesh.rotation.y = e.yaw; e.mesh.rotation.z = d.flies ? Math.sin(e.bob * 3) * 0.1 : 0; if (d.wings) e.mesh.rotation.x = Math.sin(e.bob * 20) * 0.15;
+    if (e.rig) { const r = e.rig.root; r.position.set(e.x, e.y + hop, e.z); r.rotation.y = e.yaw; r.rotation.x = d.flies && moving ? 0.12 : 0; if (e.rig.kind !== 'fish' && e.rig.kind !== 'crab' && e.rig.kind !== 'worm') r.rotation.z = d.flies ? Math.sin(e.bob * 3) * 0.1 : 0; BC.Critters.animate(e.rig, dt, { moving, speed: d.speed ? Math.min(1.6, d.speed / 1.6) : 1, flying: !!d.flies, hop: hop * 4 }); }
+  }
   spawn(id, x, z, uid) {
     const def = BC.ANIMAL_BY_ID[id]; if (!def) return null; const w = this.game.world; const y = w.top(x | 0, z | 0) + 1;
     const mesh = this.buildMesh(def); mesh.position.set(x, y, z); this.game.scene.add(mesh);
@@ -28,7 +36,7 @@ BC.Animals = class Animals {
     this.list.push(e); return e;
   }
   byUid(uid) { return this.list.find(e => e.uid === uid); }
-  remove(e) { const i = this.list.indexOf(e); if (i < 0) return; this.list.splice(i, 1); this.game.scene.remove(e.mesh); if (e.line) { this.game.scene.remove(e.line); e.line = null; } }
+  remove(e) { const i = this.list.indexOf(e); if (i < 0) return; this.list.splice(i, 1); this.game.scene.remove(e.mesh); if (e.rig) { this.game.scene.remove(e.rig.root); e.rig = null; } if (e.line) { this.game.scene.remove(e.line); e.line = null; } }
   // Position of the player holding a leash (host resolves by name).
   leaderPos(name) { const g = this.game; if (name === g.playerName) return g.player.pos; let out = null; g.peers.forEach(pe => { if (pe.name.toLowerCase() === name) out = pe.group.position; }); return out; }
   anchor(e) { if (e.tether) { const t = e.tether; return { x: t[0] + 0.5, y: this.game.world.top(t[0], t[1]) + 1, z: t[1] + 0.5, post: true }; } return e.leash ? this.leaderPos(e.leash) : null; }
@@ -88,8 +96,7 @@ BC.Animals = class Animals {
       const t = w.top(e.x | 0, e.z | 0); let gy = w.standY(e.x | 0, e.z | 0); if (w.get(e.x | 0, t + 1, e.z | 0) === 15) gy = d.aquatic ? t + 1.1 : t + 1.6;
       const targetY = gy + (d.flies ? e.fly + Math.sin(e.bob * 2) * 0.2 : 0); e.y += (targetY - e.y) * Math.min(1, 8 * dt);
       const hop = (d.id === 'cottontail' || d.id === 'hare' || d.id === 'frog' || d.id === 'dart_frog') && e.target ? Math.abs(Math.sin(e.bob * 8)) * 0.25 : (e.target && !d.flies ? Math.abs(Math.sin(e.bob * 10)) * 0.04 : 0);
-      e.mesh.position.set(e.x, e.y + hop, e.z); e.mesh.rotation.y = e.yaw; e.mesh.rotation.z = d.flies ? Math.sin(e.bob * 3) * 0.1 : 0;
-      if (d.wings) e.mesh.rotation.x = Math.sin(e.bob * 20) * 0.15;
+      this.pose(e, dt, hop, !!e.target, far);
     }
     this.updateLeashLines();
   }
@@ -101,7 +108,7 @@ BC.Animals = class Animals {
     for (const e of this.list) { e.bob += dt; if (e.rx !== undefined) { const k = Math.min(1, dt * 6); const dx = e.rx - e.x, dz = e.rz - e.z; const moving = Math.hypot(dx, dz) > 0.05; e.x += dx * k; e.y += (e.ry - e.y) * k; e.z += dz * k; let da = e.ryaw - e.yaw; da = Math.atan2(Math.sin(da), Math.cos(da)); e.yaw += da * k; e.moving = moving; }
       const d = e.def; if ((e.x - pl.x) ** 2 + (e.z - pl.z) ** 2 < 3.2 * 3.2 && !stats.journal.has('animal:' + d.id)) this.game.discover('animal:' + d.id, 'seen');
       const hop = (d.id === 'cottontail' || d.id === 'hare' || d.id === 'frog' || d.id === 'dart_frog') && e.moving ? Math.abs(Math.sin(e.bob * 8)) * 0.25 : 0;
-      e.mesh.position.set(e.x, e.y + hop, e.z); e.mesh.rotation.y = e.yaw; e.mesh.rotation.z = d.flies ? Math.sin(e.bob * 3) * 0.1 : 0; if (d.wings) e.mesh.rotation.x = Math.sin(e.bob * 20) * 0.15; }
+      this.pose(e, dt, hop, !!e.moving, (e.x - pl.x) ** 2 + (e.z - pl.z) ** 2); }
     this.updateLeashLines();
   }
   raycast(origin, dir, maxD) {

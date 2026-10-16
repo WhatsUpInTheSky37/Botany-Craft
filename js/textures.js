@@ -140,7 +140,7 @@ BC.Atlas = (function () {
     const art = p.art || { stem: '#4a8a3a', leaf: '#4f9a3c' }; const k = size / 32;
     const sc = withered ? 1 : [0.4, 0.68, 1][stage];
     g.save(); g.scale(k, k); g.translate(16, 32); g.scale(sc, sc); g.translate(-16, -32);
-    g.imageSmoothingEnabled = false; g.lineCap = 'round';
+    g.imageSmoothingEnabled = false; g.lineCap = 'round'; g.lineJoin = 'round';
     const mature = stage === 2 && !withered;
     const stemC = withered ? '#7a6a4a' : art.stem, leafC = withered ? '#9a8a6a' : art.leaf;
     const flowerC = art.flower || '#ffffff', fruitC = art.fruit || '#d04040', centerC = art.center || shade(flowerC, 0.6);
@@ -148,69 +148,102 @@ BC.Atlas = (function () {
     const curve = (x1, y1, cx, cy, x2, y2, w, c) => { g.strokeStyle = c; g.lineWidth = w; g.beginPath(); g.moveTo(x1, y1); g.quadraticCurveTo(cx, cy, x2, y2); g.stroke(); };
     const disc = (x, y, r, c) => { g.fillStyle = c; g.beginPath(); g.arc(x, y, r, 0, 6.283); g.fill(); };
     const ell = (x, y, rx, ry, ang, c) => { g.save(); g.translate(x, y); g.rotate(ang); g.fillStyle = c; g.beginPath(); g.ellipse(0, 0, rx, ry, 0, 0, 6.283); g.fill(); g.restore(); };
-    const leaf = (x, y, ang, len, wid, c) => ell(x + Math.cos(ang) * len / 2, y + Math.sin(ang) * len / 2, len / 2, wid / 2, ang, c);
-    const petals = (x, y, n, r, pr, c, cc) => { for (let i = 0; i < n; i++) { const a = i / n * 6.283; disc(x + Math.cos(a) * r, y + Math.sin(a) * r, pr, c); } disc(x, y, Math.max(1.2, r * 0.55), cc); };
+    // a leaf: two-tone blade with a pale midrib, pointing along ang from its base at (x, y)
+    const leaf = (x, y, ang, len, wid, c, veins) => { g.save(); g.translate(x, y); g.rotate(ang); g.fillStyle = shade(c, 0.86); g.beginPath(); g.ellipse(len / 2, 0, len / 2, wid / 2, 0, 0, 6.283); g.fill(); g.fillStyle = c; g.beginPath(); g.ellipse(len / 2, -wid * 0.12, len / 2, wid * 0.38, 0, 0, 6.283); g.fill(); g.strokeStyle = shade(c, 1.35); g.lineWidth = Math.max(0.3, wid * 0.08); g.beginPath(); g.moveTo(0, 0); g.lineTo(len * 0.92, 0); g.stroke(); if (veins !== false && wid > 3) { g.lineWidth = 0.25; for (let i = 1; i < 4; i++) { const px = len * i / 4.5; g.beginPath(); g.moveTo(px, 0); g.lineTo(px + len * 0.1, -wid * 0.3); g.moveTo(px, 0); g.lineTo(px + len * 0.1, wid * 0.3); g.stroke(); } } g.restore(); };
+    const petalRay = (x, y, n, r, pl, pw, c, cc, droop) => { for (let i = 0; i < n; i++) { const a = i / n * 6.283 + (droop ? 0 : 0.3); const cx = x + Math.cos(a) * (r + pl * 0.5), cy = y + Math.sin(a) * (r + pl * 0.5) + (droop ? pl * 0.35 : 0); ell(cx, cy, pl * 0.5, pw * 0.5, a + (droop ? 0.4 * Math.sign(Math.cos(a)) : 0), i % 2 ? c : shade(c, 0.92)); } disc(x, y, r * 1.05, cc); disc(x - r * 0.25, y - r * 0.25, r * 0.35, shade(cc, 1.3)); };
+    const petals = (x, y, n, r, pr, c, cc) => { for (let i = 0; i < n; i++) { const a = i / n * 6.283; disc(x + Math.cos(a) * r, y + Math.sin(a) * r, pr, i % 2 ? c : shade(c, 0.9)); } disc(x, y, Math.max(1.2, r * 0.55), cc); disc(x - r * 0.15, y - r * 0.15, Math.max(0.5, r * 0.2), shade(cc, 1.4)); };
+    const umbel = (x, y, c, spread) => { for (let i = -3; i <= 3; i++) { const ex = x + i * spread, ey = y - 1 + Math.abs(i) * 0.9; line(x, y + 4, ex, ey, 0.5, '#7a9a4a'); for (let k2 = 0; k2 < 4; k2++) disc(ex + Math.cos(k2 * 1.57) * 0.9, ey + Math.sin(k2 * 1.57) * 0.7, 0.7, k2 % 2 ? c : shade(c, 0.9)); } };
+    const pom = (x, y, r, c) => { for (let i = 0; i < 14; i++) { const a = i * 2.4, rr = r * Math.sqrt(i / 14); disc(x + Math.cos(a) * rr, y + Math.sin(a) * rr, r * 0.32, i % 3 ? c : shade(c, 1.15)); } };
+    const spike = (x, top, len, c, w) => { for (let i = 0; i < len; i++) { const yy = top + i * 2.0; disc(x + ((i % 2) ? w : -w), yy, 1.3 + (i / len) * 0.6, i % 3 ? c : shade(c, 1.15)); disc(x, yy + 1, 1.1, shade(c, 0.9)); } };
     const droop = withered ? 6 : 0;
-    const f = p.form;
+    const f = p.form; const id = p.id;
     if (f === 'flower' || f === 'sunflower') {
       const top = f === 'sunflower' ? 6 : 8;
-      curve(16, 32, 16 + droop, 20, 16 + droop * 1.5, top, f === 'sunflower' ? 2.2 : 1.4, stemC);
-      const nL = p.art.leafBig ? 3 : 5;
-      for (let i = 0; i < nL; i++) { const y = 28 - i * (18 / nL); const dir = i % 2 ? 1 : -1; leaf(16 + droop * (1 - i / nL), y, dir > 0 ? -0.5 : Math.PI + 0.5, p.art.leafBig ? 9 : 6, p.art.leafBig ? 5 : 2.6, leafC); }
+      curve(16, 32, 16 + droop, 20, 16 + droop * 1.5, top, f === 'sunflower' ? 2.4 : 1.4, stemC); curve(16.4, 32, 16.4 + droop, 20, 16.4 + droop * 1.5, top, 0.4, shade(stemC, 1.3));
+      const nL = p.art.leafBig ? 3 : 5; const arrow = id === 'arrowhead', lobed = id === 'garlic_mustard' || id === 'cloudberry';
+      for (let i = 0; i < nL; i++) { const y = 28 - i * (18 / nL); const dir = i % 2 ? 1 : -1; const ang = dir > 0 ? -0.5 : Math.PI + 0.5; const L = p.art.leafBig ? 9 : 6.5, W = p.art.leafBig ? 5 : 2.8;
+        if (arrow) { g.save(); g.translate(16 + droop * (1 - i / nL), y); g.rotate(ang); g.fillStyle = i % 2 ? leafC : shade(leafC, 0.86); g.beginPath(); g.moveTo(0, 0); g.lineTo(L * 0.55, -W * 0.9); g.lineTo(L, 0); g.lineTo(L * 0.55, W * 0.9); g.closePath(); g.fill(); g.restore(); }
+        else if (lobed) { for (let q = 0; q < 3; q++) disc(16 + droop + dir * (2.5 + q * 1.6), y - q * 0.4, 1.9, q % 2 ? leafC : shade(leafC, 0.88)); }
+        else if (id === 'yarrow' || id === 'dill') { for (let q = 0; q < 4; q++) line(16 + droop, y, 16 + droop + dir * (3 + q), y - 2.5 + q * 1.6, 0.6, q % 2 ? leafC : shade(leafC, 0.85)); }
+        else leaf(16 + droop * (1 - i / nL), y, ang, L, W, leafC); }
       if (mature) {
-        if (p.spike) { for (let i = 0; i < 6; i++) { const y = 16 - i * 2.2; disc(16 + ((i % 2) ? 2.2 : -2.2), y, 1.6, flowerC); } disc(16, 3, 1.3, flowerC); }
-        else if (f === 'sunflower') { petals(16, 7, 14, 6, 2.2, flowerC, centerC); disc(16, 7, 3.4, centerC); }
-        else { petals(16, top, p.petals || 6, 3.2, 1.8, flowerC, centerC); if (p.berry) disc(16, top, 2.2, fruitC); }
+        if (p.spike || id === 'prairie_clover') spike(16, 2, id === 'prairie_clover' ? 4 : 7, flowerC, id === 'prairie_clover' ? 0.6 : 2.2);
+        else if (f === 'sunflower') { petalRay(16, 8, 18, 4.2, 5.5, 2.4, flowerC, centerC, false); g.fillStyle = shade(centerC, 0.7); for (let i = 0; i < 40; i++) { const a = i * 2.4, rr = 4.0 * Math.sqrt(i / 40); g.fillRect(16 + Math.cos(a) * rr - 0.35, 8 + Math.sin(a) * rr - 0.35, 0.7, 0.7); } }
+        else if (id === 'coneflower') { petalRay(16, 7, 11, 2.2, 5, 2, flowerC, centerC, true); ell(16, 6, 2.2, 2.8, 0, shade(centerC, 0.85)); }
+        else if (id === 'desert_marigold' || id === 'marigold') { petalRay(16, 7, 12, 2.2, 3.4, 2.4, flowerC, shade(flowerC, 0.8), false); if (id === 'marigold') petalRay(16, 7, 8, 1.2, 2.4, 1.8, shade(flowerC, 1.1), centerC, false); }
+        else if (id === 'yarrow' || id === 'dill') umbel(16, 6, flowerC, 2.1);
+        else if (id === 'milkweed' || id === 'alfalfa' || id === 'buckwheat') { pom(16, 6, 4, flowerC); if (id === 'milkweed') pom(11, 11, 2.6, shade(flowerC, 0.9)); }
+        else if (id === 'wild_bergamot') { for (let i = 0; i < 16; i++) { const a = i / 16 * 6.283; line(16, 7, 16 + Math.cos(a) * 5, 7 + Math.sin(a) * 5 - 1, 1.1, i % 2 ? flowerC : shade(flowerC, 0.85)); } disc(16, 7, 2, centerC); }
+        else if (id === 'trillium') { for (let i = 0; i < 3; i++) { const a = -1.57 + i * 2.094; ell(16 + Math.cos(a) * 4, 8 + Math.sin(a) * 3.6, 4.2, 2.4, a, '#4a7a3a'); } for (let i = 0; i < 3; i++) { const a = -0.52 + i * 2.094; ell(16 + Math.cos(a) * 3.2, 8 + Math.sin(a) * 2.9, 3.6, 2.4, a, i ? flowerC : shade(flowerC, 0.93)); } disc(16, 8, 1.3, '#e8d040'); }
+        else if (id === 'jewelweed') { ell(14, 9, 3.4, 2.2, 0.3, flowerC); ell(11, 11, 1.2, 0.9, 0.8, shade(flowerC, 0.9)); disc(16, 8, 1.1, shade(flowerC, 0.7)); ell(20, 13, 2.6, 1.7, -0.3, flowerC); }
+        else if (id === 'garlic_mustard' || id === 'mustard') { for (let i = 0; i < 5; i++) { const x = 13 + (i % 3) * 3, y = 5 + Math.floor(i / 3) * 3 + (i % 2); petals(x, y, 4, 1.1, 0.8, flowerC, centerC); } }
+        else if (id === 'bunchberry') { for (let i = 0; i < 4; i++) { const a = i * 1.571 + 0.785; ell(16 + Math.cos(a) * 3, 8 + Math.sin(a) * 3, 3, 2, a, flowerC); } pom(16, 8, 1.6, '#c8d860'); }
+        else if (id === 'arrowhead') { for (let yy = 4; yy <= 12; yy += 4) petals(16 + (yy % 8 ? 2 : -2), yy, 3, 1.6, 1.5, flowerC, '#e8d040'); }
+        else if (id === 'cloudberry') { petals(16, 8, 5, 2.6, 1.6, flowerC, centerC); disc(20, 13, 2.4, fruitC); disc(19.4, 12.4, 0.7, shade(fruitC, 1.4)); }
+        else { petals(16, top, p.petals || 6, 3.2, 1.9, flowerC, centerC); if (p.berry) { disc(16, top, 2.2, fruitC); disc(15.3, top - 0.7, 0.6, shade(fruitC, 1.5)); } }
       } else if (stage === 1 && !withered) disc(16, top, 1.5, shade(leafC, 1.2));
     } else if (f === 'grass' || f === 'cattail') {
-      const n = f === 'cattail' ? 5 : 7;
-      for (let i = 0; i < n; i++) { const t = (i / (n - 1) - 0.5); const x2 = 16 + t * 20 + droop; const y2 = p.tall ? 1 + Math.abs(t) * 10 : 8 + Math.abs(t) * 10; curve(16 + t * 3, 32, 16 + t * 8, 20, x2, y2 + droop, f === 'cattail' ? 1.6 : 1.2, i % 2 ? leafC : shade(leafC, 0.85)); }
-      if (mature) { if (f === 'cattail') { line(16, 32, 16, 2, 1.2, '#8a9a5a'); g.fillStyle = art.flower; g.fillRect(14.5, 2, 3, 9); disc(16, 1, 0.8, '#d8c890'); } else for (let i = 0; i < 4; i++) disc(10 + i * 4, 4 + (i % 2) * 3, 1.3, art.flower || '#c0a060'); }
+      if (id === 'ocotillo') { for (let i = 0; i < 6; i++) { const t = (i / 5 - 0.5); const ex = 16 + t * 26, ey = 2 + Math.abs(t) * 6; curve(16, 32, 16 + t * 8, 20, ex, ey, 1.3, i % 2 ? '#6a6a4a' : '#5a5a3a'); for (let s2 = 0.2; s2 < 0.95; s2 += 0.12) { const px = 16 + (ex - 16) * s2 * s2 * 0.6 + (ex - 16) * s2 * 0.4, py = 32 + (ey - 32) * s2; disc(px + 0.6, py, 0.6, '#4a8a3a'); disc(px - 0.6, py + 0.4, 0.5, '#3a7a2a'); } if (mature) { for (let q = 0; q < 4; q++) disc(ex + (q % 2) * 1.2 - 0.6, ey + q * 1.2, 1.0, q % 2 ? '#e03020' : '#f05030'); } } }
+      else {
+        const n = f === 'cattail' ? 6 : 11;
+        for (let i = 0; i < n; i++) { const t = (i / (n - 1) - 0.5); const x2 = 16 + t * 22 + droop; const y2 = p.tall ? 1 + Math.abs(t) * 10 : 7 + Math.abs(t) * 11; const col = i % 3 === 0 ? shade(leafC, 0.8) : i % 3 === 1 ? leafC : shade(leafC, 1.12); curve(16 + t * 3, 32, 16 + t * 9, 20, x2, y2 + droop, f === 'cattail' ? 1.5 : 1.0, col); }
+        if (mature) {
+          if (f === 'cattail') { line(16, 32, 16, 2, 1.2, '#8a9a5a'); g.fillStyle = art.flower || '#6a4a2a'; g.fillRect(14.3, 3, 3.4, 10); g.fillStyle = shade(art.flower || '#6a4a2a', 1.25); g.fillRect(14.3, 3, 1, 10); disc(16, 1.5, 0.8, '#d8c890'); }
+          else if (id === 'chives') { for (let i = 0; i < 3; i++) pom(11 + i * 5, 5 + (i % 2) * 2, 2.2, art.flower || '#c080d0'); }
+          else if (id === 'blue_grama') { for (let i = 0; i < 3; i++) { const x = 9 + i * 6, y = 6 + (i % 2) * 3; line(x, 20, x, y, 0.6, '#9aa060'); g.fillStyle = '#b89a5a'; g.fillRect(x, y - 1.2, 5, 1.6); } }
+          else if (id === 'pink_muhly') { for (let i = 0; i < 26; i++) { const a = i * 2.4, rr = 7 * Math.sqrt(i / 26); disc(16 + Math.cos(a) * rr * 1.3, 8 + Math.sin(a) * rr * 0.7, 0.55, i % 2 ? '#e880b0' : '#f0a0c8'); } }
+          else if (id === 'wild_rice' || id === 'switchgrass' || id === 'big_bluestem' || id === 'little_bluestem') { for (let i = 0; i < 3; i++) { const x = 10 + i * 6; line(x, 18, x + 1, 4, 0.6, '#b8a870'); for (let q = 0; q < 5; q++) { const yy = 5 + q * 2.4; line(x + 1 - q * 0.1, yy, x + 1 + (q % 2 ? 2.4 : -2.4), yy + 1.6, 0.5, art.flower || '#c8b070'); disc(x + 1 + (q % 2 ? 2.4 : -2.4), yy + 1.6, 0.55, art.flower || '#d8c080'); } } }
+          else for (let i = 0; i < 4; i++) { const x = 10 + i * 4, y = 4 + (i % 2) * 3; line(x, y + 4, x, y, 0.5, '#a0a060'); disc(x, y, 1.1, art.flower || '#c0a060'); }
+        }
+      }
     } else if (f === 'bush') {
-      line(16, 32, 16 + droop, 22, 1.8, stemC); line(16, 28, 11, 22, 1.2, stemC); line(16, 28, 21, 22, 1.2, stemC);
-      const r = rng(hash(p.id)); for (let i = 0; i < 14; i++) disc(8 + r() * 16, 12 + r() * 12 + droop, 2.4 + r() * 1.6, i % 3 ? leafC : shade(leafC, 0.78));
-      if (p.cauliflory && mature) { ell(14, 27, 1.6, 3, 0, fruitC); ell(18, 29, 1.4, 2.6, 0, fruitC); }
-      if (mature) { const r2 = rng(hash(p.id) + 1); for (let i = 0; i < 6; i++) { const x = 9 + r2() * 14, y = 13 + r2() * 10; if (p.flowerOnBush) petals(x, y, 6, 1.4, 0.8, flowerC, centerC); else disc(x, y, 1.3, fruitC); } }
+      line(16, 32, 16 + droop, 21, 1.9, stemC); line(16, 27, 10, 20, 1.2, stemC); line(16, 27, 22, 20, 1.2, stemC); line(13, 24, 8, 23, 0.9, stemC); line(19, 24, 24, 23, 0.9, stemC);
+      const r = rng(hash(id)); const small = id === 'blueberry' || id === 'labrador_tea' || id === 'creosote' || id === 'brittlebush';
+      for (let i = 0; i < 16; i++) { const x = 7 + r() * 18, y = 11 + r() * 13 + droop; leaf(x, y, r() * 6.283, small ? 3.6 : 5.2, small ? 1.8 : 3, i % 3 ? leafC : shade(leafC, 0.78), false); }
+      if (p.cauliflory && mature) { ell(14, 27, 1.6, 3, 0, fruitC); ell(18, 29, 1.4, 2.6, 0, fruitC); ell(13.6, 26.2, 0.5, 0.9, 0, shade(fruitC, 1.4)); }
+      if (mature) { const r2 = rng(hash(id) + 1); for (let i = 0; i < 6; i++) { const x = 9 + r2() * 14, y = 13 + r2() * 10; if (p.flowerOnBush) petals(x, y, 6, 1.4, 0.8, flowerC, centerC); else { const rr = id === 'potato' ? 1.0 : 1.4; disc(x, y, rr, fruitC); disc(x - rr * 0.35, y - rr * 0.35, rr * 0.35, shade(fruitC, 1.6)); if (id === 'chili') ell(x, y + 1.5, 0.9, 2.2, 0.3, fruitC); } } if (id === 'wild_strawberry' || id === 'blackberry') { petals(10, 12, 5, 1.6, 1.1, '#ffffff', '#f0d040'); } }
     } else if (f === 'rosette') {
-      const n = 9; for (let i = 0; i < n; i++) { const a = -Math.PI / 2 + (i / (n - 1) - 0.5) * 2.4; const len = 9 + (i % 2) * 5; g.save(); g.translate(16, 31); g.rotate(a); g.fillStyle = i % 2 ? leafC : shade(leafC, 0.85); g.beginPath(); g.moveTo(0, -2.2); g.lineTo(len, 0); g.lineTo(0, 2.2); g.closePath(); g.fill(); g.restore(); }
-      if (mature && p.fruitTop) { g.fillStyle = fruitC; g.beginPath(); g.ellipse(16, 15, 4.5, 6, 0, 0, 6.283); g.fill(); g.fillStyle = shade(fruitC, 0.7); for (let y = 10; y < 21; y += 3) for (let x = 13; x < 20; x += 3) g.fillRect(x, y, 1, 1); for (let i = -2; i <= 2; i++) line(16, 10, 16 + i * 2, 2, 1.2, leafC); }
-      else if (mature && art.flower && !p.epiphyte) { line(16, 24, 16, 1, 1.5, '#a09060'); for (let i = 0; i < 5; i++) { disc(13 + (i % 2) * 6, 3 + i * 3, 1.5, flowerC); } }
+      const n = id === 'agave' ? 11 : 9; const stiff = id === 'agave' || id === 'pineapple' || id === 'bromeliad'; const broad = id === 'hosta' || id === 'cabbage' || id === 'heuchera' || id === 'lambs_ear';
+      for (let i = 0; i < n; i++) { const a = -Math.PI / 2 + (i / (n - 1) - 0.5) * (broad ? 2.8 : 2.4); const len = (stiff ? 10 : 8) + (i % 2) * 5; const wid = broad ? 3.4 : 2.2; g.save(); g.translate(16, 31); g.rotate(a); const col = i % 2 ? leafC : shade(leafC, 0.85); g.fillStyle = col; g.beginPath(); if (broad) { g.ellipse(len * 0.55, 0, len * 0.5, wid, 0, 0, 6.283); } else { g.moveTo(0, -wid); g.lineTo(len, 0); g.lineTo(0, wid); g.closePath(); } g.fill(); g.strokeStyle = shade(col, 1.3); g.lineWidth = 0.35; g.beginPath(); g.moveTo(1, 0); g.lineTo(len * 0.9, 0); g.stroke(); if (broad && id !== 'lambs_ear') { g.lineWidth = 0.25; for (let q = 1; q < 4; q++) { g.beginPath(); g.moveTo(len * q / 4, 0); g.lineTo(len * q / 4 + len * 0.15, -wid * 0.7); g.moveTo(len * q / 4, 0); g.lineTo(len * q / 4 + len * 0.15, wid * 0.7); g.stroke(); } } if (id === 'agave') { g.fillStyle = '#7a4a3a'; for (let q = 2; q < len; q += 2.5) { g.fillRect(q, -wid - 0.4, 0.6, 0.6); g.fillRect(q, wid - 0.2, 0.6, 0.6); } } if (id === 'lambs_ear') { g.fillStyle = 'rgba(255,255,255,0.35)'; for (let q = 1; q < len; q += 1.6) g.fillRect(q, -wid * 0.6 + (q % 3), 0.5, 0.5); } g.restore(); }
+      if (id === 'cabbage') { disc(16, 22, 6.5, shade(leafC, 1.15)); disc(16, 22, 4.5, shade(leafC, 1.3)); g.strokeStyle = shade(leafC, 0.8); g.lineWidth = 0.4; for (let q = 0; q < 5; q++) { g.beginPath(); g.arc(16, 22, 2 + q * 1.1, 2.4 + q * 0.3, 4.6 + q * 0.3); g.stroke(); } }
+      if (mature && p.fruitTop) { g.fillStyle = fruitC; g.beginPath(); g.ellipse(16, 15, 4.5, 6, 0, 0, 6.283); g.fill(); g.fillStyle = shade(fruitC, 0.7); for (let y = 10; y < 21; y += 2.4) for (let x = 12.5; x < 20; x += 2.4) g.fillRect(x + ((y / 2.4) % 2), y, 0.9, 0.9); for (let i = -2; i <= 2; i++) line(16, 10, 16 + i * 2.2, 2, 1.2, leafC); }
+      else if (mature && art.flower && !p.epiphyte) { line(16, 24, 16, 1, 1.5, '#a09060'); for (let i = 0; i < 6; i++) { disc(13 + (i % 2) * 6, 2 + i * 2.6, 1.3, i % 2 ? flowerC : shade(flowerC, 0.9)); } }
       else if (mature && p.epiphyte) { line(16, 26, 16, 10, 1.8, '#d07090'); petals(16, 9, 7, 3, 1.5, flowerC, '#f0a0c0'); }
     } else if (f === 'cactus') {
-      ell(16, 25, 7, 6, 0, leafC); if (stage >= 1 || withered) ell(11, 15, 5, 6.5, 0.4, shade(leafC, 1.05)); if (stage >= 1 || withered) ell(22, 14, 4.5, 6, -0.3, shade(leafC, 0.9));
-      g.fillStyle = '#f0f0d0'; for (let i = 0; i < 24; i++) { const a = i * 2.39; const rr = (i % 7) * 0.9; g.fillRect(16 + Math.cos(a) * rr - 0.5, 25 + Math.sin(a) * rr * 0.8, 1, 1); g.fillRect(11 + Math.cos(a) * rr * 0.7, 15 + Math.sin(a) * rr, 1, 1); }
-      if (mature) { petals(11, 8, 7, 2, 1.2, flowerC, centerC); ell(24, 8, 1.6, 2.4, 0, fruitC); ell(20, 7.5, 1.4, 2.2, 0, fruitC); }
+      if (id === 'barrel_cactus') { ell(16, 20, 9, 11, 0, leafC); for (let i = -3; i <= 3; i++) { const x = 16 + i * 2.6; curve(x, 10, x * 1.02 - 0.3, 20, x, 30.5, 0.8, shade(leafC, 0.72)); for (let y = 12; y < 30; y += 3.2) { g.fillStyle = '#f0e8c0'; g.fillRect(x - 0.9, y, 1.8, 0.5); g.fillRect(x - 0.3, y - 0.8, 0.6, 1.8); } } if (mature) { for (let i = -1; i <= 1; i++) petals(16 + i * 4, 9 - Math.abs(i), 6, 1.6, 1.0, flowerC, centerC); } }
+      else { ell(16, 25, 7, 6, 0, leafC); if (stage >= 1 || withered) ell(11, 15, 5, 6.5, 0.4, shade(leafC, 1.05)); if (stage >= 1 || withered) ell(22, 14, 4.5, 6, -0.3, shade(leafC, 0.9)); g.fillStyle = '#f0f0d0'; for (let i = 0; i < 30; i++) { const a = i * 2.39; const rr = (i % 7) * 0.9; const px = 16 + Math.cos(a) * rr, py = 25 + Math.sin(a) * rr * 0.8; g.fillRect(px - 0.9, py - 0.2, 1.8, 0.4); g.fillRect(px - 0.2, py - 0.9, 0.4, 1.8); const qx = 11 + Math.cos(a) * rr * 0.7, qy = 15 + Math.sin(a) * rr; g.fillRect(qx - 0.7, qy - 0.2, 1.4, 0.4); } if (mature) { petals(11, 8, 8, 2.2, 1.3, flowerC, centerC); ell(24, 8, 1.6, 2.4, 0, fruitC); ell(20, 7.5, 1.4, 2.2, 0, fruitC); } }
     } else if (f === 'vine') {
-      curve(16, 32, 8, 22, 16, 12, 1.3, stemC); curve(16, 12, 24, 8, 14, 2, 1.1, stemC);
-      for (let i = 0; i < 5; i++) { const y = 28 - i * 5.5; leaf(13 + (i % 2) * 6, y, i % 2 ? -0.3 : Math.PI + 0.3, 6, 4, leafC); }
-      if (mature) { petals(21, 16, 7, 2.6, 1.4, flowerC, centerC); if (art.fruit) { ell(10, 20, 1.2, 3.5, 0.2, fruitC); ell(21, 8, 1.2, 3.2, -0.2, fruitC); } }
+      curve(16, 32, 8, 22, 16, 12, 1.3, stemC); curve(16, 12, 24, 8, 14, 2, 1.1, stemC); curve(16, 20, 22, 19, 24, 15, 0.5, stemC); curve(24, 15, 26, 13, 24, 12, 0.5, stemC);
+      for (let i = 0; i < 5; i++) { const y = 28 - i * 5.5; const x = 13 + (i % 2) * 6; if (id === 'monstera') { leaf(x, y, i % 2 ? -0.4 : Math.PI + 0.4, 8, 6, leafC); g.save(); g.globalCompositeOperation = 'destination-out'; for (let q = 0; q < 3; q++) ell(x + (i % 2 ? 2 : -2) + q * (i % 2 ? 1.5 : -1.5), y - 1 + q * 0.8, 1.1, 0.5, 0.3, '#000'); g.restore(); } else if (id === 'nasturtium') { disc(x, y, 3.2, i % 2 ? leafC : shade(leafC, 0.85)); g.strokeStyle = shade(leafC, 1.3); g.lineWidth = 0.3; for (let q = 0; q < 6; q++) { g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(q) * 3, y + Math.sin(q) * 3); g.stroke(); } } else leaf(x, y, i % 2 ? -0.3 : Math.PI + 0.3, 6, 4.2, leafC); }
+      if (mature) { if (id === 'passionflower') { for (let i = 0; i < 24; i++) { const a = i / 24 * 6.283; line(20, 15, 20 + Math.cos(a) * 4.5, 15 + Math.sin(a) * 4.5, 0.5, i % 2 ? '#6a3a9a' : '#ffffff'); } petals(20, 15, 10, 2.2, 1.2, flowerC, centerC); } else petals(21, 16, 7, 2.6, 1.4, flowerC, centerC); if (id === 'tomato') { for (let q = 0; q < 3; q++) { disc(9 + q * 2.2, 20 + (q % 2) * 2, 1.9, fruitC); disc(8.4 + q * 2.2, 19.4 + (q % 2) * 2, 0.6, shade(fruitC, 1.5)); } } else if (id === 'cucumber') { ell(10, 21, 1.4, 4.2, 0.2, fruitC); ell(21, 8, 1.3, 3.6, -0.2, fruitC); } else if (art.fruit) { ell(10, 20, 1.2, 3.5, 0.2, fruitC); ell(21, 8, 1.2, 3.2, -0.2, fruitC); } }
     } else if (f === 'fern') {
-      for (let i = 0; i < 5; i++) { const t = i / 4 - 0.5; const ex = 16 + t * 24, ey = 10 + Math.abs(t) * 8; curve(16, 32, 16 + t * 10, 20, ex, ey, 1, stemC); for (let s = 0.3; s < 1; s += 0.14) { const px = 16 + (ex - 16) * s, py = 32 + (ey - 32) * s; line(px - 2.2, py - 1, px + 2.2, py + 1, 1.4, leafC); } }
+      for (let i = 0; i < 5; i++) { const t = i / 4 - 0.5; const ex = 16 + t * 24, ey = 8 + Math.abs(t) * 9; curve(16, 32, 16 + t * 10, 20, ex, ey, 0.9, stemC); for (let s2 = 0.22; s2 < 1; s2 += 0.09) { const px = 16 + (ex - 16) * (2 * s2 - s2 * s2) * 0.5 + (ex - 16) * s2 * 0.5, py = 32 + (ey - 32) * s2; const L = 3.2 * (1 - s2) + 0.8; const dx = (ex - 16), dy = (ey - 32); const ang = Math.atan2(dy, dx); leaf(px, py, ang - 1.1, L, L * 0.45, i % 2 ? leafC : shade(leafC, 0.9), false); leaf(px, py, ang + 1.1, L, L * 0.45, i % 2 ? shade(leafC, 0.9) : leafC, false); } }
+      if (!mature && stage === 0) { curve(16, 32, 12, 24, 18, 22, 1.2, leafC); disc(18, 22, 1.5, shade(leafC, 1.1)); }
     } else if (f === 'moss') {
-      const r = rng(hash(p.id)); for (let i = 0; i < 18; i++) disc(6 + r() * 20, 26 + r() * 5, 2 + r() * 2, i % 3 ? leafC : shade(leafC, 0.85)); for (let i = 0; i < 10; i++) line(8 + r() * 16, 30, 8 + r() * 16, 22 + r() * 4, 1, shade(leafC, 1.1));
+      const r = rng(hash(id)); for (let i = 0; i < 18; i++) disc(6 + r() * 20, 26 + r() * 5, 2 + r() * 2, i % 3 ? leafC : shade(leafC, 0.85)); for (let i = 0; i < 14; i++) line(8 + r() * 16, 30, 8 + r() * 16, 21 + r() * 5, 0.9, shade(leafC, 1.15));
       if (mature && art.fruit) for (let i = 0; i < 4; i++) disc(9 + i * 5, 21, 1, fruitC);
     } else if (f === 'corn') {
-      line(16, 32, 16 + droop, 2, 2, stemC); for (let i = 0; i < 6; i++) { const y = 28 - i * 4.4; const dir = i % 2 ? 1 : -1; curve(16, y, 16 + dir * 7, y - 3, 16 + dir * 12, y + 2, 1.5, leafC); }
-      if (mature) { ell(13, 16, 2, 4.5, 0.2, fruitC); line(13, 11, 12, 8, 0.8, '#d8b060'); for (let i = -2; i <= 2; i++) line(16, 3, 16 + i * 3, -1, 0.8, flowerC); }
+      line(16, 32, 16 + droop, 2, 2.2, stemC); line(16.5, 32, 16.5 + droop, 2, 0.5, shade(stemC, 1.3)); for (let i = 0; i < 6; i++) { const y = 28 - i * 4.4; const dir = i % 2 ? 1 : -1; curve(16, y, 16 + dir * 7, y - 3, 16 + dir * 13, y + 2, 1.7, i % 2 ? leafC : shade(leafC, 0.88)); curve(16, y, 16 + dir * 7, y - 2.7, 16 + dir * 12, y + 2, 0.4, shade(leafC, 1.3)); }
+      if (mature) { ell(13, 16, 2.2, 4.8, 0.2, '#b8c870'); ell(13.2, 14.5, 1.3, 3, 0.2, fruitC); g.fillStyle = shade(fruitC, 0.8); for (let q = 0; q < 6; q++) g.fillRect(12.4 + (q % 2) * 0.9, 12.2 + q * 0.9, 0.5, 0.5); line(13, 11, 12, 7.5, 0.9, '#d8b060'); line(13.6, 11, 13.8, 7.8, 0.6, '#e8c870'); for (let i = -2; i <= 2; i++) line(16, 3, 16 + i * 3, -1, 0.8, flowerC); }
     } else if (f === 'squash') {
       curve(16, 32, 10, 28, 4, 30, 1.4, stemC); curve(16, 32, 22, 28, 28, 30, 1.4, stemC);
-      for (let i = 0; i < 5; i++) { const x = 6 + i * 5; disc(x, 20 + (i % 2) * 4, 4.2, i % 2 ? leafC : shade(leafC, 0.85)); line(x, 24 + (i % 2) * 4, x, 31, 1, stemC); }
-      if (mature) { ell(8, 28, 4, 3.2, 0, fruitC); petals(23, 15, 5, 2.4, 1.5, flowerC, centerC); }
+      if (id === 'mayapple') { line(16, 32, 16, 14, 1.4, stemC); for (let q = 0; q < 7; q++) { const a = q / 7 * 6.283; leaf(16, 13, a, 7, 4.5, q % 2 ? leafC : shade(leafC, 0.88)); } if (mature) { disc(13, 22, 2.4, flowerC); disc(13, 22, 1, '#e8d040'); } }
+      else { for (let i = 0; i < 5; i++) { const x = 6 + i * 5, y = 20 + (i % 2) * 4; line(x, y + 4, x, 31, 1, stemC); for (let q = 0; q < 5; q++) { const a = -Math.PI / 2 + (q - 2) * 0.55; leaf(x, y + 1, a, 4.6, 2.4, i % 2 ? leafC : shade(leafC, 0.85), false); } } if (mature) { ell(8, 28, 4.4, 3.4, 0, fruitC); g.strokeStyle = shade(fruitC, 0.75); g.lineWidth = 0.4; for (let q = -2; q <= 2; q++) { g.beginPath(); g.moveTo(8 + q * 1.6, 25); g.quadraticCurveTo(8 + q * 2.2, 28, 8 + q * 1.6, 31); g.stroke(); } petals(23, 15, 5, 2.6, 1.7, flowerC, centerC); } }
     } else if (f === 'heliconia' || f === 'banana') {
-      line(16, 32, 16, 10, f === 'banana' ? 3 : 1.8, stemC);
-      for (let i = 0; i < 4; i++) { const dir = i % 2 ? 1 : -1; const y = 18 - i * 4; ell(16 + dir * 7, y, 8, 2.6, dir * -0.5, i % 2 ? leafC : shade(leafC, 0.85)); }
-      if (mature) { if (f === 'heliconia') { for (let i = 0; i < 4; i++) { g.save(); g.translate(16 + (i % 2 ? 3 : -3), 8 + i * 3); g.rotate(i % 2 ? 0.7 : -0.7); g.fillStyle = flowerC; g.fillRect(0, -1, 5, 2.2); g.fillStyle = centerC; g.fillRect(4, -0.8, 1.5, 1.8); g.restore(); } } else { for (let i = 0; i < 5; i++) ell(20, 14 + i * 1.6, 3.5, 1, 0.3, fruitC); ell(21, 24, 1.6, 2.4, 0, flowerC); } }
+      line(16, 32, 16, 10, f === 'banana' ? 3 : 1.8, stemC); line(16.8, 32, 16.8, 10, 0.5, shade(stemC, 1.25));
+      for (let i = 0; i < 4; i++) { const dir = i % 2 ? 1 : -1; const y = 18 - i * 4; leaf(16, y, dir > 0 ? -0.5 : Math.PI + 0.5, 11, 5, i % 2 ? leafC : shade(leafC, 0.85)); }
+      if (mature) { if (f === 'heliconia') { for (let i = 0; i < 4; i++) { g.save(); g.translate(16 + (i % 2 ? 3 : -3), 8 + i * 3); g.rotate(i % 2 ? 0.7 : -0.7); g.fillStyle = flowerC; g.fillRect(0, -1, 5, 2.2); g.fillStyle = centerC; g.fillRect(4, -0.8, 1.5, 1.8); g.restore(); } } else { for (let i = 0; i < 5; i++) { ell(20, 14 + i * 1.6, 3.5, 1, 0.3, fruitC); ell(19, 13.6 + i * 1.6, 1.2, 0.4, 0.3, shade(fruitC, 1.3)); } ell(21, 24, 1.6, 2.4, 0, flowerC); } }
     } else if (f === 'pitcher') {
-      for (let i = 0; i < 3; i++) { const x = 9 + i * 7; g.fillStyle = i % 2 ? leafC : shade(leafC, 0.85); g.beginPath(); g.moveTo(x - 1, 31); g.lineTo(x - 3.2, 18); g.lineTo(x + 3.2, 18); g.lineTo(x + 1, 31); g.closePath(); g.fill(); ell(x, 17, 3.4, 1.8, 0, shade(leafC, 1.15)); g.fillStyle = '#8a9a5a'; g.fillRect(x - 1.2, 20, 0.8, 7); }
+      for (let i = 0; i < 3; i++) { const x = 9 + i * 7; const col = i % 2 ? leafC : shade(leafC, 0.85); g.fillStyle = col; g.beginPath(); g.moveTo(x - 1, 31); g.lineTo(x - 3.2, 18); g.lineTo(x + 3.2, 18); g.lineTo(x + 1, 31); g.closePath(); g.fill(); g.strokeStyle = '#a04a4a'; g.lineWidth = 0.4; for (let q = 0; q < 4; q++) { g.beginPath(); g.moveTo(x - 2.5 + q * 1.6, 19); g.lineTo(x - 1 + q * 0.6, 30); g.stroke(); } ell(x, 17, 3.4, 1.8, 0, shade(leafC, 1.15)); ell(x, 17, 2, 0.9, 0, '#7a3a3a'); g.fillStyle = '#8a9a5a'; g.fillRect(x - 1.2, 20, 0.8, 7); }
       if (mature) { line(16, 24, 16, 6, 1, '#7a4a4a'); disc(16, 6, 3, flowerC); disc(16, 7.5, 1.5, shade(flowerC, 0.7)); }
     } else if (f === 'lily') {
-      disc(16, 16, 11, leafC); g.fillStyle = 'rgba(0,0,0,0)'; g.globalCompositeOperation = 'destination-out'; g.beginPath(); g.moveTo(16, 16); g.lineTo(28, 10); g.lineTo(28, 20); g.closePath(); g.fill(); g.globalCompositeOperation = 'source-over';
-      g.strokeStyle = shade(leafC, 0.8); g.lineWidth = 1; for (let a = 0; a < 6; a++) { g.beginPath(); g.moveTo(16, 16); g.lineTo(16 + Math.cos(a) * 10, 16 + Math.sin(a) * 10); g.stroke(); }
-      if (mature) { petals(11, 14, 9, 3.6, 1.8, flowerC, centerC); }
+      disc(16, 16, 11, leafC); g.save(); g.globalCompositeOperation = 'destination-out'; g.beginPath(); g.moveTo(16, 16); g.lineTo(28, 10); g.lineTo(28, 20); g.closePath(); g.fill(); g.restore();
+      g.strokeStyle = shade(leafC, 0.8); g.lineWidth = 0.6; for (let a = 0; a < 6; a++) { g.beginPath(); g.moveTo(16, 16); g.lineTo(16 + Math.cos(a + 0.5) * 10, 16 + Math.sin(a + 0.5) * 10); g.stroke(); } g.strokeStyle = shade(leafC, 1.25); g.lineWidth = 0.8; g.beginPath(); g.arc(16, 16, 10.4, 0.6, 5.7); g.stroke();
+      if (mature) { petalRay(11, 14, 12, 1.6, 4, 1.8, flowerC, '#f0d040', false); petals(11, 14, 7, 1.6, 1.1, shade(flowerC, 1.05), '#f0d040'); }
     } else if (f === 'sapling') {
-      line(16, 32, 16, 18, 1.6, '#6a4a2a'); disc(16, 14, 6, leafC); disc(12, 17, 4, shade(leafC, 0.85)); disc(20, 17, 4, shade(leafC, 1.1));
+      line(16, 32, 16, 18, 1.6, '#6a4a2a'); disc(16, 14, 6, leafC); disc(12, 17, 4, shade(leafC, 0.85)); disc(20, 17, 4, shade(leafC, 1.1)); disc(14, 12, 2.5, shade(leafC, 1.2));
     } else if (f === 'sapling_conifer') {
-      line(16, 32, 16, 20, 1.6, '#5a3a2a'); g.fillStyle = leafC; for (let i = 0; i < 3; i++) { g.beginPath(); g.moveTo(16, 4 + i * 6); g.lineTo(16 - 5 - i * 2, 12 + i * 6); g.lineTo(16 + 5 + i * 2, 12 + i * 6); g.closePath(); g.fill(); }
+      line(16, 32, 16, 20, 1.6, '#5a3a2a'); for (let i = 0; i < 3; i++) { g.fillStyle = i % 2 ? leafC : shade(leafC, 0.88); g.beginPath(); g.moveTo(16, 4 + i * 6); g.lineTo(16 - 5 - i * 2, 12 + i * 6); g.lineTo(16 + 5 + i * 2, 12 + i * 6); g.closePath(); g.fill(); }
     } else if (f === 'sapling_cactus') {
       g.fillStyle = leafC; g.fillRect(12, 10, 8, 22); g.fillStyle = shade(leafC, 0.75); g.fillRect(14, 10, 1, 22); g.fillRect(17, 10, 1, 22); disc(16, 10, 4, leafC); g.fillStyle = '#f0f0d0'; for (let y = 12; y < 31; y += 4) { g.fillRect(12, y, 1, 1); g.fillRect(19, y, 1, 1); }
     }

@@ -7,13 +7,9 @@ BC.NPCs = class {
     this.clear(); const w = this.game.world; if (!w.villages) return;
     w.villages.forEach(v => v.npcs.forEach(n => {
       const t = BC.NPC_BY_ID[n.type]; if (!t) return;
-      const group = this.game.buildAvatar(n.name, t.color);
-      const hat = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.12, 0.56), new THREE.MeshLambertMaterial({ color: new THREE.Color(t.hat) })); hat.position.y = 1.82; group.add(hat);
-      const crown = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.22, 0.36), new THREE.MeshLambertMaterial({ color: new THREE.Color(t.hat) })); crown.position.y = 1.95; group.add(crown);
-      const apron = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.5, 0.06), new THREE.MeshLambertMaterial({ color: 0xe8e0c8 })); apron.position.set(0, 0.8, 0.18); group.add(apron);
+      const look = BC.Avatar.npcLook(t.id, n.name); const group = this.game.buildAvatar(n.name, t.color, Object.assign({ style: 'npc' }, look));
       const y = this.floorAt(Math.floor(n.x), Math.floor(n.z), n.y !== undefined ? n.y + 1 : w.top(Math.floor(n.x), Math.floor(n.z)) + 1); group.position.set(n.x, y, n.z); this.game.scene.add(group);
-      const arms = [group.children[4], group.children[5]];
-      this.list.push({ uid: n.uid, type: t, def: t, name: n.name, village: v, x: n.x, y, z: n.z, home: [n.x, n.z], origHome: [n.x, n.z], origY: y, origIndoors: !!n.indoors, indoors: !!n.indoors, yaw: Math.random() * 6.28, group, arms, target: null, timer: 1 + Math.random() * 3, talking: 0, work: 0, workT: 0 });
+      this.list.push({ uid: n.uid, type: t, def: t, name: n.name, village: v, x: n.x, y, z: n.z, home: [n.x, n.z], origHome: [n.x, n.z], origY: y, origIndoors: !!n.indoors, indoors: !!n.indoors, yaw: Math.random() * 6.28, group, workStyle: look.work || 'inspect', target: null, timer: 1 + Math.random() * 3, talking: 0, work: 0, workT: 0 });
     }));
   }
   // Standing height: the first solid block at or below a reference height, plus one. Ignores roofs overhead.
@@ -36,9 +32,9 @@ BC.NPCs = class {
         if (e.target) { const dx = e.target[0] - e.x, dz = e.target[1] - e.z; const d = Math.hypot(dx, dz); if (d < 0.2) { e.target = null; } else { const sp = 1.3 * dt; const nx = e.x + dx / d * sp, nz = e.z + dz / d * sp; if (this.walkable(nx, nz, e.y)) { e.x = nx; e.z = nz; } else e.target = null; const want = Math.atan2(dx, dz); let da = want - e.yaw; da = Math.atan2(Math.sin(da), Math.cos(da)); e.yaw += da * Math.min(1, dt * 8); } }
       }
       const gy = this.floorAt(Math.floor(e.x), Math.floor(e.z), e.y + 0.5); if (gy >= 0) e.y += (gy - e.y) * Math.min(1, dt * 10);
-      // arms: swing when walking, work when busy (potting up, hoeing, sorting seed)
-      let bob = 0; if (e.work > 0) { e.work -= dt; e.workT += dt; const s = Math.sin(e.workT * 6); e.arms[0].rotation.x = -1.2 + s * 0.5; e.arms[1].rotation.x = -1.2 - s * 0.5; bob = Math.abs(s) * 0.05; } else if (e.target) { const s = Math.sin(e.bobT = (e.bobT || 0) + dt * 9); e.arms[0].rotation.x = s * 0.6; e.arms[1].rotation.x = -s * 0.6; } else { e.arms[0].rotation.x *= 0.9; e.arms[1].rotation.x *= 0.9; }
-      e.group.position.set(e.x, e.y - bob, e.z); e.group.rotation.y = e.yaw; e.group.visible = d2 < 80 * 80;
+      // rig animation: walk, idle fidgets and blinking, talk gestures, and the role's own way of working
+      if (e.work > 0) { e.work -= dt; e.workT += dt; } BC.Avatar.animate(e.group, dt, { moving: !!e.target, speed: 0.8, talking: e.talking > 0, work: e.work > 0 ? e.workStyle : null, workT: e.workT });
+      e.group.position.set(e.x, e.y, e.z); e.group.rotation.y = e.yaw; e.group.visible = d2 < 80 * 80;
     }
   }
   raycast(origin, dir, maxD) {

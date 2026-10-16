@@ -81,7 +81,7 @@ BC.Game = class Game {
   packPlant(p) { return { id: p.id, x: p.x, y: p.y, z: p.z, wild: p.wild, progress: p.progress, health: p.health, pollinated: p.pollinated, withered: p.withered, onBark: p.onBark, owner: p.owner, pest: p.pest || undefined, covered: p.covered || undefined, shaded: p.shaded || undefined, frostCover: p.frostCover || undefined }; }
   begin() { this.clearChunks(); this.world.dirty.clear(); this.streamChunks(true); this.ui.hideStart(); this.ui.renderHotbar(); this.ui.updateQuestTracker(); this.ui.setLockHint(true); this.ui.updateShared(); this.ui.updateHUD(); this.running = true; this.last = performance.now(); if (!this.loopStarted) { this.loopStarted = true; requestAnimationFrame(t => this.loop(t)); } }
   clearChunks() { Array.from(this.chunks.keys()).forEach(ci => this.unloadChunk(ci)); this.chunks.clear(); }
-  clearAnimals() { this.animals.list.forEach(e => { this.scene.remove(e.mesh); if (e.line) this.scene.remove(e.line); }); this.animals.list = []; this.npcs.clear(); this.boats.clear(); this.hires = []; this.stopFishing(); }
+  clearAnimals() { this.animals.list.forEach(e => { this.scene.remove(e.mesh); if (e.rig) this.scene.remove(e.rig.root); if (e.line) this.scene.remove(e.line); }); this.animals.list = []; this.npcs.clear(); this.boats.clear(); this.hires = []; this.stopFishing(); }
   unloadChunk(ci) { const c = this.chunks.get(ci); if (!c) return; ['solid', 'water', 'plants', 'cutout'].forEach(k => { if (c[k]) { this.scene.remove(c[k]); c[k].geometry.dispose(); } }); this.chunks.delete(ci); }
   // Only chunks near the player are meshed. `initial` builds the nearest ring synchronously so the world is never empty on arrival.
   streamChunks(initial) {
@@ -189,26 +189,12 @@ BC.Game = class Game {
   goToPeer(key) { const pe = this.peers.get(key); if (!pe) return; const w = this.world; const px = Math.floor(pe.group.position.x), pz = Math.floor(pe.group.position.z); for (const [dx, dz] of [[2, 0], [-2, 0], [0, 2], [0, -2], [2, 2], [-2, -2], [1, 0], [0, 1]]) { const x = px + dx, z = pz + dz; if (x < 1 || z < 1 || x >= w.W - 1 || z >= w.D - 1) continue; const t = w.top(x, z); if (w.get(x, t + 1, z) === 0 && w.get(x, t + 2, z) === 0) { this.player.pos.set(x + 0.5, t + 1.01, z + 0.5); this.player.vel.set(0, 0, 0); this.player.yaw = Math.atan2(-(pe.group.position.x - this.player.pos.x), -(pe.group.position.z - this.player.pos.z)); this.toast(`You are now next to ${pe.name}.`, 'good'); return; } } this.toast(`Could not find solid ground next to ${pe.name}.`, 'bad'); }
   peerPositions() { const out = []; this.peers.forEach(pe => out.push(pe.group.position)); return out; }
   buildAvatar(name, color, look) {
-    const g = new THREE.Group(); const shirt = new THREE.Color(look && look.shirt ? look.shirt : color), skin = new THREE.Color(look && look.skin ? look.skin : 0xe8b890), pants = new THREE.Color(look && look.pants ? look.pants : 0x3a4a6a);
-    const box = (w, hh, d, x, y, z, c) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, hh, d), new THREE.MeshLambertMaterial({ color: c })); m.position.set(x, y, z); m.castShadow = !!BC.SHADOWS; g.add(m); };
-    box(0.5, 0.65, 0.3, 0, 1.0, 0, shirt); box(0.45, 0.45, 0.45, 0, 1.55, 0, skin); box(0.18, 0.7, 0.22, -0.16, 0.35, 0, pants); box(0.18, 0.7, 0.22, 0.16, 0.35, 0, pants); box(0.14, 0.6, 0.2, -0.33, 1.0, 0, shirt); box(0.14, 0.6, 0.2, 0.33, 1.0, 0, shirt);
-    const c = document.createElement('canvas'); c.width = 256; c.height = 64; const x = c.getContext('2d'); x.fillStyle = 'rgba(20,28,18,0.7)'; x.fillRect(0, 0, 256, 64); x.fillStyle = '#f3efe2'; x.font = 'bold 34px Nunito, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(name.slice(0, 14), 128, 32);
-    const tex = new THREE.CanvasTexture(c); const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false })); sp.scale.set(1.6, 0.4, 1); sp.position.y = 2.1; g.add(sp);
-    if (look) { // hair, hat and accessory come after the six body parts and the label so NPC arm indices stay put
-      const hair = new THREE.Color(look.hair || '#5a3a1a'); if (look.hat !== 'hood') { box(0.47, 0.1, 0.47, 0, 1.82, 0, hair); box(0.47, 0.18, 0.08, 0, 1.68, -0.2, hair); }
-      if (look.hat === 'straw') { box(0.9, 0.05, 0.9, 0, 1.86, 0, 0xd8b868); box(0.4, 0.2, 0.4, 0, 1.97, 0, 0xd8b868); box(0.42, 0.05, 0.42, 0, 1.9, 0, 0x6a4a2a); }
-      else if (look.hat === 'ranger') { box(0.78, 0.05, 0.78, 0, 1.86, 0, 0x4a6a3a); box(0.4, 0.26, 0.4, 0, 2.0, 0, 0x4a6a3a); box(0.42, 0.05, 0.42, 0, 1.9, 0, 0x2a3a1a); }
-      else if (look.hat === 'cap') { box(0.5, 0.14, 0.5, 0, 1.9, 0, pants); box(0.5, 0.04, 0.3, 0, 1.84, 0.36, pants); }
-      else if (look.hat === 'hood') { const hc = shirt.clone().multiplyScalar(0.75); box(0.55, 0.5, 0.55, 0, 1.58, -0.04, hc); box(0.55, 0.1, 0.3, 0, 1.82, 0.16, hc); }
-      if (look.acc === 'backpack') { box(0.42, 0.5, 0.22, 0, 1.0, -0.26, 0x7a5a3a); box(0.3, 0.14, 0.1, 0, 1.3, -0.3, 0x5a8a3a); }
-      else if (look.acc === 'satchel') { box(0.06, 0.6, 0.3, -0.2, 1.05, 0.0, 0x6a4a2a); box(0.22, 0.2, 0.34, -0.28, 0.66, 0.0, 0x8a6a3a); }
-      else if (look.acc === 'binoculars') { box(0.22, 0.1, 0.1, 0, 1.08, 0.18, 0x1a1a1a); box(0.08, 0.12, 0.12, -0.06, 1.08, 0.2, 0x2a2a2a); box(0.08, 0.12, 0.12, 0.06, 1.08, 0.2, 0x2a2a2a); }
-      else if (look.acc === 'glasses') { box(0.16, 0.12, 0.03, -0.1, 1.58, 0.235, 0x1a1a1a); box(0.16, 0.12, 0.03, 0.1, 1.58, 0.235, 0x1a1a1a); box(0.06, 0.03, 0.03, 0, 1.6, 0.235, 0x1a1a1a); }
-      else if (look.acc === 'leaf') { box(0.12, 0.16, 0.03, 0.12, 1.12, 0.165, 0x5a9a3a); }
-    }
+    const spec = look ? BC.Avatar.playerLook(look, look.style) : { shirt: color || '#4f7a3a' }; const rig = BC.Avatar.build(spec); const g = rig.root;
+    const c = document.createElement('canvas'); c.width = 256; c.height = 64; const x = c.getContext('2d'); x.fillStyle = 'rgba(20,28,18,0.7)'; x.fillRect(0, 0, 256, 64); x.fillStyle = '#f3efe2'; x.font = 'bold 34px Nunito, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(name, 128, 32);
+    const tex = new THREE.CanvasTexture(c); const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false })); sp.scale.set(1.6, 0.4, 1); sp.position.y = 2.25; g.add(sp); g.userData.label = sp;
     return g;
   }
-  updatePeers(dt) { this.peers.forEach(pe => { pe.group.position.lerp(pe.target, Math.min(1, dt * 8)); let da = pe.yaw - pe.group.rotation.y; da = Math.atan2(Math.sin(da), Math.cos(da)); pe.group.rotation.y += da * Math.min(1, dt * 8); }); }
+  updatePeers(dt) { this.peers.forEach(pe => { const moving = pe.group.position.distanceToSquared(pe.target) > 0.0025; BC.Avatar.animate(pe.group, dt, { moving, speed: 1 }); pe.group.position.lerp(pe.target, Math.min(1, dt * 8)); let da = pe.yaw - pe.group.rotation.y; da = Math.atan2(Math.sin(da), Math.cos(da)); pe.group.rotation.y += da * Math.min(1, dt * 8); }); }
   netTick(dt) {
     const n = this.net, a = this.netAcc; a.pos += dt; a.plants += dt; a.animals += dt; a.time += dt;
     if (this.player.riding && a.pos >= 0.2) { const b = this.player.riding; n.send('boat_pos', { uid: b.uid, x: +b.x.toFixed(2), z: +b.z.toFixed(2), yaw: +b.yaw.toFixed(2), rider: this.playerName }); }
@@ -617,7 +603,7 @@ BC.Game = class Game {
   loadCharacter() { if (!BC.CHARACTERS) { BC.CHARACTERS = [{ id: 'explorer', name: 'Explorer', emoji: '', blurb: '', perks: [], look: { hair: '#5a3a1a', shirt: '#5f9a3c', pants: '#b89a6a', skin: '#e8b890', hat: 'none', acc: 'backpack' } }]; BC.CHARACTER_BY_ID = { explorer: BC.CHARACTERS[0] }; BC.STARTER_KITS = {}; } try { const c = JSON.parse(localStorage.getItem(this.CHAR_KEY)); if (c && BC.CHARACTER_BY_ID[c.id] && c.look) return c; } catch (e) { } const d = BC.CHARACTERS[0]; return { id: d.id, look: Object.assign({}, d.look) }; }
   perk(id) { return this.character && this.character.id === id; }
   setCharacter(id, look) {
-    const def = BC.CHARACTER_BY_ID[id]; if (!def) return; this.character = { id, look: Object.assign({}, def.look, look || {}) }; try { localStorage.setItem(this.CHAR_KEY, JSON.stringify(this.character)); } catch (e) { }
+    const def = BC.CHARACTER_BY_ID[id]; if (!def) return; this.character = { id, look: Object.assign({}, def.look, look || {}, { style: id }) }; try { localStorage.setItem(this.CHAR_KEY, JSON.stringify(this.character)); } catch (e) { }
     BC.PERK = id; if (this.mode === 'shared' && this.net) this.net.updateLook(this.character.look);
     const st = this.stats; st.kits = st.kits || {}; if (!st.kits[id] && this.running) { st.kits[id] = true; (BC.STARTER_KITS[id] || []).forEach(it => this.give(Object.assign({ count: 1 }, it))); this.toast(`You are now the ${def.name}. Starter kit added to your bag.`, 'good'); } else if (this.running) this.toast(`You are now the ${def.name}.`, 'good');
   }
