@@ -1,5 +1,6 @@
 window.BC = window.BC || {};
 // Blocky animals built from merged boxes, with simple wander / forage / pollinate behaviour.
+const JUMPERS = new Set(['bluegill', 'catfish', 'trout', 'piranha', 'largemouth_bass', 'salmon', 'koi', 'desert_pupfish']);
 BC.Animals = class Animals {
   constructor(game) { this.game = game; this.list = []; this.mat = new THREE.MeshLambertMaterial({ vertexColors: true }); this.tmp = new THREE.Vector3(); }
   buildMesh(def) {
@@ -37,8 +38,9 @@ BC.Animals = class Animals {
     const d = e.def; const g = this.game; const near = far2 < 30 * 30; if (!e.rig && !e.mesh.visible) e.mesh.visible = true;
     if (near && e.rig === undefined || (near && e.rig === null)) { try { e.rig = BC.Critters.build(d); g.scene.add(e.rig.root); e.mesh.visible = false; } catch (err) { console.warn('rig', d.id, err); e.rig = false; } }
     else if (!near && e.rig) { g.scene.remove(e.rig.root); e.rig = null; e.mesh.visible = true; }
-    e.mesh.position.set(e.x, e.y + hop, e.z); e.mesh.rotation.y = e.yaw; e.mesh.rotation.z = d.flies ? Math.sin(e.bob * 3) * 0.1 : 0; if (d.wings) e.mesh.rotation.x = Math.sin(e.bob * 20) * 0.15;
-    if (e.rig) { const r = e.rig.root; r.position.set(e.x, e.y + hop, e.z); r.rotation.y = e.yaw; r.rotation.x = d.flies && moving ? 0.12 : 0; if (e.rig.kind !== 'fish' && e.rig.kind !== 'crab' && e.rig.kind !== 'worm') r.rotation.z = d.flies ? Math.sin(e.bob * 3) * 0.1 : 0; BC.Critters.animate(e.rig, dt, { moving, speed: d.speed ? Math.min(1.6, d.speed / 1.6) : 1, flying: !!d.flies, hop: hop * 4 }); }
+    const tilt = e.jumping ? -Math.cos(e.jumping * Math.PI) * 0.9 : 0;
+    e.mesh.position.set(e.x, e.y + hop, e.z); e.mesh.rotation.y = e.yaw; e.mesh.rotation.z = d.flies ? Math.sin(e.bob * 3) * 0.1 : 0; if (d.wings) e.mesh.rotation.x = Math.sin(e.bob * 20) * 0.15; else if (tilt) e.mesh.rotation.x = tilt;
+    if (e.rig) { const r = e.rig.root; r.position.set(e.x, e.y + hop, e.z); r.rotation.y = e.yaw; r.rotation.x = tilt || (d.flies && moving ? 0.12 : 0); if (e.rig.kind !== 'fish' && e.rig.kind !== 'crab' && e.rig.kind !== 'worm') r.rotation.z = d.flies ? Math.sin(e.bob * 3) * 0.1 : 0; BC.Critters.animate(e.rig, dt, { moving, speed: d.speed ? Math.min(1.6, d.speed / 1.6) : 1, flying: !!d.flies, hop: hop * 4 }); }
   }
   spawn(id, x, z, uid) {
     const def = BC.ANIMAL_BY_ID[id]; if (!def) return null; const w = this.game.world; const y = w.top(x | 0, z | 0) + 1;
@@ -63,8 +65,13 @@ BC.Animals = class Animals {
   nearestPlant(e, pred, range) {
     let best = null, bd = range * range; this.game.world.plants.forEach(p => { if (!pred(p)) return; const d = (p.x + 0.5 - e.x) ** 2 + (p.z + 0.5 - e.z) ** 2; if (d < bd) { bd = d; best = p; } }); return best;
   }
+  // Fish roll out of the water now and then: a short arc with a splash at each end.
+  splash(x, y, z) { const g = this.game; if (!this.splashTex) { const c = document.createElement('canvas'); c.width = c.height = 64; const cg = c.getContext('2d'); cg.strokeStyle = 'rgba(255,255,255,0.9)'; cg.lineWidth = 6; cg.beginPath(); cg.arc(32, 32, 22, 0, 6.283); cg.stroke(); cg.fillStyle = 'rgba(255,255,255,0.35)'; cg.beginPath(); cg.arc(32, 32, 12, 0, 6.283); cg.fill(); this.splashTex = new THREE.CanvasTexture(c); }
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: this.splashTex, transparent: true, depthWrite: false, fog: false })); m.rotation.x = -Math.PI / 2; m.position.set(x, y + 0.02, z); g.scene.add(m); (this.splashes = this.splashes || []).push({ m, t: 0 }); }
+  tickSplashes(dt) { if (!this.splashes || !this.splashes.length) return; for (let i = this.splashes.length - 1; i >= 0; i--) { const s = this.splashes[i]; s.t += dt; const k = s.t / 0.6; if (k >= 1) { this.game.scene.remove(s.m); s.m.geometry.dispose(); s.m.material.dispose(); this.splashes.splice(i, 1); continue; } s.m.scale.setScalar(0.5 + k * 1.6); s.m.material.opacity = 1 - k; } }
   walkable(e, x, z) { const w = this.game.world; if (x < 1 || z < 1 || x >= w.W - 1 || z >= w.D - 1) return false; const t = w.top(x | 0, z | 0); const under = w.get(x | 0, t, z | 0); const above = w.get(x | 0, t + 1, z | 0); if (e.def.aquatic) return above === 15; if (above === 15 && !(e.def.id === 'moose' || e.def.id === 'frog' || e.def.id === 'heron' || e.def.flies)) return false; if (above === 15 && w.get(x | 0, t + 2, z | 0) === 15) return false; if (BC.BLOCKS[under] && BC.BLOCKS[under].fence) return false; if (Math.abs(t + 1 - e.y) > 1.6 && !e.def.flies) return false; return true; }
   update(dt) {
+    this.tickSplashes(dt);
     const w = this.game.world; const pl = this.game.player.pos; const stats = this.game.stats; const others = this.game.peerPositions();
     for (const e of this.list) {
       const d = e.def; e.timer -= dt; e.cool -= dt; e.bob += dt;
@@ -106,9 +113,10 @@ BC.Animals = class Animals {
         }
       }
       // ground follow
-      const t = w.top(e.x | 0, e.z | 0); let gy = w.standY(e.x | 0, e.z | 0); if (w.get(e.x | 0, t + 1, e.z | 0) === 15) { if (d.aquatic) { const ws = w.waterSurface(e.x | 0, e.z | 0); gy = Math.max(t + 0.9, (ws < 0 ? t + 1 : ws) + 0.45 + Math.sin(e.bob * 0.6) * 0.18); } else gy = t + 1.6; }
+      const t = w.top(e.x | 0, e.z | 0); let gy = w.standY(e.x | 0, e.z | 0); if (w.get(e.x | 0, t + 1, e.z | 0) === 15) { if (d.aquatic) { const ws = w.waterSurface(e.x | 0, e.z | 0); const top = (ws < 0 ? t + 1 : ws); gy = Math.max(t + 0.9, top + 0.55 + Math.max(0, Math.sin(e.bob * 0.5)) * 0.45); } else gy = t + 1.6; } // fish cruise just under the surface and roll their backs out of it now and then
       const targetY = gy + (d.flies ? e.fly + Math.sin(e.bob * 2) * 0.2 : 0); e.y += (targetY - e.y) * Math.min(1, 8 * dt);
-      const hop = (d.id === 'cottontail' || d.id === 'hare' || d.id === 'frog' || d.id === 'dart_frog') && e.target ? Math.abs(Math.sin(e.bob * 8)) * 0.25 : (e.target && !d.flies ? Math.abs(Math.sin(e.bob * 10)) * 0.04 : 0);
+      let jump = 0; if (JUMPERS.has(d.id)) { if (e.jt === undefined) e.jt = 3 + Math.random() * 10; if (!e.jumping) { e.jt -= dt; if (e.jt <= 0) { e.jumping = 0.001; e.jt = 7 + Math.random() * 14; this.splash(e.x, e.y + 0.3, e.z); } } else { e.jumping += dt / 0.9; if (e.jumping >= 1) { e.jumping = 0; this.splash(e.x, e.y + 0.3, e.z); } else jump = Math.sin(e.jumping * Math.PI) * 1.4; } }
+      const hop = jump + ((d.id === 'cottontail' || d.id === 'hare' || d.id === 'frog' || d.id === 'dart_frog') && e.target ? Math.abs(Math.sin(e.bob * 8)) * 0.25 : (e.target && !d.flies ? Math.abs(Math.sin(e.bob * 10)) * 0.04 : 0));
       this.pose(e, dt, hop, !!e.target, far);
     }
     this.updateLeashLines();
