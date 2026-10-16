@@ -23,7 +23,7 @@ BC.Game = class Game {
     this.inventory = [{ type: 'tool', id: 'hand' }, { type: 'tool', id: 'trowel' }, { type: 'tool', id: 'axe' }, { type: 'tool', id: 'can' }, { type: 'coin', count: 20 }, { type: 'material', id: 'rope', count: 2 }, { type: 'tool', id: 'hammer' }, null, null]; this.selected = 0; this.CHAR_KEY = 'bc_character_v1'; this.character = this.loadCharacter(); this.points = 0;
   }
   setupScene() {
-    const atlas = BC.Atlas.build(); this.atlas = atlas.texture;
+    const atlas = BC.Atlas.build(); this.atlas = atlas.texture; try { this.atlas.anisotropy = Math.min(8, this.renderer.capabilities.getMaxAnisotropy()); } catch (e) { }
     this.matSolid = new THREE.MeshLambertMaterial({ map: this.atlas, vertexColors: true });
     this.matPlant = new THREE.MeshLambertMaterial({ map: this.atlas, vertexColors: true, alphaTest: 0.5, side: THREE.DoubleSide });
     this.waterTex = BC.Atlas.waterTexture(); this.matWater = new THREE.MeshPhongMaterial({ map: this.waterTex, vertexColors: true, transparent: true, opacity: 0.66, depthWrite: false, specular: new THREE.Color(0x9fc3e6), shininess: 120 });
@@ -602,7 +602,7 @@ BC.Game = class Game {
   useHammer(h) { const w = this.world; if (h.type !== 'block') return this.toast('Tap a block of ground with the hammer.', ''); const b = BC.BLOCKS[h.id]; if (b.unbreakable || (h.id === 14 && h.y <= 1)) return this.toast('Bedrock will not change.', ''); let cur = BC.UNTILL[h.id] || h.id; if (b.rock) cur = 14; const i = BC.SOIL_CYCLE.indexOf(cur); if (i < 0 && !b.soil) return this.toast('The hammer changes earth, sand and rock, not ' + b.name.toLowerCase() + '.', ''); const next = BC.SOIL_CYCLE[(i + 1) % BC.SOIL_CYCLE.length]; w.set(h.x, h.y, h.z, next); const nb = BC.BLOCKS[next]; const soil = nb.soil ? BC.SOILS[nb.soil] : null; this.stats.hammered = (this.stats.hammered || 0) + 1; if (soil) this.discover('soil:' + nb.soil, 'hammer'); this.lastInspect = { x: h.x, y: h.y, z: h.z };
     const idx = (i + 1) % BC.SOIL_CYCLE.length; this.toast(`${nb.name}${soil ? ` (${soil.order}): pH ${soil.ph}, ${soil.texture.split(' (')[0].toLowerCase()}, ${soil.drainage.toLowerCase()} drainage` : next === 16 ? ': loose and fast-draining, roots dry out' : ': bare rock, nothing grows'}. ${idx + 1} of ${BC.SOIL_CYCLE.length}: tap again for the next.`, 'good'); }
   // ---------- character styles ----------
-  loadCharacter() { try { const c = JSON.parse(localStorage.getItem(this.CHAR_KEY)); if (c && BC.CHARACTER_BY_ID[c.id] && c.look) return c; } catch (e) { } const d = BC.CHARACTERS[0]; return { id: d.id, look: Object.assign({}, d.look) }; }
+  loadCharacter() { if (!BC.CHARACTERS) { BC.CHARACTERS = [{ id: 'explorer', name: 'Explorer', emoji: '', blurb: '', perks: [], look: { hair: '#5a3a1a', shirt: '#5f9a3c', pants: '#b89a6a', skin: '#e8b890', hat: 'none', acc: 'backpack' } }]; BC.CHARACTER_BY_ID = { explorer: BC.CHARACTERS[0] }; BC.STARTER_KITS = {}; } try { const c = JSON.parse(localStorage.getItem(this.CHAR_KEY)); if (c && BC.CHARACTER_BY_ID[c.id] && c.look) return c; } catch (e) { } const d = BC.CHARACTERS[0]; return { id: d.id, look: Object.assign({}, d.look) }; }
   perk(id) { return this.character && this.character.id === id; }
   setCharacter(id, look) {
     const def = BC.CHARACTER_BY_ID[id]; if (!def) return; this.character = { id, look: Object.assign({}, def.look, look || {}) }; try { localStorage.setItem(this.CHAR_KEY, JSON.stringify(this.character)); } catch (e) { }
