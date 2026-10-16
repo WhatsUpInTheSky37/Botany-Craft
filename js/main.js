@@ -3,7 +3,7 @@ window.BC = window.BC || {};
 BC.Game = class Game {
   constructor() {
     this.canvas = document.getElementById('gl');
-    this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: false, powerPreference: 'high-performance' });
+    this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: (window.devicePixelRatio || 1) < 1.5, powerPreference: 'high-performance' });
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.scene = new THREE.Scene(); this.camera = new THREE.PerspectiveCamera(72, 1, 0.1, 260);
     this.player = new BC.Player(this); this.ui = new BC.UI(this); this.animals = new BC.Animals(this); this.npcs = new BC.NPCs(this); this.boats = new BC.Boats(this); this.net = new BC.Net(this); this.hires = []; this.fishing = null;
@@ -26,13 +26,19 @@ BC.Game = class Game {
     const atlas = BC.Atlas.build(); this.atlas = atlas.texture;
     this.matSolid = new THREE.MeshLambertMaterial({ map: this.atlas, vertexColors: true });
     this.matPlant = new THREE.MeshLambertMaterial({ map: this.atlas, vertexColors: true, alphaTest: 0.5, side: THREE.DoubleSide });
-    this.waterTex = BC.Atlas.waterTexture(); this.matWater = new THREE.MeshLambertMaterial({ map: this.waterTex, vertexColors: true, transparent: true, opacity: 0.72, depthWrite: false });
-    this.matWater.onBeforeCompile = sh => { sh.uniforms.uTime = { value: 0 }; this.matWater.userData.shader = sh;
+    this.waterTex = BC.Atlas.waterTexture(); this.matWater = new THREE.MeshPhongMaterial({ map: this.waterTex, vertexColors: true, transparent: true, opacity: 0.66, depthWrite: false, specular: new THREE.Color(0x9fc3e6), shininess: 120 });
+    this.matWater.onBeforeCompile = sh => { sh.uniforms.uTime = { value: 0 }; sh.uniforms.uSky = { value: new THREE.Color(0x8fc4ea) }; this.matWater.userData.shader = sh;
       sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec2 flow; uniform float uTime; varying vec2 vFlow;').replace('#include <uv_vertex>', '#include <uv_vertex>\nvMapUv += flow * uTime * 0.35; vFlow = flow;').replace('#include <begin_vertex>', '#include <begin_vertex>\ntransformed.y += sin(position.x * 1.9 + uTime * 2.2 + position.z * 1.3) * 0.035 * (1.0 + length(flow) * 2.0);');
-      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec2 vFlow;').replace('#include <dithering_fragment>', '#include <dithering_fragment>\ngl_FragColor.rgb += vec3(0.08, 0.1, 0.1) * min(1.0, length(vFlow) * 1.2);'); };
-    this.hemi = new THREE.HemisphereLight(0xcfe3ff, 0x6a5a40, 1.05); this.scene.add(this.hemi);
-    this.sun = new THREE.DirectionalLight(0xfff4e0, 1.25); this.scene.add(this.sun); this.scene.add(this.sun.target);
-    this.scene.fog = new THREE.Fog(0x8fc4ea, 40, 104); this.scene.background = new THREE.Color(0x8fc4ea);
+      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec2 vFlow; uniform vec3 uSky;').replace('#include <dithering_fragment>', '#include <dithering_fragment>\ngl_FragColor.rgb += vec3(0.08, 0.1, 0.1) * min(1.0, length(vFlow) * 1.2);\n{ vec3 vd = normalize(vViewPosition); float fr = pow(1.0 - clamp(dot(vd, normalize(vNormal)), 0.0, 1.0), 2.5); gl_FragColor.rgb = mix(gl_FragColor.rgb, uSky, fr * 0.6); gl_FragColor.a = mix(gl_FragColor.a, 0.97, fr * 0.85); }'); };
+    this.hemi = new THREE.HemisphereLight(0xc6dcff, 0x7a6244, 1.05); this.scene.add(this.hemi);
+    this.sun = new THREE.DirectionalLight(0xffe6c2, 1.35); this.scene.add(this.sun); this.scene.add(this.sun.target);
+    this.scene.fog = new THREE.Fog(0x8fc4ea, 44, 118); this.scene.background = new THREE.Color(0x8fc4ea);
+    // gradient sky dome that follows the camera: haze at the horizon, deeper blue overhead
+    this.skyMat = new THREE.ShaderMaterial({ uniforms: { top: { value: new THREE.Color(0x3a74d0) }, bottom: { value: new THREE.Color(0x8fc4ea) } }, vertexShader: 'varying vec3 vW; void main(){ vW = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }', fragmentShader: 'uniform vec3 top; uniform vec3 bottom; varying vec3 vW; void main(){ float t = smoothstep(-0.03, 0.55, vW.y); gl_FragColor = vec4(mix(bottom, top, t), 1.0);\n#include <colorspace_fragment>\n}', side: THREE.BackSide, depthWrite: false, fog: false });
+    this.skyDome = new THREE.Mesh(new THREE.SphereGeometry(232, 24, 12), this.skyMat); this.skyDome.renderOrder = -10; this.skyDome.frustumCulled = false; this.scene.add(this.skyDome);
+    // real sun shadows on desktop; phones keep the baked ambient occlusion only
+    this.shadows = !this.player.touch && (navigator.hardwareConcurrency || 4) >= 4; BC.SHADOWS = this.shadows;
+    if (this.shadows) { this.renderer.shadowMap.enabled = true; this.renderer.shadowMap.type = THREE.PCFSoftShadowMap; this.sun.castShadow = true; this.sun.shadow.mapSize.set(2048, 2048); const sc = this.sun.shadow.camera; sc.left = -46; sc.right = 46; sc.top = 46; sc.bottom = -46; sc.near = 1; sc.far = 330; sc.updateProjectionMatrix(); this.sun.shadow.bias = -0.0004; this.sun.shadow.normalBias = 0.05; this.depthPlant = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: this.atlas, alphaTest: 0.5 }); }
     this.sunMesh = new THREE.Mesh(new THREE.SphereGeometry(4, 12, 12), new THREE.MeshBasicMaterial({ color: 0xfff1c0, fog: false })); this.scene.add(this.sunMesh);
     this.moonMesh = new THREE.Mesh(new THREE.SphereGeometry(2.5, 12, 12), new THREE.MeshBasicMaterial({ color: 0xdde6f5, fog: false })); this.scene.add(this.moonMesh);
     this.clouds = new THREE.Group(); const cm = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 });
@@ -76,7 +82,7 @@ BC.Game = class Game {
   rebuildChunk(ci) {
     const cx = ci % this.world.CX, cz = Math.floor(ci / this.world.CX); let c = this.chunks.get(ci); if (!c) { c = {}; this.chunks.set(ci, c); }
     const res = BC.Mesher.buildChunk(this.world, cx, cz); const pg = BC.Mesher.buildPlants(this.world, cx, cz);
-    const swap = (k, geo, mat) => { if (c[k]) { this.scene.remove(c[k]); c[k].geometry.dispose(); c[k] = null; } if (geo) { const m = new THREE.Mesh(geo, mat); m.frustumCulled = true; this.scene.add(m); c[k] = m; } };
+    const swap = (k, geo, mat) => { if (c[k]) { this.scene.remove(c[k]); c[k].geometry.dispose(); c[k] = null; } if (geo) { const m = new THREE.Mesh(geo, mat); m.frustumCulled = true; if (this.shadows && k !== 'water') { m.castShadow = true; m.receiveShadow = true; if (mat === this.matPlant) m.customDepthMaterial = this.depthPlant; } this.scene.add(m); c[k] = m; } };
     swap('solid', res.solid, this.matSolid); swap('water', res.water, this.matWater); swap('plants', pg, this.matPlant); swap('cutout', res.cutout, this.matPlant);
   }
   spawnAnimals(list) { list.forEach(a => { const e = this.animals.spawn(a.id, a.x, a.z, a.uid); if (e && a.tether) e.tether = a.tether; }); this.npcs.spawnFromWorld(); }
@@ -171,7 +177,7 @@ BC.Game = class Game {
   peerPositions() { const out = []; this.peers.forEach(pe => out.push(pe.group.position)); return out; }
   buildAvatar(name, color) {
     const g = new THREE.Group(); const shirt = new THREE.Color(color), skin = new THREE.Color(0xe8b890), pants = new THREE.Color(0x3a4a6a);
-    const box = (w, hh, d, x, y, z, c) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, hh, d), new THREE.MeshLambertMaterial({ color: c })); m.position.set(x, y, z); g.add(m); };
+    const box = (w, hh, d, x, y, z, c) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, hh, d), new THREE.MeshLambertMaterial({ color: c })); m.position.set(x, y, z); m.castShadow = !!BC.SHADOWS; g.add(m); };
     box(0.5, 0.65, 0.3, 0, 1.0, 0, shirt); box(0.45, 0.45, 0.45, 0, 1.55, 0, skin); box(0.18, 0.7, 0.22, -0.16, 0.35, 0, pants); box(0.18, 0.7, 0.22, 0.16, 0.35, 0, pants); box(0.14, 0.6, 0.2, -0.33, 1.0, 0, shirt); box(0.14, 0.6, 0.2, 0.33, 1.0, 0, shirt);
     const c = document.createElement('canvas'); c.width = 256; c.height = 64; const x = c.getContext('2d'); x.fillStyle = 'rgba(20,28,18,0.7)'; x.fillRect(0, 0, 256, 64); x.fillStyle = '#f3efe2'; x.font = 'bold 34px Nunito, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(name.slice(0, 14), 128, 32);
     const tex = new THREE.CanvasTexture(c); const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false })); sp.scale.set(1.6, 0.4, 1); sp.position.y = 2.1; g.add(sp);
@@ -213,9 +219,10 @@ BC.Game = class Game {
     const col = elev > 0.15 ? skyDay.clone().lerp(dusk, BC.util.clamp(1 - (elev - 0.15) / 0.25, 0, 1) * 0.6) : night.clone().lerp(dusk, BC.util.clamp((elev + 0.15) / 0.3, 0, 1));
     if (this.weather.raining) col.lerp(new THREE.Color(0x6a7a86), 0.6);
     const under = this.player.headInWater; if (under) { col.set(0x1e5c9a).lerp(new THREE.Color(0x3a86c8), day * 0.6); }
-    this.scene.background.copy(col); this.scene.fog.color.copy(col); this.scene.fog.near = under ? 1 : this.weather.raining ? 20 : 40; this.scene.fog.far = under ? 22 : this.weather.raining ? 80 : 104;
+    const haze = under ? col.clone() : col.clone().lerp(new THREE.Color(0xf6e9d2), day * 0.22); const zen = under ? col.clone() : col.clone().lerp(new THREE.Color(0x2d62c9), day * 0.6); if (this.weather.raining && !under) zen.lerp(new THREE.Color(0x4a5a68), 0.5);
+    this.scene.background.copy(haze); this.scene.fog.color.copy(haze); this.scene.fog.near = under ? 1 : this.weather.raining ? 20 : 44; this.scene.fog.far = under ? 22 : this.weather.raining ? 80 : 118; this.skyMat.uniforms.bottom.value.copy(haze); this.skyMat.uniforms.top.value.copy(zen); this.skyDome.position.copy(this.camera.position); { const sh = this.matWater.userData.shader; if (sh) sh.uniforms.uSky.value.copy(haze); }
     { const ov = this.ui.$('underwater'); const show = under || (this.player.inWater && this.camera.position.y < this.world.waterSurface(Math.floor(this.player.pos.x), Math.floor(this.player.pos.z)) + 1); if (ov.hidden === show) ov.hidden = !show; }
-    this.sun.intensity = 0.25 + day * (this.weather.raining ? 0.6 : 1.1); this.hemi.intensity = 0.4 + day * 0.75;
+    this.sun.intensity = 0.25 + day * (this.weather.raining ? 0.6 : 1.2); this.hemi.intensity = 0.42 + day * 0.78; this.sun.color.setHex(elev < 0.3 ? 0xffc890 : 0xffe6c2);
     const p = this.player.pos; const sx = Math.cos(ang) * 120, sy = Math.sin(ang) * 120; this.sun.position.set(p.x + sx, p.y + Math.max(sy, 10), p.z + 40); this.sun.target.position.set(p.x, p.y, p.z);
     this.sunMesh.position.set(p.x + sx * 1.6, p.y + sy * 1.6, p.z + 60); this.moonMesh.position.set(p.x - sx * 1.6, p.y - sy * 1.6, p.z - 60); this.sunMesh.visible = elev > -0.1; this.moonMesh.visible = elev < 0.1;
     this.clouds.position.x = (this.time.t * 0.4) % 120 - 60; this.clouds.position.z = p.z - 150 + ((p.z + 150) % 1);

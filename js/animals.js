@@ -19,7 +19,7 @@ BC.Animals = class Animals {
     if (def.id === 'deer' || def.id === 'moose' || def.id === 'bison') box(0.08, 0.2, 0.06, 0, legH + bh * 0.8, -bl / 2 - 0.02, c.accent);
     if (def.id === 'cottontail' || def.id === 'hare') box(0.12, 0.12, 0.12, 0, legH + bh * 0.7, -bl / 2 - 0.04, c.accent);
     if (def.id === 'dart_frog' || def.id === 'lizard' || def.id === 'frog') box(bw * 0.9, bh * 0.4, bl * 0.4, 0, legH + bh * 0.9, -bl * 0.1, c.accent);
-    const merged = BC.mergeGeometries(geos); merged.scale(s, s, s); const m = new THREE.Mesh(merged, this.mat); m.castShadow = false; return m;
+    const merged = BC.mergeGeometries(geos); merged.scale(s, s, s); const m = new THREE.Mesh(merged, this.mat); m.castShadow = !!BC.SHADOWS; return m;
   }
   spawn(id, x, z, uid) {
     const def = BC.ANIMAL_BY_ID[id]; if (!def) return null; const w = this.game.world; const y = w.top(x | 0, z | 0) + 1;
