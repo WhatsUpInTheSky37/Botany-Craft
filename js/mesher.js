@@ -47,7 +47,7 @@ BC.Mesher = (function () {
   }
 
   function buildChunk(world, cx, cz) {
-    const solid = new Builder(), water = new Builder(), cutout = new Builder(); water.flow = []; cutout.sway = []; const TUFT = BC.Atlas.has('tuft') ? BC.Atlas.uv('tuft') : null; const GREEN = [0x5c / 255, 0xa2 / 255, 0x38 / 255];
+    const solid = new Builder(), water = new Builder(), cutout = new Builder(); water.flow = []; cutout.sway = [];
     const x0 = cx * 16, z0 = cz * 16, x1 = Math.min(world.W, x0 + 16), z1 = Math.min(world.D, z0 + 16);
     for (let z = z0; z < z1; z++) for (let x = x0; x < x1; x++) for (let y = 0; y < world.H; y++) {
       const id = world.blocks[world.idx(x, y, z)]; if (id === 0) continue; const b = BC.BLOCKS[id]; if (!b) continue;
@@ -75,13 +75,6 @@ BC.Mesher = (function () {
         if (b.grassTop && fi === 0) { const bm = BC.BIOMES[world.biomeAt(x, z)]; const m = world.moisture[x + z * world.W]; const k = (0.92 + m * 0.1) * (0.95 + hv * 0.1); tint = [k, k * (bm.id === 'desert' ? 1 : 1.02), k * 0.98]; }
         else if (b.leaves) { const k = 0.9 + hv * 0.2; tint = [k, k * (0.98 + hv * 0.04), k * 0.95]; }
         solid.quad(f.v.map(v => [x + v[0], y + v[1], z + v[2]]), f.n, uvr, shades, tint);
-        // grass tufts: a short crossed sprite on about half of all open grass tops, coloured by the region's grass
-        if (TUFT && b.grassTop && fi === 0 && world.get(x, y + 1, z) === 0 && !world.plantAt(x, y + 1, z) && hv < 0.55) {
-          const bm = BC.BIOMES[world.biomeAt(x, z)]; const gc = bm.grass ? bm.grass[0] : 0x5ca238; const tk = [Math.min(1.4, ((gc >> 16) & 255) / 255 / GREEN[0]), Math.min(1.4, ((gc >> 8) & 255) / 255 / GREEN[1]), Math.min(1.4, (gc & 255) / 255 / GREEN[2])];
-          const a = hv * 6.283, rr = 0.42 + BC.util.hash2(z, x, 17) * 0.1, hh = 0.5 + BC.util.hash2(x, z, 19) * 0.25; const ox = x + 0.5 + (BC.util.hash2(x, z, 23) - 0.5) * 0.3, oz = z + 0.5 + (BC.util.hash2(z, x, 29) - 0.5) * 0.3, c = Math.cos(a) * rr, s = Math.sin(a) * rr; const sh = (shades[0] + shades[1] + shades[2] + shades[3]) / 4; const ts = [sh, sh, sh * 1.08, sh * 1.08];
-          cutout.quad([[ox - c, y + 1, oz - s], [ox + c, y + 1, oz + s], [ox + c, y + 1 + hh, oz + s], [ox - c, y + 1 + hh, oz - s]], [-s, 0, c], TUFT, ts, tk, true);
-          cutout.quad([[ox + s, y + 1, oz - c], [ox - s, y + 1, oz + c], [ox - s, y + 1 + hh, oz + c], [ox + s, y + 1 + hh, oz - c]], [c, 0, s], TUFT, ts, tk, true);
-        }
       }
     }
     return { solid: solid.geometry(), water: water.geometry(), cutout: cutout.geometry() };
