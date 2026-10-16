@@ -213,3 +213,10 @@ body.touch #item-name { font-size: 12px; opacity: 0.9; }
 @media (max-width: 900px) { #quest-tracker { display: none; } #score { display: none; } #biome-pill span { display: none; } }
 #underwater { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at center, rgba(40,110,190,0.28) 0%, rgba(20,70,140,0.5) 100%); mix-blend-mode: multiply; z-index: 1; }
 #underwater::after { content: ''; position: absolute; inset: 0; background: rgba(60,140,220,0.22); }
+
+/* character picker */
+.chars { display: grid; gap: 10px; margin-top: 10px; } .char { display: grid; grid-template-columns: 96px 1fr auto; gap: 12px; align-items: center; padding: 10px 12px; border: 1px solid var(--rule); border-radius: 12px; background: #fff8; }
+.char.on { border-color: var(--sun); box-shadow: 0 0 0 2px var(--sun) inset; } .char .pic { width: 96px; height: 96px; border-radius: 10px; background: var(--paper-2); display: grid; place-items: center; } .char .pic canvas { width: 88px; height: 88px; image-rendering: pixelated; }
+.char .txt b { display: block; font-family: var(--font-display); font-size: 17px; } .char .txt span { display: block; font-size: 13px; color: var(--ink-soft); margin: 2px 0 4px; } .char .txt ul { margin: 0; padding-left: 18px; font-size: 12px; color: var(--ink); } .char .txt li { margin: 1px 0; }
+.char-edit { margin-top: 14px; } .char-edit .req th { width: 90px; } .opts .tag { cursor: pointer; border: 2px solid transparent; } .opts .tag.on { border-color: var(--sun); background: #fff; }
+@media (max-width: 640px) { .char { grid-template-columns: 72px 1fr; } .char .pic { width: 72px; height: 72px; } .char .pic canvas { width: 64px; height: 64px; } .char .make { grid-column: 1 / 3; } }

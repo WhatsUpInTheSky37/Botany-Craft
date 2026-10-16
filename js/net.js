@@ -22,9 +22,9 @@ BC.Net = class Net {
   listPlayers() { return this.rpc('bc_world_players', { p_world: this.creds.world, p_pin: this.creds.pin }); }
   // ---- realtime ----
   on(event, fn) { this.handlers[event] = fn; }
-  join(worldId, playerName, color) {
+  join(worldId, playerName, color, look) {
     return new Promise((resolve, reject) => {
-      const sb = this.client(); this.joinedAt = Date.now(); this.me = playerName; this.myColor = color || '#4f7a3a'; this.lastError = null; this.status = 'connecting'; let settled = false;
+      const sb = this.client(); this.joinedAt = Date.now(); this.me = playerName; this.myColor = color || '#4f7a3a'; this.myLook = look || null; this.lastError = null; this.status = 'connecting'; let settled = false;
       const ch = sb.channel('bc:' + worldId, { config: { presence: { key: this.myKey }, broadcast: { self: false, ack: false } } });
       this.channel = ch;
       ch.on('presence', { event: 'sync' }, () => this.syncPresence());
@@ -34,7 +34,7 @@ BC.Net = class Net {
       const fail = msg => { this.lastError = msg; this.status = 'failed'; this.live = false; if (!settled) { settled = true; clearTimeout(timer); reject(new Error(msg)); } this.game.onLiveChange(); };
       const timer = setTimeout(() => fail('Timed out connecting to the live session (no reply from the server in 20 s).'), 20000);
       ch.subscribe(async (status, err) => {
-        if (status === 'SUBSCRIBED') { try { await ch.track({ name: playerName, joined: this.joinedAt, color: this.myColor }); } catch (e) { } this.live = true; this.status = 'live'; this.lastError = null; this.game.onLiveChange(); if (!settled) { settled = true; clearTimeout(timer); resolve(); } }
+        if (status === 'SUBSCRIBED') { try { await ch.track({ name: playerName, joined: this.joinedAt, color: this.myColor, look: this.myLook }); } catch (e) { } this.live = true; this.status = 'live'; this.lastError = null; this.game.onLiveChange(); if (!settled) { settled = true; clearTimeout(timer); resolve(); } }
         else if (status === 'CHANNEL_ERROR') fail('Live session refused: ' + (err && err.message ? err.message : 'channel error'));
         else if (status === 'TIMED_OUT') fail('Live session timed out.');
         else if (status === 'CLOSED') { if (settled) { this.live = false; this.status = 'closed'; this.lastError = 'Live connection closed.'; this.game.onLiveChange(); } }
@@ -43,16 +43,17 @@ BC.Net = class Net {
   }
   syncPresence() {
     const state = this.channel.presenceState(); const list = [];
-    Object.keys(state).forEach(key => { const p = state[key][0]; if (p) list.push({ key, name: p.name, joined: p.joined, color: p.color }); });
+    Object.keys(state).forEach(key => { const p = state[key][0]; if (p) list.push({ key, name: p.name, joined: p.joined, color: p.color, look: p.look || null }); });
     this.applyPresence(list);
   }
   applyPresence(list) {
     list.sort((a, b) => a.joined - b.joined || (a.key < b.key ? -1 : 1));
     const wasHost = this.isHost; this.hostKey = list.length ? list[0].key : this.myKey; this.isHost = this.hostKey === this.myKey;
     const seen = new Set(list.map(p => p.key)); this.peers.forEach((v, k) => { if (!seen.has(k)) { this.peers.delete(k); this.game.onPeerLeft(k); } });
-    list.forEach(p => { if (p.key !== this.myKey && !this.peers.has(p.key)) { this.peers.set(p.key, { name: p.name, color: p.color }); this.game.onPeerJoined(p.key, p.name, p.color); } });
+    list.forEach(p => { if (p.key === this.myKey) return; const known = this.peers.get(p.key); if (!known) { this.peers.set(p.key, { name: p.name, color: p.color, look: p.look }); this.game.onPeerJoined(p.key, p.name, p.color, p.look); } else if (JSON.stringify(known.look || null) !== JSON.stringify(p.look || null)) { known.look = p.look; this.game.onPeerLook(p.key, p.look); } });
     this.online = list; this.game.onPresence(list, this.isHost, wasHost);
   }
+  updateLook(look) { this.myLook = look; if (this.channel && this.live) { this.channel.track({ name: this.me, joined: this.joinedAt, color: this.myColor, look }).catch(() => { }); } }
   send(event, payload) { if (!this.channel) return; payload = payload || {}; payload.from = this.myKey; this.outbox++; this.channel.send({ type: 'broadcast', event, payload }).catch(() => { }); }
   async leave() { this.live = false; this.status = 'off'; if (this.channel) { try { await this.channel.untrack(); await this.client().removeChannel(this.channel); } catch (e) { } this.channel = null; } this.peers.clear(); this.isHost = false; }
 };

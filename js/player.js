@@ -58,7 +58,7 @@ BC.Player = class Player {
     const head = w.get(Math.floor(this.pos.x), Math.floor(this.pos.y + 1.2), Math.floor(this.pos.z)); const feet = w.get(Math.floor(this.pos.x), Math.floor(this.pos.y + 0.3), Math.floor(this.pos.z));
     this.inWater = feet === 15; this.headInWater = head === 15;
     if (this.headInWater) { this.breath -= dt; if (this.breath <= 0) { this.breath = this.MAX_BREATH; this.game.blackout(); return; } } else this.breath = Math.min(this.MAX_BREATH, this.breath + dt * 4);
-    const speed = (this.sprint ? 7 : 4.3) * (this.inWater ? 0.55 : 1);
+    const speed = (this.sprint ? 7 : 4.3) * (this.inWater ? 0.55 : 1) * (BC.PERK === 'explorer' ? 1.15 : 1);
     const sy = Math.sin(this.yaw), cy = Math.cos(this.yaw);
     const vx = (mx * cy - mz * sy) * speed, vz = (-mx * sy - mz * cy) * speed;
     const accel = this.onGround ? 14 : 5; this.vel.x += (vx - this.vel.x) * Math.min(1, accel * dt); this.vel.z += (vz - this.vel.z) * Math.min(1, accel * dt);
