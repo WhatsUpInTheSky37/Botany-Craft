@@ -99,6 +99,11 @@ window.BC = window.BC || {};
   face(130, 'Picket gate (open)', 'gateopen', { tex: ['gate', 'gate', 'gate'], extra: { solid: false, hidden: true } }); for (let k = 0; k < 4; k++) { B[130 + k].toggle = 126 + k; B[130 + k].item = 126; }
   face(134, 'Bed', 'bedhead', { tex: ['bed_head', 'bed_side', P], extra: { bedPart: 'head' } });
   face(138, 'Bed', 'bedfoot', { tex: ['bed_foot', 'bed_side', P], extra: { bedPart: 'foot', hidden: true } }); for (let k = 0; k < 4; k++) B[138 + k].item = 134;
+  // monument stone (Giza and Machu Picchu)
+  def(191, { name: 'Limestone block', solid: true, rock: true, tex: ['limestone', 'limestone', 'limestone'] });
+  def(192, { name: 'Tura casing stone', solid: true, rock: true, tex: ['casing', 'casing', 'casing'] });
+  def(193, { name: 'Red granite', solid: true, rock: true, tex: ['granite', 'granite', 'granite'] });
+  def(194, { name: 'Inca ashlar', solid: true, rock: true, tex: ['inca', 'inca', 'inca'] });
   def(146, { name: 'Beehive', wood: true, solid: true, hive: true, tex: ['beehive_top', 'beehive', 'planks'] });
   // ---------- garden gear (25 essentials) ----------
   // tilled soil: one variant per topsoil, keeps that soil's chemistry

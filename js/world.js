@@ -72,7 +72,7 @@ BC.World = class World {
       this.moisture[ci] = BC.BIOMES[biome].baseMoisture; const nb = BC.SOIL_NUTR[BC.BIOMES[biome].soil]; this.nutr[ci * 3] = nb[0]; this.nutr[ci * 3 + 1] = nb[1]; this.nutr[ci * 3 + 2] = nb[2];
       this.fillColumn(x, z, h, biome);
     }
-    this.computeFlow(); this.carveStreams(); this.placeTrees(); this.placePlants(); this.placeVillages(); this.computeWetness(); this.pickAnimals(); this.placeOrchards();
+    this.placeWonders(); this.computeFlow(); this.carveStreams(); this.placeTrees(); this.placePlants(); if (this.reserved && this.reserved.size) { const gone = []; this.plants.forEach((p, k) => { if (this.reserved.has(p.x + p.z * this.W)) gone.push(k); }); gone.forEach(k => this.plants.delete(k)); } this.placeVillages(); this.computeWetness(); this.pickAnimals(); this.placeOrchards();
     this.pruneFloating(); this.diffs.clear(); this.generating = false;
     this.genPlantKeys = new Set(this.plants.keys()); this.genTreeKeys = new Set(this.treeAt.keys());
   }
@@ -107,7 +107,7 @@ BC.World = class World {
       const opts = BC.TREES.filter(t => !t.fruit && t.biomes.includes(biome)); if (!opts.length) continue;
       const t = opts[Math.floor(this.rand() * opts.length)];
       if (t.biomes[0] !== biome && this.rand() < 0.6) continue;
-      if (this.buildTree(t, x, h + 1, z, true)) occupied.add(x + ',' + z);
+      this.noWrite = this.isReserved(x, z) || this.isReserved(x - 3, z - 3) || this.isReserved(x + 3, z - 3) || this.isReserved(x - 3, z + 3) || this.isReserved(x + 3, z + 3); if (this.buildTree(t, x, h + 1, z, true) && !this.noWrite) occupied.add(x + ',' + z); this.noWrite = false;
     }
   }
   underGlass(x, y, z) { for (let yy = y + 1; yy <= y + 3 && yy < this.H; yy++) { const b = BC.BLOCKS[this.get(x, yy, z)]; if (b && b.transparent) return true; } return false; }
@@ -115,7 +115,7 @@ BC.World = class World {
   // Fruit trees: a small orchard beside every village and lone wild fruit trees scattered through their regions. Own RNG, so older worlds keep their layout.
   placeOrchards() {
     const R = BC.util.rng((this.seed ^ 0x0f2a17) >>> 0); const saved = this.rand; this.rand = R; const W = this.W;
-    this.orchards = []; const clear = (x, z) => { if (x < 3 || z < 3 || x >= W - 3 || z >= this.D - 3) return -1; const h = this.height[x + z * W]; if (h < this.WL + 1 || this.stream[x + z * W]) return -1; const g = BC.BLOCKS[this.blocks[this.idx(x, h, z)]]; if (!g || !g.soil || g.soil === 'stone') return -1; for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) { const xx = x + dx, zz = z + dz; const hh = this.height[xx + zz * W]; if (Math.abs(hh - h) > 1) return -1; for (let y = hh + 1; y <= hh + (dx || dz ? 2 : 6); y++) { const b = this.blocks[this.idx(xx, y, zz)]; if (b !== 0 && !BC.BLOCKS[b].leaves) return -1; } } for (let y = h + 1; y <= h + 6; y++) if (this.blocks[this.idx(x, y, z)] !== 0) return -1; return h; };
+    this.orchards = []; const clear = (x, z) => { if (x < 3 || z < 3 || x >= W - 3 || z >= this.D - 3 || this.isReserved(x, z)) return -1; const h = this.height[x + z * W]; if (h < this.WL + 1 || this.stream[x + z * W]) return -1; const g = BC.BLOCKS[this.blocks[this.idx(x, h, z)]]; if (!g || !g.soil || g.soil === 'stone') return -1; for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) { const xx = x + dx, zz = z + dz; const hh = this.height[xx + zz * W]; if (Math.abs(hh - h) > 1) return -1; for (let y = hh + 1; y <= hh + (dx || dz ? 2 : 6); y++) { const b = this.blocks[this.idx(xx, y, zz)]; if (b !== 0 && !BC.BLOCKS[b].leaves) return -1; } } for (let y = h + 1; y <= h + 6; y++) if (this.blocks[this.idx(x, y, z)] !== 0) return -1; return h; };
     const plant = (x, z) => { const h = clear(x, z); if (h < 0) return false; const biome = this.biomeAt(x, z); const opts = BC.TREES.filter(t => t.fruit && t.biomes.includes(biome)); if (!opts.length) return false; const t = opts[Math.floor(R() * opts.length)]; for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) this.plants.delete(this.idx(x + dx, this.height[x + dx + (z + dz) * W] + 1, z + dz)); if (!this.buildTree(t, x, h + 1, z, true)) return false; this.orchards.push([x, h + 1, z, t.id]); return true; };
     (this.villages || []).forEach(v => { let n = 0; for (let tries = 0; tries < 60 && n < 5; tries++) { const side = Math.floor(R() * 4); const a = -6 + Math.floor(R() * 42), b = side & 1 ? 33 + Math.floor(R() * 5) : -8 + Math.floor(R() * 5); const x = v.x + (side < 2 ? a : b), z = v.z + (side < 2 ? b : a); if (plant(x, z)) n++; } });
     const want = Math.round(W * this.D / 2600); let placed = 0; for (let tries = 0; tries < want * 6 && placed < want; tries++) { if (plant(3 + Math.floor(R() * (W - 6)), 3 + Math.floor(R() * (this.D - 6)))) placed++; }
@@ -186,6 +186,7 @@ BC.World = class World {
       for (let tries = 0; tries < 900 && !best; tries++) {
         const ox = 4 + Math.floor(R() * (this.W - SZ - 8)), oz = 4 + Math.floor(R() * (this.D - SZ - 8));
         if (taken.some(t => Math.abs(t[0] - ox) < SZ + 24 && Math.abs(t[1] - oz) < SZ + 24)) continue;
+        { let near = false; for (let dz = -12; dz <= SZ + 12 && !near; dz += 8) for (let dx = -12; dx <= SZ + 12 && !near; dx += 8) if (this.isReserved(ox + dx, oz + dz)) near = true; if (near) continue; }
         let same = 0, lo = 1e9, hi = -1e9, sum = 0, dry = 0; const n = SZ * SZ; let water = 0;
         for (let z = 0; z < SZ; z++) for (let x = 0; x < SZ; x++) { const ci = (ox + x) + (oz + z) * this.W; const h = this.height[ci]; if (h <= WL) { water++; continue; } dry++; if (BC.BIOME_LIST[this.biome[ci]] === biome) same++; lo = Math.min(lo, h); hi = Math.max(hi, h); sum += h; }
         const wet = biome === 'wetland'; const tol = tries < 450 ? 3 : 5; if (water > n * (wet ? 0.45 : 0.08) || same < n * (wet ? 0.4 : 0.75) || hi - lo > tol) continue;
@@ -275,7 +276,7 @@ BC.World = class World {
     const hgt = t.height[0] + Math.floor(R() * (t.height[1] - t.height[0] + 1));
     if (y0 + hgt + 3 >= this.H) return false;
     const placed = []; const prevRemote = this.remote; if (!gen) this.remote = true;
-    const put = (xx, yy, zz, id, force) => { if (!this.inBounds(xx, yy, zz)) return; const cur = this.blocks[this.idx(xx, yy, zz)]; if (cur !== 0 && cur !== 15 && !force) return; if (gen) this.blocks[this.idx(xx, yy, zz)] = id; else { this.set(xx, yy, zz, id); placed.push([xx, yy, zz, id]); } this.treeAt.set(this.idx(xx, yy, zz), t.id); };
+    const put = (xx, yy, zz, id, force) => { if (!this.inBounds(xx, yy, zz) || this.noWrite) return; const cur = this.blocks[this.idx(xx, yy, zz)]; if (cur !== 0 && cur !== 15 && !force) return; if (gen) this.blocks[this.idx(xx, yy, zz)] = id; else { this.set(xx, yy, zz, id); placed.push([xx, yy, zz, id]); } this.treeAt.set(this.idx(xx, yy, zz), t.id); };
     const trunk = (h, from) => { for (let y = from || 0; y < h; y++) put(x, y0 + y, z, log, true); };
     const sparse = t.shape === 'spreading' ? 0.5 : 0.25;
     const blob = (cx, cy, cz, r, flat) => { for (let dy = -r; dy <= r; dy++) for (let dz = -r; dz <= r; dz++) for (let dx = -r; dx <= r; dx++) { const d = Math.sqrt(dx * dx + (flat ? dy * dy * 2.5 : dy * dy) + dz * dz); if (d <= r + 0.3 - (R() < sparse ? 0.9 : 0)) put(cx + dx, cy + dy, cz + dz, leaf); } };

@@ -217,7 +217,7 @@ window.BC = window.BC || {};
 
     { id: 'toolkeeper', role: 'Tool librarian', shop: 'Tool Library & Co-op', names: ['Augie', 'Pilar', 'Hank Jr.', 'Rosalie'], color: '#8a6a2a', hat: '#4a3a2a',
       greet: ['Why own a pickaxe you use twice a year? Borrow it. Deposit back when it comes home clean.', 'Co-op rule: leave it better than you found it.'],
-      sells: [blk(19, 1, 4), { item: { type: 'material', id: 'rope' }, price: 3 }], buys: [{ match: it => it.type === 'block' && BC.BLOCKS[it.id] && BC.BLOCKS[it.id].log, label: 'logs', price: 2 }],
+      sells: [blk(19, 1, 4), { item: { type: 'material', id: 'rope' }, price: 3 }, { item: { type: 'tool', id: 'hammer' }, price: 6 }], buys: [{ match: it => it.type === 'block' && BC.BLOCKS[it.id] && BC.BLOCKS[it.id].log, label: 'logs', price: 2 }],
       loans: [{ item: { type: 'tool', id: 'pickaxe' }, deposit: 6 }, { item: { type: 'tool', id: 'hoe' }, deposit: 5 }, { item: { type: 'tool', id: 'shears' }, deposit: 4 }, { item: { type: 'tool', id: 'bucket' }, deposit: 4 }, { item: { type: 'tool', id: 'spreader' }, deposit: 6 }, { item: { type: 'tool', id: 'machete' }, deposit: 5 }],
       service: { id: 'lumber', name: 'Co-op lumber share', desc: 'Four planks from the co-op pile in your bag every couple of minutes.', cost: 9, minutes: 5 },
       trade: ['A tool library in Berkeley has lent 3,000 tools a month since 1979. Nobody in that town owns a tile saw, and nobody needs to.', 'Deposits teach care: you get it all back if the tool comes home, which is cheaper than owning and kinder than renting.'],
