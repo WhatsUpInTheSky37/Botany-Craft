@@ -66,7 +66,7 @@ BC.Game = class Game {
   }
   // the open sea beyond the map: four water planes out to the horizon, so the world looks like an island in an ocean that wraps around
   buildOcean() {
-    if (this.ocean) { this.ocean.forEach(m => { this.scene.remove(m); m.geometry.dispose(); }); } this.ocean = []; const w = this.world; const R = 460; const y = w.WL + 1 - 0.12;
+    if (this.ocean) { this.ocean.forEach(m => { this.scene.remove(m); m.geometry.dispose(); }); } this.ocean = []; const w = this.world; const R = 460 + BC.WRAP; const y = w.WL + 1 - 0.12;
     const mk = (cx, cz, sx, sz) => { const g = new THREE.PlaneGeometry(sx, sz, 1, 1); g.rotateX(-Math.PI / 2); const uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * sx, uv.getY(i) * sz); const n = g.attributes.position.count; g.setAttribute('color', new THREE.Float32BufferAttribute(new Array(n * 3).fill(0.96), 3)); g.setAttribute('flow', new THREE.Float32BufferAttribute(new Array(n * 2).fill(0.03), 2)); const m = new THREE.Mesh(g, this.matWater); m.position.set(cx, y, cz); m.frustumCulled = true; this.scene.add(m); this.ocean.push(m); };
     mk(-R / 2, w.D / 2, R, w.D + 2 * R); mk(w.W + R / 2, w.D / 2, R, w.D + 2 * R); mk(w.W / 2, -R / 2, w.W, R); mk(w.W / 2, w.D + R / 2, w.W, R);
   }

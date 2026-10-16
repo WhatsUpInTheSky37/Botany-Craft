@@ -10,6 +10,10 @@ BC.WONDERS = [
     hint: 'In the cold north a ridge rises far above everything else, a sharp peak at its end like a raised finger. The city is in the saddle below the peak.',
     teach: 'An Inca royal estate on a ridge 2,430 m above the Urubamba river, built for the emperor Pachacuti and abandoned a century later. About 60% of the construction is underground: foundations and drainage. The famous terraces (andenes) are soil engineering. Each one is a layered filter: topsoil carried up from the valley, then sandy soil, then gravel, then broken rock, behind a stone wall, so the heaviest rains on Earth drain through instead of washing the hillside away. The terraces also face the sun and store its heat in the stone, making warm pockets where maize, potatoes, quinoa and coca could grow a thousand metres higher than usual.',
     facts: ['The walls are dry stone: granite blocks cut so exactly that no mortar was needed and a knife blade cannot enter the joints. They have ridden out five centuries of earthquakes by rocking and settling back.', 'The Temple of the Sun is a curved tower with a window that catches the first sunrise of the June solstice; the Intihuatana stone on the highest point was a sun-tracking instrument.', 'Sixteen fountains carry spring water down a stair of stone channels through the city, past the emperor\'s own door first.', 'The sharp peak to the north is Huayna Picchu (young peak); a stair climbs its face to a temple at the top. The ridge itself is Machu Picchu (old peak).', 'The site was never found by the Spanish. Local farmers were growing crops on the terraces when Hiram Bingham was led there in 1911.'] },
+  { id: 'atlantis', name: 'Atlantis, the Ring City', sci: 'Plato, Timaeus and Critias · about 360 BC', tile: 'ore_gold', region: 'the open sea', radius: 60,
+    hint: 'Sail out from the coast and follow the edge of the sea until you find a bay walled in rings: water inside land inside water, with a white bridge running to a temple at the heart.',
+    teach: 'Plato told the story in two dialogues around 360 BC: an island empire beyond the Pillars of Heracles, 9,000 years before his day, whose capital was built in rings. Poseidon cut the hill where his mortal wife Cleito lived into three rings of water and two of land; the kings bridged them, tunnelled ship canals through the land rings and sheathed each ring in metal, brass outside, tin in the middle and red-glowing orichalcum around the citadel. At the centre stood the temple of Poseidon, clad in silver with golden pinnacles, beside a hot spring and a cold one, with a racecourse a stadion wide running round the outer ring. The Atlanteans grew greedy and warlike, Athens defeated them, and in a single day and night of earthquakes and floods the island sank. Plato meant it as a lesson about pride, not a map, which is why nobody has found it. The rings, the bridge, the metal walls and the drowning are built here as he described them.',
+    facts: ['Plato is the only ancient source; every later Atlantis is a retelling of his. His pupil Aristotle is said to have remarked that the man who invented it also made it disappear.', 'The Bronze Age eruption of Thera (Santorini) around 1600 BC buried a Minoan town under ash and sent tsunamis across Crete; many think a memory of it fed the tale.', 'Orichalcum was a real alloy, probably a kind of brass; ingots of it were raised from a 2,600-year-old shipwreck off Sicily in 2015.'] },
 ];
 BC.WONDER_BY_ID = {}; BC.WONDERS.forEach(w => { BC.WONDER_BY_ID[w.id] = w; });
 // The soil hammer walks a block through every ground type in the game, in climate order.
@@ -20,6 +24,7 @@ BC.SOIL_CYCLE = [1, 2, 3, 4, 7, 8, 9, 10, 11, 12, 13, 5, 6, 17, 16, 14];
     this.reserved = new Set(); this.wonders = [];
     try { this.buildGiza(); } catch (e) { console.warn('giza', e); }
     try { this.buildMachuPicchu(); } catch (e) { console.warn('machu picchu', e); }
+    try { this.buildAtlantis(); } catch (e) { console.warn('atlantis', e); }
   };
   P.isReserved = function (x, z) { return this.reserved && this.reserved.has(x + z * this.W); };
   // Reset a column to a new ground height, keeping that column's own biome layering.
@@ -140,6 +145,59 @@ BC.SOIL_CYCLE = [1, 2, 3, 4, 7, 8, 9, 10, 11, 12, 13, 5, 6, 17, 16, 14];
     for (let i = 0; i <= 31; i++) { const dz = -27 - i, dx = Math.round(2 * i / 31); top(dx, dz, INCA); }
     this.wonders.push({ id: 'machu_picchu', x: cx, z: cz, y: TOP + 1 });
   };
+  // Atlantis as Plato tells it: a bay carved out of the coast at the map edge, open to the sea, with the ring city in it.
+  P.buildAtlantis = function () {
+    const W = this.W, D = this.D, WL = this.WL; const S = 84, HALF = 42; const SEA = WL - 3;
+    const cands = []; for (let i = 2; i <= W - S - 2; i += 6) { cands.push([i, 2]); cands.push([i, D - S - 2]); } for (let i = 2; i <= D - S - 2; i += 6) { cands.push([2, i]); cands.push([W - S - 2, i]); }
+    let best = null, bs = -1e9;
+    for (const [ox, oz] of cands) { let wet = 0, sum = 0, n = 0, res = 0; for (let z = -12; z < S + 12; z += 3) for (let x = -12; x < S + 12; x += 3) { const wx = ox + x, wz = oz + z; if (wx < 0 || wz < 0 || wx >= W || wz >= D) continue; const ci = wx + wz * W; if (this.reserved.has(ci)) res++; if (x < 0 || z < 0 || x >= S || z >= S) continue; n++; const h = this.height[ci]; sum += h; if (h < WL) wet++; } if (res || !n) continue; const score = (wet / n) * 10 - (sum / n - WL) * 0.3; if (score > bs) { bs = score; best = [ox, oz]; } }
+    if (!best) return;
+    const [ox, oz] = best; const cx = ox + HALF, cz = oz + HALF; const ex = ox === 2 ? -1 : ox === W - S - 2 ? 1 : 0, ez = ex ? 0 : (oz === 2 ? -1 : 1);
+    const along = (dx, dz) => ex ? dx * ex : dz * ez, across = (dx, dz) => ex ? dz : dx; // along runs from the citadel out to the open sea
+    const ISLAND = 7, W1 = 9, L1 = 14, W2 = 19, L2 = 27, W3 = 35, WALL = 36;
+    const drowned = (dx, dz) => { let a = Math.atan2(dz, dx) * 180 / Math.PI; if (a < 0) a += 360; return a >= 200 && a <= 250; }; // the quarter that went under
+    const ringH = (dx, dz) => { const r = Math.hypot(dx, dz); if (Math.abs(across(dx, dz)) <= 1 && along(dx, dz) >= ISLAND) return SEA; // ship channel under the bridge
+      if (r <= ISLAND) return WL + 3; if (r <= W1) return SEA; if (r <= L1) return WL + 1; if (r <= W2) return SEA; if (r <= L2) return drowned(dx, dz) ? WL - 1 : WL + 1; if (r <= W3) return SEA; if (r <= WALL) return drowned(dx, dz) ? WL - 1 : WL + 1; return SEA; };
+    const F = 10;
+    for (let dz = -HALF - F; dz <= HALF + F; dz++) for (let dx = -HALF - F; dx <= HALF + F; dx++) { const x = cx + dx, z = cz + dz; if (x < 0 || z < 0 || x >= W || z >= D) continue; const ci = x + z * W; const out = Math.max(Math.abs(dx), Math.abs(dz)) - HALF; let h;
+      const seaward = along(dx, dz) > HALF && Math.abs(across(dx, dz)) <= HALF; // between the bay and the map edge: open water
+      if (out <= 0) h = ringH(dx, dz); else if (seaward) h = SEA; else { const t = Math.min(1, out / F); h = SEA * (1 - t) + this.height[ci] * t; if (this.height[ci] <= SEA) h = this.height[ci]; }
+      this.reshape(x, z, h); if (out <= 0 && ringH(dx, dz) > SEA) this.reserved.add(ci); }
+    const B = (x, y, z, id) => { if (this.inBounds(x, y, z)) this.blocks[this.idx(x, y, z)] = id; };
+    const P = (dx, dz, y, id) => B(cx + dx, y, cz + dz, id);
+    const GOLD = 195, TIN = 196, BRASS = 197, BASALT = 221, WHITE = CASING, RED = GRANITE, BRICK = 198;
+    for (let dz = -WALL - 1; dz <= WALL + 1; dz++) for (let dx = -WALL - 1; dx <= WALL + 1; dx++) { const r = Math.hypot(dx, dz); const al = along(dx, dz), ac = across(dx, dz); const gate = Math.abs(ac) <= 1 && al > 0; const sunk = drowned(dx, dz);
+      // metal walls on the outer edge of each land ring, in Plato's order from the sea inward: brass, tin, orichalcum
+      if (!gate && r > L2 - 1 && r <= L2 && !sunk) { P(dx, dz, WL + 2, BRASS); P(dx, dz, WL + 3, BRASS); }
+      if (!gate && r > L1 - 1 && r <= L1) { P(dx, dz, WL + 2, TIN); P(dx, dz, WL + 3, TIN); }
+      if (!gate && r > ISLAND - 1 && r <= ISLAND) { P(dx, dz, WL + 4, GOLD); P(dx, dz, WL + 5, GOLD); }
+      if (!gate && r > WALL - 1 && r <= WALL && !sunk) { P(dx, dz, WL + 2, BASALT); if ((dx + dz) % 2 === 0) P(dx, dz, WL + 3, BASALT); }
+      // the racecourse, a stadion wide around the outer land ring
+      if (r >= 22.5 && r < 24.5 && !sunk && !gate) P(dx, dz, WL + 1, BRICK);
+      // drowned walls: broken stubs standing out of the shallows
+      if (sunk && ((r > L2 - 1 && r <= L2) || (r > WALL - 1 && r <= WALL)) && (dx * 7 + dz * 3) % 5 === 0) P(dx, dz, WL, r <= L2 ? BRASS : BASALT); }
+    // the white bridge from the sea gate to the citadel, over the water rings and the ship channels
+    for (let al = ISLAND; al <= WALL + 1; al++) for (let ac = -1; ac <= 1; ac++) { const dx = ex ? al * ex : ac, dz = ex ? ac : al * ez; P(dx, dz, WL + 2, WHITE); if (al === ISLAND) P(dx, dz, WL + 3, WHITE); }
+    [L1, L2, WALL].forEach(rr => { for (const side of [-2, 2]) { const dx = ex ? rr * ex : side, dz = ex ? side : rr * ez; for (let y = WL + 2; y <= WL + 5; y++) P(dx, dz, y, rr === L1 ? TIN : rr === L2 ? BRASS : BASALT); P(dx, dz, WL + 6, GOLD); } });
+    // the temple of Poseidon at the centre: white floor, red and black pillars, a silver roof with golden pinnacles, a golden god inside
+    const tx = (a, c) => ex ? [a * ex, c] : [c, a * ez];
+    for (let a = -4; a <= 4; a++) for (let c = -2; c <= 2; c++) { const [dx, dz] = tx(a, c); P(dx, dz, WL + 3, WHITE); }
+    for (let a = -4; a <= 4; a += 2) for (const c of [-2, 2]) { const [dx, dz] = tx(a, c); for (let y = WL + 4; y <= WL + 6; y++) P(dx, dz, y, (a + 4) % 4 === 0 ? RED : BASALT); }
+    for (const a of [-4, 4]) { const [dx, dz] = tx(a, 0); for (let y = WL + 4; y <= WL + 6; y++) P(dx, dz, y, BASALT); }
+    for (let a = -4; a <= 4; a++) for (let c = -2; c <= 2; c++) { const [dx, dz] = tx(a, c); P(dx, dz, WL + 7, TIN); if (c === 0) P(dx, dz, WL + 8, GOLD); }
+    { const [dx, dz] = tx(0, 0); P(dx, dz, WL + 4, GOLD); P(dx, dz, WL + 5, GOLD); P(dx, dz, WL + 6, GOLD); }
+    // the two springs, hot and cold, either side of the temple
+    for (const c of [-5, 4]) for (let a = -1; a <= 0; a++) for (let cc = c; cc <= c + 1; cc++) { const [dx, dz] = tx(a, cc); const i = this.idx(cx + dx, WL + 3, cz + dz); if (this.inBounds(cx + dx, WL + 3, cz + dz)) { this.blocks[i] = 15; this.wlvl[i] = 7; } }
+    // Poseidon's grove on the inner land ring: a few trees planted by hand
+    { const t = BC.TREES.find(tt => tt.log === 'oak' && tt.leaf) || BC.TREES.find(tt => tt.leaf); if (t) { const log = BC.LOG_IDS[t.log], leaf = BC.leafIdFor(t); for (let k = 0; k < 6; k++) { const ang = k * 1.047 + 0.5; const dx = Math.round(11.5 * Math.cos(ang)), dz = Math.round(11.5 * Math.sin(ang)); if (Math.abs(across(dx, dz)) <= 3 && along(dx, dz) > 0) continue;
+      for (let y = WL + 2; y <= WL + 4; y++) { P(dx, dz, y, log); this.treeAt.set(this.idx(cx + dx, y, cz + dz), t.id); } for (let yy = WL + 4; yy <= WL + 6; yy++) for (let zz = -1; zz <= 1; zz++) for (let xx = -1; xx <= 1; xx++) { if (yy === WL + 6 && (xx || zz)) continue; if (yy === WL + 4 && !xx && !zz) continue; P(dx + xx, dz + zz, yy, leaf); this.treeAt.set(this.idx(cx + dx + xx, yy, cz + dz + zz), t.id); } } } }
+    // houses crowded along the outer land ring, and a dock on the harbour side opposite the sea gate
+    for (let k = 0; k < 8; k++) { const ang = k * 0.785 + 0.39; const hx = Math.round(24.5 * Math.cos(ang)), hz = Math.round(24.5 * Math.sin(ang)); if (drowned(hx, hz) || Math.abs(across(hx, hz)) <= 3) continue;
+      for (let zz = -1; zz <= 1; zz++) for (let xx = -1; xx <= 1; xx++) { const edge = Math.abs(xx) === 1 || Math.abs(zz) === 1; if (edge) { P(hx + xx, hz + zz, WL + 2, LIME); P(hx + xx, hz + zz, WL + 3, LIME); } P(hx + xx, hz + zz, WL + 4, RED); }
+      const tdx = Math.sign(-hx), tdz = Math.sign(-hz); P(hx + (Math.abs(hx) >= Math.abs(hz) ? tdx : 0), hz + (Math.abs(hx) >= Math.abs(hz) ? 0 : tdz), WL + 2, 0); }
+    for (let al = -L2 + 1; al >= -W2 - 3; al--) for (let ac = -1; ac <= 1; ac++) { const dx = ex ? al * ex : ac, dz = ex ? ac : al * ez; P(dx, dz, WL + 1, 19); }
+    this.wonders.push({ id: 'atlantis', x: cx, z: cz, y: WL + 4 });
+  };
   // lore: the elders drop a hint about each landmark
-  if (BC.REGION_LORE) { if (BC.REGION_LORE.desert) BC.REGION_LORE.desert.topics.push(['The old kings', 'Far out where the sand goes flat there are hills too square to be hills. My grandmother said kings sleep under them and that the river that fed their builders is a thousand miles away.']); if (BC.REGION_LORE.boreal) BC.REGION_LORE.boreal.topics.push(['The city on the ridge', 'Follow the high ground north until a peak stands up like a finger. In the saddle below it someone built a whole town of fitted stone and farmed the cliffs in steps. Nobody here remembers who.']); }
+  if (BC.REGION_LORE) { ['wetland', 'temperate', 'rainforest'].forEach(k => { if (BC.REGION_LORE[k]) BC.REGION_LORE[k].topics.push(['The ring city', 'Fishermen say that out along the edge of the sea there is a bay where the water runs in circles between walls of red metal, and a white bridge leads to a temple in the middle. It sank in a night, long ago, they say, and a quarter of it is under the water still.']); }); if (BC.REGION_LORE.desert) BC.REGION_LORE.desert.topics.push(['The old kings', 'Far out where the sand goes flat there are hills too square to be hills. My grandmother said kings sleep under them and that the river that fed their builders is a thousand miles away.']); if (BC.REGION_LORE.boreal) BC.REGION_LORE.boreal.topics.push(['The city on the ridge', 'Follow the high ground north until a peak stands up like a finger. In the saddle below it someone built a whole town of fitted stone and farmed the cliffs in steps. Nobody here remembers who.']); }
 })();

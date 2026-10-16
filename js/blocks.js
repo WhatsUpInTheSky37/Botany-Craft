@@ -110,6 +110,7 @@ window.BC = window.BC || {};
   def(197, { name: 'Copper ore', solid: true, rock: true, ore: true, tex: ['ore_copper', 'ore_copper', 'ore_copper'] });
   def(198, { name: 'Yellow brick', solid: true, rock: true, tex: ['yellowbrick', 'yellowbrick', 'yellowbrick'] });
   def(199, { name: 'Pond liner (puddled clay)', solid: true, tex: ['pondliner', 'pondliner', 'pondliner'], gear: true });
+  def(221, { name: 'Black basalt', solid: true, rock: true, tex: ['basalt', 'basalt', 'basalt'] });
   def(220, { name: 'Solar panel', solid: true, special: 'solar', gear: true, shape: [[0, 0, 0, 1, 0.2, 1, 'solar']], tex: ['solar', 'solar', 'solar'] });
   def(146, { name: 'Beehive', wood: true, solid: true, hive: true, tex: ['beehive_top', 'beehive', 'planks'] });
   // ---------- garden gear (25 essentials) ----------

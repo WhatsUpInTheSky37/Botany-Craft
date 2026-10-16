@@ -35,7 +35,7 @@ BC.Boats = class {
       const vx = -Math.sin(b.yaw) * b.speed + cx, vz = -Math.cos(b.yaw) * b.speed + cz;
       const nx = b.x + vx * dt, nz = b.z + vz * dt;
       if (this.canFloat(nx, b.z)) b.x = nx; else b.speed *= 0.3; if (this.canFloat(b.x, nz)) b.z = nz; else b.speed *= 0.3;
-      { let wrapped = false; if (b.x < -1.5) { b.x += w.W + 2; wrapped = true; } else if (b.x > w.W + 1.5) { b.x -= w.W + 2; wrapped = true; } if (b.z < -1.5) { b.z += w.D + 2; wrapped = true; } else if (b.z > w.D + 1.5) { b.z -= w.D + 2; wrapped = true; } if (wrapped && b.rider === 'me') g.onWrap(); }
+      { let wrapped = false; const M = BC.WRAP + 1.5, SX = w.W + 2 * BC.WRAP + 2, SZ = w.D + 2 * BC.WRAP + 2; if (b.x < -M) { b.x += SX; wrapped = true; } else if (b.x > w.W + M) { b.x -= SX; wrapped = true; } if (b.z < -M) { b.z += SZ; wrapped = true; } else if (b.z > w.D + M) { b.z -= SZ; wrapped = true; } if (wrapped && b.rider === 'me') g.onWrap(); }
       const ys = w.waterSurface(Math.floor(b.x), Math.floor(b.z)); if (ys >= 0) b.y += ((ys + 0.75 + Math.sin(b.bob * 2) * 0.03) - b.y) * Math.min(1, dt * 6);
       b.mesh.position.set(b.x, b.y, b.z); b.mesh.rotation.y = b.yaw; b.mesh.rotation.z = Math.sin(b.bob * 1.7) * 0.03;
       if (b.rider === 'me') { p.pos.set(b.x, b.y + 0.2, b.z); p.vel.set(0, 0, 0); }

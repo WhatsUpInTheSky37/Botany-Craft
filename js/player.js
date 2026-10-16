@@ -81,7 +81,7 @@ BC.Player = class Player {
     if (!step('x', this.vel.x * dt)) this.vel.x = 0; if (!step('z', this.vel.z * dt)) this.vel.z = 0;
     if (this.pos.y < -5) { const t = w.top(Math.floor(this.pos.x), Math.floor(this.pos.z)); this.pos.y = t + 1.1; this.vel.set(0, 0, 0); }
     // sail or swim past the edge of the map and you come out on the far side: the ocean wraps around the world
-    { let wrapped = false; if (this.pos.x < -1.5) { this.pos.x += w.W + 2; wrapped = true; } else if (this.pos.x > w.W + 1.5) { this.pos.x -= w.W + 2; wrapped = true; } if (this.pos.z < -1.5) { this.pos.z += w.D + 2; wrapped = true; } else if (this.pos.z > w.D + 1.5) { this.pos.z -= w.D + 2; wrapped = true; } if (wrapped) this.game.onWrap(); }
+    { let wrapped = false; const M = BC.WRAP + 1.5, SX = w.W + 2 * BC.WRAP + 2, SZ = w.D + 2 * BC.WRAP + 2; if (this.pos.x < -M) { this.pos.x += SX; wrapped = true; } else if (this.pos.x > w.W + M) { this.pos.x -= SX; wrapped = true; } if (this.pos.z < -M) { this.pos.z += SZ; wrapped = true; } else if (this.pos.z > w.D + M) { this.pos.z -= SZ; wrapped = true; } if (wrapped) this.game.onWrap(); }
     // camera
     const cam = this.game.camera; cam.position.set(this.pos.x, this.pos.y + this.eye, this.pos.z);
     cam.rotation.set(0, 0, 0, 'YXZ'); cam.rotation.y = this.yaw; cam.rotation.x = this.pitch;

@@ -26,6 +26,7 @@ The backend is a Supabase project: two tables (`bc_worlds`, `bc_players`) behind
 | Biogeography | Six biomes with their real-world locations, climate and native species. A world map shows how temperature and rainfall decide the biome. |
 | Ecology | Nitrogen fixation (legumes), pollination (bees, butterflies, hummingbirds visit your flowers and double seed yield), herbivory (deer and hares eat unfenced crops), invasive species, epiphytes, carnivorous plants, succession, fire ecology, composting, the Three Sisters. |
 | Animals | 90 animals, birds, fish and insects, each with its role in the ecosystem. Horses, donkeys, camels, elk, bison, moose and caribou can be ridden, and a wagon hitched to one carries you and your cargo. |
+| Landmarks | A tenth-scale Giza pyramid complex hidden in the desert, Machu Picchu on a northern ridge, and Atlantis as Plato described it: a ring city in a bay at the edge of the sea, with a drowned quarter. Sail 160 blocks past any edge of the map and the ocean wraps you to the far side. |
 | Building | Craft kits that raise a 7 by 7 koi pond (stone rim, puddled-clay liner, water lilies, six koi) or a solar greenhouse (glass traps heat; the roof panel runs grow lights, a heater and a pump) in one tap. Gold, silver and copper ores in the bedrock pay for it. |
 
 ## Controls

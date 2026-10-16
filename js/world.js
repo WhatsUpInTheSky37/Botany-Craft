@@ -1,4 +1,5 @@
 window.BC = window.BC || {};
+BC.WRAP = 160; // blocks of open sea beyond each map edge before the world wraps to the far side
 // World storage + procedural generation.
 BC.World = class World {
   constructor(seed, W, D, H) {
