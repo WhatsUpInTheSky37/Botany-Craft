@@ -47,16 +47,16 @@ BC.UI = class UI {
     { const nm = g.itemName(g.inventory[g.selected]); const el = this.$('item-name'); el.textContent = nm; el.hidden = !g.inventory[g.selected]; }
     const bag = g.bagItems().length; const bb = this.$('btn-bag'); bb.innerHTML = `Bag ${bag ? `<em>${bag}</em>` : ''}<small>E</small>`;
   }
-  showChest(key, refresh) {
-    const g = this.game; const w = g.world; const slots = g.chestSlots(key); const c = w.coords(key); const used = slots.filter(Boolean).length; this.openChestKey = key;
-    const html = `<button class="close" aria-label="Close">×</button><div class="eyebrow">Wooden chest · ${used} of ${BC.CHEST_SLOTS} stacks</div><h2>Chest</h2><p class="small">Tap something in the chest to take it. Tap something of yours to put it in. Stacks of the same thing merge. Open the lid again any time; in a shared world everyone can use it.</p>
-    <h3>In the chest</h3><div class="inv-grid chest-grid" id="chest-slots"></div><div class="menu"><button id="chest-all" ${used ? '' : 'disabled'}>Take everything</button></div>
+  showChest(key, refresh, wagon) {
+    const g = this.game; const w = g.world; const slots = g.chestSlots(key); const used = slots.filter(Boolean).length; this.openChestKey = key; const an = wagon && wagon.hitch && g.animals.byUid(wagon.hitch);
+    const html = `<button class="close" aria-label="Close">×</button><div class="eyebrow">${wagon ? 'Wagon cargo' : 'Wooden chest'} · ${used} of ${BC.CHEST_SLOTS} stacks</div><h2>${wagon ? 'Wagon' : 'Chest'}</h2><p class="small">${wagon ? `Load seedlings, harvest and blocks here and they ride with you. ${an ? 'Hitched to a ' + this.esc(an.def.name.toLowerCase()) + '.' : 'Not hitched yet: lead a horse, donkey, camel or other big animal here on a rope and tap the wagon with the rope.'}` : 'Tap something in the chest to take it. Tap something of yours to put it in. Stacks of the same thing merge. Open the lid again any time; in a shared world everyone can use it.'}</p>
+    <h3>${wagon ? 'In the wagon' : 'In the chest'}</h3><div class="inv-grid chest-grid" id="chest-slots"></div><div class="menu">${wagon ? `<button id="wagon-ride" class="primary" ${an ? '' : 'disabled'}>Sit in the wagon and drive</button>` : ''}<button id="chest-all" ${used ? '' : 'disabled'}>Take everything</button></div>
     <h3>Your hotbar</h3><div class="inv-row" id="chest-hotbar"></div><h3>Your bag <small>${g.bagItems().length} item${g.bagItems().length === 1 ? '' : 's'}</small></h3><div class="inv-grid" id="chest-bag">${g.bagItems().length ? '' : '<div class="small">Your bag is empty.</div>'}</div>`;
     this.openModal(html, 'journal inventory'); this.onClose = () => { this.openChestKey = null; };
-    const cs = this.$('chest-slots'); slots.forEach((it, i) => { const d = this.slotEl(it, i, false); d.onclick = () => { if (g.chestTake(key, i)) this.showChest(key, true); }; cs.appendChild(d); });
-    this.$('chest-all').onclick = () => { g.chestTakeAll(key); this.showChest(key, true); };
-    const hb = this.$('chest-hotbar'); for (let i = 0; i < 9; i++) { const d = this.slotEl(g.inventory[i], i, i === g.selected, i + 1); d.onclick = () => { if (g.chestPut(key, i)) this.showChest(key, true); }; hb.appendChild(d); }
-    const bg = this.$('chest-bag'); g.bagItems().forEach(({ it, i }) => { const d = this.slotEl(it, i, false); d.onclick = () => { if (g.chestPut(key, i)) this.showChest(key, true); }; bg.appendChild(d); });
+    const cs = this.$('chest-slots'); slots.forEach((it, i) => { const d = this.slotEl(it, i, false); d.onclick = () => { if (g.chestTake(key, i)) this.showChest(key, true, wagon); }; cs.appendChild(d); });
+    this.$('chest-all').onclick = () => { g.chestTakeAll(key); this.showChest(key, true, wagon); }; if (wagon && this.$('wagon-ride')) this.$('wagon-ride').onclick = () => { this.closeModal(); g.driveWagon(wagon); };
+    const hb = this.$('chest-hotbar'); for (let i = 0; i < 9; i++) { const d = this.slotEl(g.inventory[i], i, i === g.selected, i + 1); d.onclick = () => { if (g.chestPut(key, i)) this.showChest(key, true, wagon); }; hb.appendChild(d); }
+    const bg = this.$('chest-bag'); g.bagItems().forEach(({ it, i }) => { const d = this.slotEl(it, i, false); d.onclick = () => { if (g.chestPut(key, i)) this.showChest(key, true, wagon); }; bg.appendChild(d); });
   }
   showInventory(tab) {
     const g = this.game; tab = tab || this.invTab || 'items'; this.invTab = tab;

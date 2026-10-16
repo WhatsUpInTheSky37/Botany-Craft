@@ -3,11 +3,11 @@ window.BC = window.BC || {};
 // (snouts, ears, antlers, beaks, fins, shells, claws) and procedural gaits. Used up close; the old merged mesh stays for distance.
 BC.Critters = (function () {
   const Part = () => new BC.Avatar.Part(); const shade = BC.Avatar.shade;
-  const BIRDS = new Set(['chickadee', 'hummingbird', 'toucan', 'scarlet_macaw', 'wild_turkey', 'roadrunner', 'heron']);
-  const INSECTS = new Set(['bumblebee', 'monarch', 'dragonfly']); const FISH = new Set(['bluegill', 'catfish', 'trout', 'piranha']);
-  const HOPPERS = new Set(['cottontail', 'hare', 'jackrabbit']); const FROGS = new Set(['frog', 'dart_frog']); const SHELLS = new Set(['box_turtle', 'desert_tortoise']); const BATS = new Set(['little_brown_bat', 'long_nosed_bat']);
-  const GRAZERS = new Set(['deer', 'moose', 'bison', 'pronghorn', 'caribou', 'capybara', 'prairie_dog', 'cottontail', 'hare', 'jackrabbit', 'wild_turkey']);
-  function kindOf(id) { if (BIRDS.has(id)) return 'bird'; if (INSECTS.has(id)) return 'insect'; if (FISH.has(id)) return 'fish'; if (HOPPERS.has(id)) return 'hopper'; if (FROGS.has(id)) return 'frog'; if (SHELLS.has(id)) return 'shell'; if (BATS.has(id)) return 'bat'; if (id === 'earthworm') return 'worm'; if (id === 'blue_crab') return 'crab'; if (id === 'alligator' || id === 'lizard') return 'reptile'; return 'quad'; }
+  const BIRDS = new Set(['chickadee', 'hummingbird', 'toucan', 'scarlet_macaw', 'wild_turkey', 'roadrunner', 'heron', 'mallard', 'canada_goose', 'blue_jay', 'cardinal', 'robin', 'bald_eagle', 'great_horned_owl', 'red_tailed_hawk', 'sandhill_crane', 'woodpecker', 'loon', 'kingfisher', 'pelican']);
+  const INSECTS = new Set(['bumblebee', 'monarch', 'dragonfly']); const FISH = new Set(['bluegill', 'catfish', 'trout', 'piranha', 'largemouth_bass', 'salmon']);
+  const HOPPERS = new Set(['cottontail', 'hare', 'jackrabbit']); const FROGS = new Set(['frog', 'dart_frog']); const SHELLS = new Set(['box_turtle', 'desert_tortoise', 'snapping_turtle', 'sea_turtle']); const BATS = new Set(['little_brown_bat', 'long_nosed_bat']);
+  const GRAZERS = new Set(['deer', 'moose', 'bison', 'pronghorn', 'caribou', 'capybara', 'prairie_dog', 'cottontail', 'hare', 'jackrabbit', 'wild_turkey', 'horse', 'donkey', 'camel', 'elk', 'bighorn', 'llama']);
+  function kindOf(id) { if (BIRDS.has(id)) return 'bird'; if (INSECTS.has(id)) return 'insect'; if (FISH.has(id)) return 'fish'; if (HOPPERS.has(id)) return 'hopper'; if (FROGS.has(id)) return 'frog'; if (SHELLS.has(id)) return 'shell'; if (BATS.has(id)) return 'bat'; if (id === 'earthworm') return 'worm'; if (id === 'blue_crab') return 'crab'; if (id === 'alligator' || id === 'lizard' || id === 'salamander') return 'reptile'; if (id === 'crayfish') return 'crab'; if (id === 'manatee') return 'fish'; return 'quad'; }
   const pivot = (parent, x, y, z, part) => { const g = new THREE.Group(); g.position.set(x, y, z); const m = part.mesh(); if (m) g.add(m); parent.add(g); return g; };
   const eyes = (p, hw, hh, hl, y, z, sideways) => { for (const sx of [-1, 1]) { if (sideways) { p.box(0.02, hh * 0.26, hw * 0.26, sx * hw * 0.5, y, z, '#ffffff'); p.box(0.015, hh * 0.16, hw * 0.14, sx * hw * 0.505, y, z + 0.005, '#101010'); } else { p.box(hw * 0.24, hh * 0.24, 0.02, sx * hw * 0.3, y, z, '#ffffff'); p.box(hw * 0.13, hh * 0.16, 0.015, sx * hw * 0.3 + sx * 0.005, y, z + 0.006, '#101010'); p.box(0.015, 0.015, 0.012, sx * hw * 0.3 - 0.01, y + hh * 0.06, z + 0.01, '#ffffff'); } } };
 
@@ -24,6 +24,7 @@ BC.Critters = (function () {
       if (id === 'pronghorn') { body.box(bw * 1.01, bh * 0.2, bl * 0.12, 0, y0 + bh * 0.5, bl * 0.3, '#f4ecdc'); body.box(bw * 1.01, bh * 0.2, bl * 0.12, 0, y0 + bh * 0.5, bl * 0.05, '#f4ecdc'); }
       if (id === 'caribou') body.box(bw * 1.02, bh * 0.5, bl * 0.3, 0, y0 + bh * 0.4, bl * 0.42, '#e8e2d4');
       if (id === 'red_fox') body.box(bw * 0.7, bh * 0.5, bl * 0.2, 0, y0 + bh * 0.35, bl * 0.45, '#f4ece0');
+      if (id === 'horse' || id === 'donkey') body.box(bw * 0.3, bh * 0.4, bl * 0.5, 0, y0 + bh * 1.1, bl * 0.25, acc); if (id === 'camel') { body.box(bw * 0.8, bh * 0.5, bl * 0.4, 0, y0 + bh * 1.05, -bl * 0.05, shade(bodyC, 0.95)); } if (id === 'skunk') body.box(bw * 0.4, bh * 0.1, bl * 0.9, 0, y0 + bh * 1.02, 0, acc); if (id === 'raccoon') body.box(bw * 0.5, bh * 0.16, bl * 0.22, 0, y0 + bh * 0.5, -bl * 0.6, acc);
       if (kind === 'reptile') { body.box(bw * 0.6, bh * 0.3, bl * 0.9, 0, y0 + bh * 0.95, 0, shade(bodyC, 0.8)); for (let i = 0; i < 4; i++) body.box(bw * 0.25, bh * 0.25, 0.08, 0, y0 + bh * 1.1, -bl * 0.35 + i * bl * 0.22, shade(bodyC, 0.7)); }
       // neck
       const neckL = ['deer', 'pronghorn', 'caribou', 'moose'].includes(id) ? hl * 0.9 : hl * 0.5; if (kind !== 'reptile') body.box(bw * 0.5, bh * 0.55, neckL, 0, y0 + bh * 0.95, bl / 2 + neckL * 0.25, bodyC, { rx: -0.55 });
@@ -37,6 +38,9 @@ BC.Critters = (function () {
       { const p = Part();
         if (id === 'red_fox') { p.box(0.14, 0.14, 0.3, 0, -0.02, -0.15, bodyC); p.box(0.18, 0.18, 0.34, 0, -0.1, -0.42, bodyC); p.box(0.14, 0.14, 0.18, 0, -0.16, -0.66, '#f4ece0'); }
         else if (id === 'beaver') { p.box(0.3, 0.05, 0.42, 0, -0.06, -0.24, '#2a2018'); }
+        else if (id === 'horse' || id === 'donkey' || id === 'camel' || id === 'llama') { p.box(0.1, 0.5, 0.1, 0, -0.26, -0.03, id === 'horse' ? acc : shade(bodyC, 0.7)); }
+        else if (id === 'raccoon' || id === 'skunk' || id === 'coyote' || id === 'gray_wolf') { p.box(0.14, 0.14, 0.4, 0, -0.08, -0.2, bodyC); p.box(0.12, 0.12, 0.14, 0, -0.14, -0.44, id === 'skunk' ? acc : shade(bodyC, 0.8)); }
+        else if (id === 'river_otter' || id === 'muskrat') { p.box(0.1, 0.08, 0.4, 0, -0.04, -0.2, shade(bodyC, 0.9)); }
         else if (id === 'black_bear' || id === 'capybara' || id === 'prairie_dog' || id === 'sloth') { p.box(0.1, 0.1, 0.1, 0, -0.03, -0.05, shade(bodyC, 0.9)); }
         else if (kind === 'hopper') { p.box(0.13, 0.13, 0.13, 0, 0, -0.05, '#ffffff'); }
         else if (kind === 'reptile') { p.box(bw * 0.6, bh * 0.6, bl * 0.6, 0, 0, -bl * 0.3, bodyC); p.box(bw * 0.35, bh * 0.4, bl * 0.6, 0, 0, -bl * 0.85, shade(bodyC, 0.95)); }

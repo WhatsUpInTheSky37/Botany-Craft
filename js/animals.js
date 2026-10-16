@@ -21,9 +21,20 @@ BC.Animals = class Animals {
     if (def.id === 'dart_frog' || def.id === 'lizard' || def.id === 'frog') box(bw * 0.9, bh * 0.4, bl * 0.4, 0, legH + bh * 0.9, -bl * 0.1, c.accent);
     const merged = BC.mergeGeometries(geos); merged.scale(s, s, s); const m = new THREE.Mesh(merged, this.mat); m.castShadow = !!BC.SHADOWS; return m;
   }
+  // Riding: the rider's keys steer the animal like a boat. Used for a mount and for an animal hitched to a wagon the player sits in.
+  steer(e, dt) {
+    const p = this.game.player, d = e.def; const k = p.keys; let mz = p.joy.y; if (k.KeyW || k.ArrowUp) mz += 1; if (k.KeyS || k.ArrowDown) mz -= 1; mz = Math.max(-1, Math.min(1, mz)); let mx = p.joy.x; if (k.KeyA || k.ArrowLeft) mx -= 1; if (k.KeyD || k.ArrowRight) mx += 1;
+    const max = (d.speed || 1.5) * 2.4 * (p.sprint ? 1.45 : 1); const want = mz * max; e.rideSpeed = (e.rideSpeed || 0) + (want - (e.rideSpeed || 0)) * Math.min(1, dt * 3);
+    let da = p.yaw - e.yaw; da = Math.atan2(Math.sin(da), Math.cos(da)); if (Math.abs(e.rideSpeed) > 0.15 || Math.abs(da) > 0.4) e.yaw += da * Math.min(1, dt * 2.6); if (mx) e.yaw -= mx * dt * 1.8;
+    const sp = e.rideSpeed * dt; const nx = e.x - Math.sin(e.yaw) * sp, nz = e.z - Math.cos(e.yaw) * sp;
+    if (this.walkable(e, nx, e.z)) e.x = nx; else e.rideSpeed *= 0.4; if (this.walkable(e, e.x, nz)) e.z = nz; else e.rideSpeed *= 0.4;
+    const t = this.game.world.top(e.x | 0, e.z | 0); const gy = this.game.world.standY(e.x | 0, e.z | 0); e.y += (gy - e.y) * Math.min(1, dt * 10);
+    return Math.abs(e.rideSpeed) > 0.15;
+  }
+  mountHeight(e) { const d = e.def; return (d.legH + d.body[1] * 0.95) * (d.scale || 1); }
   // Pose an animal: the articulated rig within 30 blocks of a player (built on demand), the merged mesh beyond. Both track the same position.
   pose(e, dt, hop, moving, far2) {
-    const d = e.def; const g = this.game; const near = far2 < 30 * 30;
+    const d = e.def; const g = this.game; const near = far2 < 30 * 30; if (!e.rig && !e.mesh.visible) e.mesh.visible = true;
     if (near && e.rig === undefined || (near && e.rig === null)) { try { e.rig = BC.Critters.build(d); g.scene.add(e.rig.root); e.mesh.visible = false; } catch (err) { console.warn('rig', d.id, err); e.rig = false; } }
     else if (!near && e.rig) { g.scene.remove(e.rig.root); e.rig = null; e.mesh.visible = true; }
     e.mesh.position.set(e.x, e.y + hop, e.z); e.mesh.rotation.y = e.yaw; e.mesh.rotation.z = d.flies ? Math.sin(e.bob * 3) * 0.1 : 0; if (d.wings) e.mesh.rotation.x = Math.sin(e.bob * 20) * 0.15;
@@ -57,7 +68,9 @@ BC.Animals = class Animals {
     const w = this.game.world; const pl = this.game.player.pos; const stats = this.game.stats; const others = this.game.peerPositions();
     for (const e of this.list) {
       const d = e.def; e.timer -= dt; e.cool -= dt; e.bob += dt;
-      let far = (e.x - pl.x) ** 2 + (e.z - pl.z) ** 2; for (const o of others) far = Math.min(far, (e.x - o.x) ** 2 + (e.z - o.z) ** 2); if (far > 70 * 70) continue; // sleep far away
+      let far = (e.x - pl.x) ** 2 + (e.z - pl.z) ** 2; for (const o of others) far = Math.min(far, (e.x - o.x) ** 2 + (e.z - o.z) ** 2);
+      if (e.rider || e.driver) { const mine = e.rider === 'me' || e.driver === 'me'; const moving = mine ? this.steer(e, dt) : !!e.rmoving; if (!mine && e.rx !== undefined) { const k = Math.min(1, dt * 6); e.x += (e.rx - e.x) * k; e.y += (e.ry - e.y) * k; e.z += (e.rz - e.z) * k; let da = e.ryaw - e.yaw; da = Math.atan2(Math.sin(da), Math.cos(da)); e.yaw += da * k; } e.leash = null; e.tether = null; e.target = null; e.state = 'idle'; this.pose(e, dt, moving ? Math.abs(Math.sin(e.bob * 9)) * 0.05 : 0, moving, far); if (e.rider === 'me') { pl.set(e.x, e.y + this.mountHeight(e), e.z); this.game.player.vel.set(0, 0, 0); } continue; }
+      if (far > 70 * 70) { if (e.mesh.visible) e.mesh.visible = false; continue; } // sleep far away
       const nearPlayer = (e.x - pl.x) ** 2 + (e.z - pl.z) ** 2 < 3.2 * 3.2; if (nearPlayer && !stats.journal.has('animal:' + d.id)) this.game.discover('animal:' + d.id, 'seen');
       // on a rope: follow the leader, nothing else
       if (e.leash) { const lp = this.leaderPos(e.leash); if (!lp) e.leash = null; else { const dx = lp.x - e.x, dz = lp.z - e.z; const dist = Math.hypot(dx, dz); e.state = 'idle'; e.timer = 1; e.plant = null; const near = BC.PERK === 'ranger' ? 1.3 : 1.8, far = BC.PERK === 'ranger' ? 2.3 : 3.2; if (dist > near) { e.target = [lp.x - dx / dist * (near - 0.4), lp.z - dz / dist * (near - 0.4)]; } else e.target = null; if (dist > far) { const k = (dist - (far - 0.2)) / dist; e.x += dx * k; e.z += dz * k; e.target = e.target || [lp.x, lp.z]; } } }
@@ -102,10 +115,10 @@ BC.Animals = class Animals {
   }
   // Host -> guests: compact positions. Guests interpolate toward them.
   snapshot() { const out = []; this.list.forEach(e => { out.push(e.uid, Math.round(e.x * 20) / 20, Math.round(e.y * 20) / 20, Math.round(e.z * 20) / 20, Math.round(e.yaw * 100) / 100); }); return out; }
-  applyRemote(list) { const m = new Map(this.list.map(e => [e.uid, e])); for (let i = 0; i < list.length; i += 5) { const e = m.get(list[i]); if (!e) continue; e.rx = list[i + 1]; e.ry = list[i + 2]; e.rz = list[i + 3]; e.ryaw = list[i + 4]; if (e.rx === undefined || e.first === undefined) { e.x = e.rx; e.y = e.ry; e.z = e.rz; e.yaw = e.ryaw; e.first = 1; } } }
+  applyRemote(list) { const m = new Map(this.list.map(e => [e.uid, e])); for (let i = 0; i < list.length; i += 5) { const e = m.get(list[i]); if (!e || e.rider === 'me' || e.driver === 'me') continue; e.rx = list[i + 1]; e.ry = list[i + 2]; e.rz = list[i + 3]; e.ryaw = list[i + 4]; if (e.rx === undefined || e.first === undefined) { e.x = e.rx; e.y = e.ry; e.z = e.rz; e.yaw = e.ryaw; e.first = 1; } } }
   updateGuest(dt) {
     const pl = this.game.player.pos; const stats = this.game.stats;
-    for (const e of this.list) { e.bob += dt; if (e.rx !== undefined) { const k = Math.min(1, dt * 6); const dx = e.rx - e.x, dz = e.rz - e.z; const moving = Math.hypot(dx, dz) > 0.05; e.x += dx * k; e.y += (e.ry - e.y) * k; e.z += dz * k; let da = e.ryaw - e.yaw; da = Math.atan2(Math.sin(da), Math.cos(da)); e.yaw += da * k; e.moving = moving; }
+    for (const e of this.list) { e.bob += dt; if (e.rider === 'me' || e.driver === 'me') { const moving = this.steer(e, dt); this.pose(e, dt, moving ? Math.abs(Math.sin(e.bob * 9)) * 0.05 : 0, moving, 0); if (e.rider === 'me') { pl.set(e.x, e.y + this.mountHeight(e), e.z); this.game.player.vel.set(0, 0, 0); } continue; } if (e.rx !== undefined) { const k = Math.min(1, dt * 6); const dx = e.rx - e.x, dz = e.rz - e.z; const moving = Math.hypot(dx, dz) > 0.05; e.x += dx * k; e.y += (e.ry - e.y) * k; e.z += dz * k; let da = e.ryaw - e.yaw; da = Math.atan2(Math.sin(da), Math.cos(da)); e.yaw += da * k; e.moving = moving; }
       const d = e.def; if ((e.x - pl.x) ** 2 + (e.z - pl.z) ** 2 < 3.2 * 3.2 && !stats.journal.has('animal:' + d.id)) this.game.discover('animal:' + d.id, 'seen');
       const hop = (d.id === 'cottontail' || d.id === 'hare' || d.id === 'frog' || d.id === 'dart_frog') && e.moving ? Math.abs(Math.sin(e.bob * 8)) * 0.25 : 0;
       this.pose(e, dt, hop, !!e.moving, (e.x - pl.x) ** 2 + (e.z - pl.z) ** 2); }

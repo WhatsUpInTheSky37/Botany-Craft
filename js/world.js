@@ -316,8 +316,8 @@ BC.World = class World {
     this.addPlant({ id: p.id, x, y: h + 1, z, wild: true, progress: 1, health: 1 }); return true;
   }
   pickAnimals() {
-    const perBiome = {}; for (let z = 4; z < this.D - 4; z += 3) for (let x = 4; x < this.W - 4; x += 3) { const b = this.biomeAt(x, z); const h = this.height[x + z * this.W]; if (h < this.WL) continue; (perBiome[b] = perBiome[b] || []).push([x, z]); }
-    BC.ANIMALS.forEach(a => { if (a.hidden) return; a.biomes.forEach((b, bi) => { const cells = perBiome[b]; if (!cells || !cells.length) return; const n = Math.round((a.insect ? (bi === 0 ? 3 : 1) : (bi === 0 ? 4 : 2)) * this.scale); for (let i = 0; i < n; i++) { const c = cells[Math.floor(this.rand() * cells.length)]; this.spawnAnimals.push({ id: a.id, x: c[0] + 0.5, z: c[1] + 0.5 }); } }); });
+    const perBiome = {}, waterBiome = {}; for (let z = 4; z < this.D - 4; z += 3) for (let x = 4; x < this.W - 4; x += 3) { const b = this.biomeAt(x, z); const h = this.height[x + z * this.W]; if (h < this.WL) { if (h >= this.WL - 7 && !this.isReserved(x, z)) (waterBiome[b] = waterBiome[b] || []).push([x, z]); continue; } if (this.isReserved(x, z)) continue; (perBiome[b] = perBiome[b] || []).push([x, z]); }
+    BC.ANIMALS.forEach(a => { if (a.hidden) return; a.biomes.forEach((b, bi) => { const cells = a.aquatic ? (waterBiome[b] || perBiome[b]) : perBiome[b]; if (!cells || !cells.length) return; const n = Math.round((a.insect ? (bi === 0 ? 3 : 1) : a.aquatic ? (bi === 0 ? 9 : 4) : (bi === 0 ? 7 : 3)) * this.scale); for (let i = 0; i < n; i++) { const c = cells[Math.floor(this.rand() * cells.length)]; this.spawnAnimals.push({ id: a.id, x: c[0] + 0.5, z: c[1] + 0.5 }); } }); });
   }
   openAround(x, z, r) { for (let dz = -r; dz <= r; dz++) for (let dx = -r; dx <= r; dx++) { const h = this.height[(x + dx) + (z + dz) * this.W]; for (let y = h + 1; y <= h + 3; y++) if (this.get(x + dx, y, z + dz) !== 0) return false; } return true; }
   findSpawn(biome) {
