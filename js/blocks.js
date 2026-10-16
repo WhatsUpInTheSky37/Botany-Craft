@@ -26,7 +26,7 @@ window.BC = window.BC || {};
   const logs = { oak: 20, birch: 21, spruce: 22, tropical: 23, cypress: 24, cactus: 25, mesquite: 26, paloverde: 27, palm: 28 };
   Object.keys(logs).forEach(k => def(logs[k], { name: k === 'cactus' ? 'Saguaro trunk' : { oak: 'Oak log', birch: 'Birch log', spruce: 'Spruce log', tropical: 'Hardwood log', cypress: 'Cypress log', mesquite: 'Mesquite log', paloverde: 'Palo verde log', palm: 'Palm trunk' }[k], log: k, tex: [k === 'cactus' ? 'cactus_top' : 'log_top_' + k, k === 'cactus' ? 'cactus' : 'log_' + k, k === 'cactus' ? 'cactus_top' : 'log_top_' + k], solid: true }));
   BC.LOG_IDS = logs;
-  BC.LEAF_BASE = 30; const leafIdx = i => i < 30 ? 30 + i : 170 + (i - 30);
+  BC.LEAF_BASE = 30; const leafIdx = i => i < 30 ? 30 + i : i < 50 ? 170 + (i - 30) : 200 + (i - 50); // 200-219: fruit trees added after the ore ids
   BC.TREES.forEach((t, i) => { if (t.leaf) def(leafIdx(i), { name: 'Leaves', leaves: true, tree: t.id, tex: ['leaves_' + t.id, 'leaves_' + t.id, 'leaves_' + t.id], solid: true }); });
   // ---------- planks by species (19 = oak) ----------
   B[19].name = 'Oak planks'; B[19].plank = true; B[19].wood = true; B[18].wood = true;
@@ -109,6 +109,8 @@ window.BC = window.BC || {};
   def(196, { name: 'Silver ore', solid: true, rock: true, ore: true, tex: ['ore_silver', 'ore_silver', 'ore_silver'] });
   def(197, { name: 'Copper ore', solid: true, rock: true, ore: true, tex: ['ore_copper', 'ore_copper', 'ore_copper'] });
   def(198, { name: 'Yellow brick', solid: true, rock: true, tex: ['yellowbrick', 'yellowbrick', 'yellowbrick'] });
+  def(199, { name: 'Pond liner (puddled clay)', solid: true, tex: ['pondliner', 'pondliner', 'pondliner'], gear: true });
+  def(220, { name: 'Solar panel', solid: true, special: 'solar', gear: true, shape: [[0, 0, 0, 1, 0.2, 1, 'solar']], tex: ['solar', 'solar', 'solar'] });
   def(146, { name: 'Beehive', wood: true, solid: true, hive: true, tex: ['beehive_top', 'beehive', 'planks'] });
   // ---------- garden gear (25 essentials) ----------
   // tilled soil: one variant per topsoil, keeps that soil's chemistry
@@ -138,7 +140,7 @@ window.BC = window.BC || {};
   BC.BLOCKS = B;
   BC.BLOCK = {
     AIR: 0, GRASS_A: 1, ALFISOL: 2, GRASS_M: 3, MOLLISOL: 4, SAND: 5, CALICHE: 6, FLOOR_O: 7, OXISOL: 8, MOSS: 9, PODZOL_E: 10, PODZOL_B: 11,
-    PEAT: 12, GLEY: 13, STONE: 14, WATER: 15, GRAVEL: 16, COMPOST: 17, FENCE: 18, PLANKS: 19,
+    PEAT: 12, GLEY: 13, STONE: 14, WATER: 15, GRAVEL: 16, COMPOST: 17, FENCE: 18, PLANKS: 19, GLASS: 154, POND_LINER: 199, SOLAR: 220,
   };
   BC.leafIdFor = t => leafIdx(BC.TREES.indexOf(t));
   BC.isSolid = id => !!(B[id] && B[id].solid);

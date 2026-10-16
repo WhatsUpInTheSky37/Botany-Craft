@@ -40,6 +40,8 @@ BC.Sim = (function () {
     else if (def.sun === 'full') { lScore = light > 0.8 ? 1 : light > 0.5 ? 0.55 : 0.2; lMsg = light > 0.8 ? 'Full sun: perfect.' : 'Too shady. It needs full sun; move it away from tree canopy.'; }
     else if (def.sun === 'part') { lScore = light > 0.35 ? 1 : 0.4; lMsg = light > 0.35 ? 'Light level suits it.' : 'Deep shade is a little dark for it.'; }
     else { lScore = light < 0.65 ? 1 : 0.55; lMsg = light < 0.65 ? 'Dappled shade: just what a forest-floor plant wants.' : 'Full sun scorches this shade plant. Plant under trees.'; }
+    const solar = world.solarNear && world.underGlass(x, y, z) && world.solarNear(x, y, z, 6);
+    if (solar && lScore < 1 && light < 0.8) { lScore = 1; lMsg = 'Solar grow lights under glass make up for the shade.'; }
     factors.push({ key: 'light', label: 'Light', score: lScore, msg: lMsg });
     // ---- climate ----
     // ---- nutrients ----
@@ -54,7 +56,7 @@ BC.Sim = (function () {
     if (def.biomes.includes(biome)) { cScore = 1; cMsg = `${BC.BIOMES[biome].short} is its home climate.`; }
     else if ((BC.CLIMATE_NEIGHBORS[def.biomes[0]] || []).includes(biome)) { cScore = 0.55; cMsg = `${BC.BIOMES[biome].short} is a stretch; it grows slowly outside its native ${BC.BIOMES[def.biomes[0]].short.toLowerCase()}.`; }
     else { cScore = 0.08; const home = BC.BIOMES[def.biomes[0]]; const cold = BC.BIOMES[biome].temp === 'cold' || (BC.BIOMES[biome].temp === 'cool' && home.temp === 'hot'); cMsg = cold ? `Wrong climate: frost kills a ${home.short.toLowerCase()} plant here.` : `Wrong climate: a ${home.short.toLowerCase()} plant cannot take this heat and drought.`; }
-    if (cScore < 0.8) { const glass = world.underGlass(x, y, z); if (glass) { cScore = Math.max(cScore, 0.85); cMsg = 'Under glass: the greenhouse keeps it warm and sheltered, whatever the region.'; } else if (p.frostCover) { cScore = Math.max(cScore, 0.7); cMsg = 'A frost blanket is carrying it through the cold nights.'; } else if (p.shaded && (BC.BIOMES[biome].temp === 'hot')) { cScore = Math.max(cScore, 0.7); cMsg = 'Shade cloth takes the edge off the heat.'; } }
+    if (cScore < 0.8) { const glass = world.underGlass(x, y, z); if (glass && solar) { cScore = 1; cMsg = 'Solar greenhouse: the panel runs a heater under the glass, so it is as warm as home.'; } else if (glass) { cScore = Math.max(cScore, 0.85); cMsg = 'Under glass: the greenhouse keeps it warm and sheltered, whatever the region.'; } else if (p.frostCover) { cScore = Math.max(cScore, 0.7); cMsg = 'A frost blanket is carrying it through the cold nights.'; } else if (p.shaded && (BC.BIOMES[biome].temp === 'hot')) { cScore = Math.max(cScore, 0.7); cMsg = 'Shade cloth takes the edge off the heat.'; } }
     factors.push({ key: 'climate', label: 'Climate', score: cScore, msg: cMsg });
     const min = Math.min(...factors.map(f => f.score)); const mean = factors.reduce((a, f) => a + f.score, 0) / factors.length;
     const score = min * 0.6 + mean * 0.4;

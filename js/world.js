@@ -111,6 +111,7 @@ BC.World = class World {
       this.noWrite = this.isReserved(x, z) || this.isReserved(x - 3, z - 3) || this.isReserved(x + 3, z - 3) || this.isReserved(x - 3, z + 3) || this.isReserved(x + 3, z + 3); if (this.buildTree(t, x, h + 1, z, true) && !this.noWrite) occupied.add(x + ',' + z); this.noWrite = false;
     }
   }
+  solarNear(x, y, z, r) { let hit = false; this.special.forEach((id, key) => { if (hit || id !== 220) return; const c = this.coords(key); if (Math.abs(c[0] - x) <= r && Math.abs(c[2] - z) <= r && c[1] >= y && c[1] <= y + 7) hit = true; }); return hit; }
   underGlass(x, y, z) { for (let yy = y + 1; yy <= y + 3 && yy < this.H; yy++) { const b = BC.BLOCKS[this.get(x, yy, z)]; if (b && b.transparent) return true; } return false; }
   waterNear(x, y, z, r) { for (let dz = -r; dz <= r; dz++) for (let dx = -r; dx <= r; dx++) for (let dy = -2; dy <= 1; dy++) { const b = this.get(x + dx, y + dy, z + dz); if (b === 15 || b === 162 || b === 77) return true; } return false; }
   // Fruit trees: a small orchard beside every village and lone wild fruit trees scattered through their regions. Own RNG, so older worlds keep their layout.

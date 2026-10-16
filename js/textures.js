@@ -1,7 +1,7 @@
 window.BC = window.BC || {};
 // Procedural pixel-art texture atlas. Everything the game shows is drawn here at load time.
 BC.Atlas = (function () {
-  const TILE = 32, RES = 3, PAD = 4, CELL = TILE + PAD * 2, COLS = 34, ATLAS_W = 4096, ATLAS_H = 2048; // painters work in 32-unit tiles drawn at 3x (96 px faces) inside padded cells so mipmaps never bleed
+  const TILE = 32, RES = 3, PAD = 4, CELL = TILE + PAD * 2, COLS = 34, ATLAS_W = 4096; let ATLAS_H = 2048; // painters work in 32-unit tiles drawn at 3x (96 px faces) inside padded cells so mipmaps never bleed
   let ROWS = 17;
   const tiles = {}; let count = 0;
   let canvas, ctx;
@@ -110,6 +110,8 @@ BC.Atlas = (function () {
     stonewall: g => { noise(g, '#8a8a84', 0.14, 92, 2); g.fillStyle = '#5a5a56'; const r = rng(93); for (let y = 0; y < TILE; y += 8) { g.fillRect(0, y, TILE, 1); for (let x = (y / 8) % 2 ? 6 : 0; x < TILE; x += 12) g.fillRect(x, y, 1, 8); } for (let i = 0; i < 20; i++) { g.fillStyle = r() < 0.5 ? '#9a9a94' : '#747470'; g.fillRect((r() * TILE) | 0, (r() * TILE) | 0, 2, 2); } },
     compostbin: g => { planks(g, '#8a6a40'); g.fillStyle = '#3a2a1a'; for (let y = 3; y < TILE; y += 7) g.fillRect(0, y, TILE, 2); g.fillStyle = '#4a3a20'; g.fillRect(0, 0, 3, TILE); g.fillRect(29, 0, 3, TILE); },
     compostbin_top: g => { noise(g, '#4a3a22', 0.18, 94, 2); g.fillStyle = '#8a6a40'; g.fillRect(0, 0, TILE, 3); g.fillRect(0, 29, TILE, 3); g.fillRect(0, 0, 3, TILE); g.fillRect(29, 0, 3, TILE); g.fillStyle = '#c8a860'; g.fillRect(10, 12, 3, 2); g.fillRect(18, 18, 4, 2); g.fillStyle = '#6a8a3a'; g.fillRect(14, 20, 5, 3); },
+    pondliner: g => { noise(g, '#3f3a34', 0.1, 97, 2); const r = rng(98); for (let i = 0; i < 26; i++) { g.fillStyle = r() < 0.5 ? '#5a554c' : '#2e2a26'; g.fillRect((r() * TILE) | 0, (r() * TILE) | 0, 2, 2); } g.fillStyle = 'rgba(90,120,140,0.25)'; g.fillRect(0, 0, TILE, TILE); },
+    solar: g => { g.fillStyle = '#1c2a4a'; g.fillRect(0, 0, TILE, TILE); g.fillStyle = '#243a6a'; for (let y = 0; y < TILE; y += 8) for (let x = 0; x < TILE; x += 8) if ((x + y) % 16 === 0) g.fillRect(x, y, 8, 8); g.fillStyle = '#c8ccd4'; for (let k = 0; k <= TILE; k += 8) { g.fillRect(k === TILE ? k - 1 : k, 0, 1, TILE); g.fillRect(0, k === TILE ? k - 1 : k, TILE, 1); } g.fillStyle = 'rgba(255,255,255,0.18)'; g.fillRect(2, 2, 3, 3); g.fillRect(18, 10, 3, 3); g.fillRect(10, 26, 3, 3); },
     sprinkler: g => { noise(g, '#8a8a90', 0.1, 95, 1); g.fillStyle = '#3a6a9a'; g.fillRect(12, 12, 8, 8); g.fillStyle = '#8ac0f0'; g.fillRect(4, 4, 3, 3); g.fillRect(25, 6, 3, 3); g.fillRect(6, 25, 3, 3); g.fillRect(24, 24, 3, 3); },
     scarecrow: g => { noise(g, '#8a4a3a', 0.12, 96, 2); g.fillStyle = '#3a5aa8'; g.fillRect(0, 0, TILE, 8); g.fillStyle = '#e0c060'; g.fillRect(4, 26, 4, 6); g.fillRect(22, 24, 4, 8); g.fillStyle = '#5a2a1a'; g.fillRect(14, 8, 4, 20); },
     straw_face: g => { noise(g, '#d8c070', 0.1, 97, 2); g.fillStyle = '#2a2a2a'; g.fillRect(9, 11, 4, 4); g.fillRect(19, 11, 4, 4); g.fillRect(11, 21, 10, 2); },
@@ -196,7 +198,7 @@ BC.Atlas = (function () {
           else if (id === 'chives') { for (let i = 0; i < 3; i++) pom(11 + i * 5, 5 + (i % 2) * 2, 2.2, art.flower || '#c080d0'); }
           else if (id === 'blue_grama') { for (let i = 0; i < 3; i++) { const x = 9 + i * 6, y = 6 + (i % 2) * 3; line(x, 20, x, y, 0.6, '#9aa060'); g.fillStyle = '#b89a5a'; g.fillRect(x, y - 1.2, 5, 1.6); } }
           else if (id === 'pink_muhly') { for (let i = 0; i < 26; i++) { const a = i * 2.4, rr = 7 * Math.sqrt(i / 26); disc(16 + Math.cos(a) * rr * 1.3, 8 + Math.sin(a) * rr * 0.7, 0.55, i % 2 ? '#e880b0' : '#f0a0c8'); } }
-          else if (id === 'wild_rice' || id === 'switchgrass' || id === 'big_bluestem' || id === 'little_bluestem') { for (let i = 0; i < 3; i++) { const x = 10 + i * 6; line(x, 18, x + 1, 4, 0.6, '#b8a870'); for (let q = 0; q < 5; q++) { const yy = 5 + q * 2.4; line(x + 1 - q * 0.1, yy, x + 1 + (q % 2 ? 2.4 : -2.4), yy + 1.6, 0.5, art.flower || '#c8b070'); disc(x + 1 + (q % 2 ? 2.4 : -2.4), yy + 1.6, 0.55, art.flower || '#d8c080'); } } }
+          else if (id === 'wild_rice' || id === 'switchgrass' || id === 'big_bluestem' || id === 'little_bluestem' || id === 'wheat' || id === 'indian_grass') { for (let i = 0; i < 3; i++) { const x = 10 + i * 6; line(x, 18, x + 1, 4, 0.6, '#b8a870'); for (let q = 0; q < 5; q++) { const yy = 5 + q * 2.4; line(x + 1 - q * 0.1, yy, x + 1 + (q % 2 ? 2.4 : -2.4), yy + 1.6, 0.5, art.flower || '#c8b070'); disc(x + 1 + (q % 2 ? 2.4 : -2.4), yy + 1.6, 0.55, art.flower || '#d8c080'); } } }
           else for (let i = 0; i < 4; i++) { const x = 10 + i * 4, y = 4 + (i % 2) * 3; line(x, y + 4, x, y, 0.5, '#a0a060'); disc(x, y, 1.1, art.flower || '#c0a060'); }
         }
       }
@@ -207,7 +209,7 @@ BC.Atlas = (function () {
       if (p.cauliflory && mature) { ell(14, 27, 1.6, 3, 0, fruitC); ell(18, 29, 1.4, 2.6, 0, fruitC); ell(13.6, 26.2, 0.5, 0.9, 0, shade(fruitC, 1.4)); }
       if (mature) { const r2 = rng(hash(id) + 1); for (let i = 0; i < 6; i++) { const x = 9 + r2() * 14, y = 13 + r2() * 10; if (p.flowerOnBush) petals(x, y, 6, 1.4, 0.8, flowerC, centerC); else { const rr = id === 'potato' ? 1.0 : 1.4; disc(x, y, rr, fruitC); disc(x - rr * 0.35, y - rr * 0.35, rr * 0.35, shade(fruitC, 1.6)); if (id === 'chili') ell(x, y + 1.5, 0.9, 2.2, 0.3, fruitC); } } if (id === 'wild_strawberry' || id === 'blackberry') { petals(10, 12, 5, 1.6, 1.1, '#ffffff', '#f0d040'); } }
     } else if (f === 'rosette') {
-      const n = id === 'agave' ? 11 : 9; const stiff = id === 'agave' || id === 'pineapple' || id === 'bromeliad'; const broad = id === 'hosta' || id === 'cabbage' || id === 'heuchera' || id === 'lambs_ear';
+      const n = id === 'agave' ? 11 : 9; const stiff = id === 'agave' || id === 'pineapple' || id === 'bromeliad' || id === 'yucca' || id === 'aloe'; const broad = id === 'hosta' || id === 'cabbage' || id === 'heuchera' || id === 'lambs_ear' || id === 'taro' || id === 'lettuce';
       for (let i = 0; i < n; i++) { const a = -Math.PI / 2 + (i / (n - 1) - 0.5) * (broad ? 2.8 : 2.4); const len = (stiff ? 10 : 8) + (i % 2) * 5; const wid = broad ? 3.4 : 2.2; g.save(); g.translate(16, 31); g.rotate(a); const col = i % 2 ? leafC : shade(leafC, 0.85); g.fillStyle = col; g.beginPath(); if (broad) { g.ellipse(len * 0.55, 0, len * 0.5, wid, 0, 0, 6.283); } else { g.moveTo(0, -wid); g.lineTo(len, 0); g.lineTo(0, wid); g.closePath(); } g.fill(); g.strokeStyle = shade(col, 1.3); g.lineWidth = 0.35; g.beginPath(); g.moveTo(1, 0); g.lineTo(len * 0.9, 0); g.stroke(); if (broad && id !== 'lambs_ear') { g.lineWidth = 0.25; for (let q = 1; q < 4; q++) { g.beginPath(); g.moveTo(len * q / 4, 0); g.lineTo(len * q / 4 + len * 0.15, -wid * 0.7); g.moveTo(len * q / 4, 0); g.lineTo(len * q / 4 + len * 0.15, wid * 0.7); g.stroke(); } } if (id === 'agave') { g.fillStyle = '#7a4a3a'; for (let q = 2; q < len; q += 2.5) { g.fillRect(q, -wid - 0.4, 0.6, 0.6); g.fillRect(q, wid - 0.2, 0.6, 0.6); } } if (id === 'lambs_ear') { g.fillStyle = 'rgba(255,255,255,0.35)'; for (let q = 1; q < len; q += 1.6) g.fillRect(q, -wid * 0.6 + (q % 3), 0.5, 0.5); } g.restore(); }
       if (id === 'cabbage') { disc(16, 22, 6.5, shade(leafC, 1.15)); disc(16, 22, 4.5, shade(leafC, 1.3)); g.strokeStyle = shade(leafC, 0.8); g.lineWidth = 0.4; for (let q = 0; q < 5; q++) { g.beginPath(); g.arc(16, 22, 2 + q * 1.1, 2.4 + q * 0.3, 4.6 + q * 0.3); g.stroke(); } }
       if (mature && p.fruitTop) { g.fillStyle = fruitC; g.beginPath(); g.ellipse(16, 15, 4.5, 6, 0, 0, 6.283); g.fill(); g.fillStyle = shade(fruitC, 0.7); for (let y = 10; y < 21; y += 2.4) for (let x = 12.5; x < 20; x += 2.4) g.fillRect(x + ((y / 2.4) % 2), y, 0.9, 0.9); for (let i = -2; i <= 2; i++) line(16, 10, 16 + i * 2.2, 2, 1.2, leafC); }
@@ -256,6 +258,7 @@ BC.Atlas = (function () {
 
   function build() {
     count = 0; Object.keys(tiles).forEach(k => delete tiles[k]);
+    { const need = Object.keys(BLOCK_PAINTERS).length + BC.TREES.filter(t => t.leaf).length + BC.PLANTS.length * 3 + 24; ATLAS_H = need > COLS * Math.floor(2048 / (CELL * RES)) ? 4096 : 2048; } // grow the atlas when the species list outgrows it
     canvas = document.createElement('canvas'); canvas.width = ATLAS_W; canvas.height = ATLAS_H; ctx = canvas.getContext('2d', { willReadFrequently: true });
     ctx.imageSmoothingEnabled = false; ROWS = Math.floor(ATLAS_H / (CELL * RES));
     const origin = i => [((i % COLS) * CELL + PAD) * RES, (Math.floor(i / COLS) * CELL + PAD) * RES];
@@ -296,5 +299,5 @@ BC.Atlas = (function () {
   function waterTexture() { const N = 128; const c = document.createElement('canvas'); c.width = c.height = N; const g = c.getContext('2d'); const img = g.createImageData(N, N); const d = img.data; const b = hex('#2f74c4'); const T = Math.PI * 2 / N;
     for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { const w1 = Math.sin(x * T * 3 + Math.sin(y * T * 2) * 1.6), w2 = Math.sin(y * T * 4 + Math.sin(x * T * 3) * 1.4), w3 = Math.sin((x + y) * T * 5 + Math.cos((x - y) * T * 2) * 1.2); let k = 0.9 + w1 * 0.06 + w2 * 0.06; const ca = Math.max(0, (w1 + w2 + w3) / 3 - 0.35) * 1.8; k += ca * ca * 0.9; const o = (y * N + x) * 4; d[o] = Math.min(255, b[0] * k + ca * 120); d[o + 1] = Math.min(255, b[1] * k + ca * 110); d[o + 2] = Math.min(255, b[2] * k + ca * 80); d[o + 3] = 255; }
     g.putImageData(img, 0, 0); const t = new THREE.CanvasTexture(c); t.magFilter = THREE.LinearFilter; t.minFilter = THREE.LinearMipmapLinearFilter; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; return t; }
-  return { build, uv, spriteCanvas, tileCanvas, ingredientCanvas, waterTexture, TILE, COLS, has: n => tiles[n] !== undefined, shade, mix };
+  return { build, uv, spriteCanvas, tileCanvas, ingredientCanvas, waterTexture, TILE, COLS, has: n => tiles[n] !== undefined, shade, mix, get count() { return count; }, get capacity() { return COLS * ROWS; } };
 })();

@@ -4,7 +4,7 @@ window.BC = window.BC || {};
 BC.Critters = (function () {
   const Part = () => new BC.Avatar.Part(); const shade = BC.Avatar.shade;
   const BIRDS = new Set(['chickadee', 'hummingbird', 'toucan', 'scarlet_macaw', 'wild_turkey', 'roadrunner', 'heron', 'mallard', 'canada_goose', 'blue_jay', 'cardinal', 'robin', 'bald_eagle', 'great_horned_owl', 'red_tailed_hawk', 'sandhill_crane', 'woodpecker', 'loon', 'kingfisher', 'pelican']);
-  const INSECTS = new Set(['bumblebee', 'monarch', 'dragonfly']); const FISH = new Set(['bluegill', 'catfish', 'trout', 'piranha', 'largemouth_bass', 'salmon']);
+  const INSECTS = new Set(['bumblebee', 'monarch', 'dragonfly']); const FISH = new Set(['bluegill', 'catfish', 'trout', 'piranha', 'largemouth_bass', 'salmon', 'koi']);
   const HOPPERS = new Set(['cottontail', 'hare', 'jackrabbit']); const FROGS = new Set(['frog', 'dart_frog']); const SHELLS = new Set(['box_turtle', 'desert_tortoise', 'snapping_turtle', 'sea_turtle']); const BATS = new Set(['little_brown_bat', 'long_nosed_bat']);
   const GRAZERS = new Set(['deer', 'moose', 'bison', 'pronghorn', 'caribou', 'capybara', 'prairie_dog', 'cottontail', 'hare', 'jackrabbit', 'wild_turkey', 'horse', 'donkey', 'camel', 'elk', 'bighorn', 'llama']);
   function kindOf(id) { if (BIRDS.has(id)) return 'bird'; if (INSECTS.has(id)) return 'insect'; if (FISH.has(id)) return 'fish'; if (HOPPERS.has(id)) return 'hopper'; if (FROGS.has(id)) return 'frog'; if (SHELLS.has(id)) return 'shell'; if (BATS.has(id)) return 'bat'; if (id === 'earthworm') return 'worm'; if (id === 'blue_crab') return 'crab'; if (id === 'alligator' || id === 'lizard' || id === 'salamander') return 'reptile'; if (id === 'crayfish') return 'crab'; if (id === 'manatee') return 'fish'; return 'quad'; }
@@ -87,6 +87,7 @@ BC.Critters = (function () {
     else if (kind === 'fish') {
       body.box(bw, bh, bl * 0.8, 0, y0 + bh / 2, 0.05, bodyC); body.box(bw * 0.7, bh * 0.75, bl * 0.3, 0, y0 + bh / 2, bl * 0.5, shade(bodyC, 1.05)); body.box(bw * 0.8, bh * 0.4, bl * 0.6, 0, y0 + bh * 0.3, 0, shade(bodyC, 1.25)); body.box(0.02, bh * 0.5, bl * 0.4, 0, y0 + bh * 1.2, -bl * 0.05, acc); for (const sx of [-1, 1]) body.box(0.02, bh * 0.3, bl * 0.25, sx * bw * 0.5, y0 + bh * 0.35, bl * 0.15, acc, { ry: sx * 0.5 });
       body.box(bw * 0.3, bh * 0.1, 0.03, 0, y0 + bh * 0.25, bl * 0.65, dark); eyes(body, hw, hh, hl, y0 + bh * 0.65, bl * 0.45, true);
+      if (id === 'koi') { body.box(bw * 1.03, bh * 0.28, bl * 0.18, 0, y0 + bh * 0.84, bl * 0.1, '#f4f0e8'); body.box(bw * 1.03, bh * 0.26, bl * 0.12, 0, y0 + bh * 0.8, -bl * 0.24, '#f4f0e8'); body.box(bw * 1.05, bh * 0.16, bl * 0.07, 0, y0 + bh * 0.92, bl * 0.3, '#2a2a2a'); }
       if (id === 'catfish') for (const sx of [-1, 1]) body.box(0.015, 0.015, bl * 0.4, sx * bw * 0.3, y0 + bh * 0.3, bl * 0.75, dark, { ry: sx * 0.6 });
       { const p = Part(); p.box(0.03, bh * 0.9, bl * 0.35, 0, 0, -bl * 0.18, acc); p.box(0.03, bh * 1.2, bl * 0.12, 0, 0, -bl * 0.4, acc); rig.tail = pivot(root, 0, y0 + bh / 2, -bl * 0.35, p); }
     }
@@ -114,7 +115,7 @@ BC.Critters = (function () {
       body.box(bw, bh, bl, 0, y0 + bh / 2, 0, bodyC); body.box(bw * 0.8, bh * 0.3, bl * 0.8, 0, y0 + bh * 1.05, 0, shade(bodyC, 0.9)); for (const sx of [-1, 1]) { body.box(0.02, bh * 0.6, 0.02, sx * bw * 0.25, y0 + bh * 1.3, bl * 0.4, dark); body.box(0.04, 0.04, 0.04, sx * bw * 0.25, y0 + bh * 1.6, bl * 0.4, dark); for (let i = 0; i < 3; i++) body.box(bw * 0.5, 0.025, 0.025, sx * bw * 0.7, y0 + bh * 0.3, -bl * 0.3 + i * bl * 0.3, legC, { rz: sx * -0.6 }); }
       for (const sx of [-1, 1]) { const p = Part(); p.box(bw * 0.2, bh * 0.3, bl * 0.4, 0, 0, bl * 0.2, legC); p.box(bw * 0.3, bh * 0.45, bl * 0.35, 0, 0, bl * 0.55, acc); p.box(bw * 0.12, bh * 0.15, bl * 0.3, sx * bw * 0.1, 0, bl * 0.85, acc, { ry: sx * 0.3 }); rig.wings.push(pivot(root, sx * bw * 0.45, y0 + bh * 0.4, bl * 0.4, p)); }
     }
-    const bm = body.mesh(); if (bm) root.add(bm); root.scale.setScalar(s); rig.body = bm;
+    const bm = body.mesh(); if (bm) root.add(bm); root.scale.setScalar(def.aquatic && bl < 0.6 ? s * 1.5 : s); rig.body = bm; // small fish drawn half again as big so they show through the water
     root.traverse(o => { if (o.isMesh) o.castShadow = !!BC.SHADOWS; });
     return rig;
   }

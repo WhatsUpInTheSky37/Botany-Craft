@@ -19,7 +19,7 @@ BC.Animals = class Animals {
     if (def.id === 'deer' || def.id === 'moose' || def.id === 'bison') box(0.08, 0.2, 0.06, 0, legH + bh * 0.8, -bl / 2 - 0.02, c.accent);
     if (def.id === 'cottontail' || def.id === 'hare') box(0.12, 0.12, 0.12, 0, legH + bh * 0.7, -bl / 2 - 0.04, c.accent);
     if (def.id === 'dart_frog' || def.id === 'lizard' || def.id === 'frog') box(bw * 0.9, bh * 0.4, bl * 0.4, 0, legH + bh * 0.9, -bl * 0.1, c.accent);
-    const merged = BC.mergeGeometries(geos); merged.scale(s, s, s); const m = new THREE.Mesh(merged, this.mat); m.castShadow = !!BC.SHADOWS; return m;
+    const merged = BC.mergeGeometries(geos); { const k = def.aquatic && bl < 0.6 ? s * 1.5 : s; merged.scale(k, k, k); } const m = new THREE.Mesh(merged, this.mat); m.castShadow = !!BC.SHADOWS; return m;
   }
   // Riding: the rider's keys steer the animal like a boat. Used for a mount and for an animal hitched to a wagon the player sits in.
   steer(e, dt) {
@@ -106,7 +106,7 @@ BC.Animals = class Animals {
         }
       }
       // ground follow
-      const t = w.top(e.x | 0, e.z | 0); let gy = w.standY(e.x | 0, e.z | 0); if (w.get(e.x | 0, t + 1, e.z | 0) === 15) gy = d.aquatic ? t + 1.1 : t + 1.6;
+      const t = w.top(e.x | 0, e.z | 0); let gy = w.standY(e.x | 0, e.z | 0); if (w.get(e.x | 0, t + 1, e.z | 0) === 15) { if (d.aquatic) { const ws = w.waterSurface(e.x | 0, e.z | 0); gy = Math.max(t + 0.9, (ws < 0 ? t + 1 : ws) + 0.45 + Math.sin(e.bob * 0.6) * 0.18); } else gy = t + 1.6; }
       const targetY = gy + (d.flies ? e.fly + Math.sin(e.bob * 2) * 0.2 : 0); e.y += (targetY - e.y) * Math.min(1, 8 * dt);
       const hop = (d.id === 'cottontail' || d.id === 'hare' || d.id === 'frog' || d.id === 'dart_frog') && e.target ? Math.abs(Math.sin(e.bob * 8)) * 0.25 : (e.target && !d.flies ? Math.abs(Math.sin(e.bob * 10)) * 0.04 : 0);
       this.pose(e, dt, hop, !!e.target, far);
