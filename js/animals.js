@@ -42,8 +42,14 @@ BC.Animals = class Animals {
     e.mesh.position.set(e.x, e.y + hop, e.z); e.mesh.rotation.y = e.yaw; e.mesh.rotation.z = d.flies ? Math.sin(e.bob * 3) * 0.1 : 0; if (d.wings) e.mesh.rotation.x = Math.sin(e.bob * 20) * 0.15; else if (tilt) e.mesh.rotation.x = tilt;
     if (e.rig) { const r = e.rig.root; r.position.set(e.x, e.y + hop, e.z); r.rotation.y = e.yaw; r.rotation.x = tilt || (d.flies && moving ? 0.12 : 0); if (e.rig.kind !== 'fish' && e.rig.kind !== 'crab' && e.rig.kind !== 'worm') r.rotation.z = d.flies ? Math.sin(e.bob * 3) * 0.1 : 0; BC.Critters.animate(e.rig, dt, { moving, speed: d.speed ? Math.min(1.6, d.speed / 1.6) : 1, flying: !!d.flies, hop: hop * 4 }); }
   }
+  // The walking surface under a point: the first solid block below it that is not a tree's leaves or trunk, so animals live under canopies instead of on top of them.
+  groundAt(x, z, fromY) { const w = this.game.world; x |= 0; z |= 0; for (let y = Math.min(w.H - 1, Math.floor(fromY) + 1); y >= 0; y--) { const b = BC.BLOCKS[w.get(x, y, z)]; if (b && b.solid && !b.leaves && !b.log) return y; } return 0; }
+  // A cell an animal can be put down in: ground with open air above it for land animals, water for swimmers.
+  spawnOk(def, x, z) { const w = this.game.world; if (x < 1 || z < 1 || x >= w.W - 1 || z >= w.D - 1) return false; const t = this.groundAt(x, z, w.H - 1); if (t <= 0) return false; const a = w.get(x, t + 1, z); if (def.aquatic) return a === 15; if (a !== 0) return false; const a2 = BC.BLOCKS[w.get(x, t + 2, z)]; return !(a2 && a2.solid && !a2.leaves) || !!def.flies; }
   spawn(id, x, z, uid) {
-    const def = BC.ANIMAL_BY_ID[id]; if (!def) return null; const w = this.game.world; const y = w.top(x | 0, z | 0) + 1;
+    const def = BC.ANIMAL_BY_ID[id]; if (!def) return null; const w = this.game.world;
+    if (!this.spawnOk(def, x | 0, z | 0)) { let found = null; for (let r = 1; r <= 16 && !found; r++) for (let dz = -r; dz <= r && !found; dz++) for (let dx = -r; dx <= r; dx++) { if (Math.max(Math.abs(dx), Math.abs(dz)) !== r) continue; if (this.spawnOk(def, (x | 0) + dx, (z | 0) + dz)) { found = [(x | 0) + dx + 0.5, (z | 0) + dz + 0.5]; break; } } if (!found) return null; x = found[0]; z = found[1]; }
+    const y = this.groundAt(x | 0, z | 0, w.H - 1) + 1;
     const mesh = this.buildMesh(def); mesh.position.set(x, y, z); this.game.scene.add(mesh);
     const e = { uid: uid || Math.random().toString(36).slice(2, 9), def, mesh, x, y, z, yaw: Math.random() * 6.28, state: 'idle', timer: Math.random() * 3, target: null, cool: 0, bob: Math.random() * 10, fly: def.flies ? 1.5 + Math.random() : 0, home: [x, z], leash: null };
     this.list.push(e); return e;
@@ -51,7 +57,7 @@ BC.Animals = class Animals {
   byUid(uid) { return this.list.find(e => e.uid === uid); }
   remove(e) { const i = this.list.indexOf(e); if (i < 0) return; this.list.splice(i, 1); this.game.scene.remove(e.mesh); if (e.rig) { this.game.scene.remove(e.rig.root); e.rig = null; } if (e.line) { this.game.scene.remove(e.line); e.line = null; } }
   // Position of the player holding a leash (host resolves by name).
-  leaderPos(name) { const g = this.game; if (name === g.playerName) return g.player.pos; let out = null; g.peers.forEach(pe => { if (pe.name.toLowerCase() === name) out = pe.group.position; }); return out; }
+  leaderPos(name) { const g = this.game; if (!name) return null; const n = String(name).toLowerCase(); if (n === String(g.playerName).toLowerCase()) return g.player.pos; let out = null; g.peers.forEach(pe => { if (String(pe.name).toLowerCase() === n) out = pe.group.position; }); return out; }
   anchor(e) { if (e.tether) { const t = e.tether; return { x: t[0] + 0.5, y: this.game.world.top(t[0], t[1]) + 1, z: t[1] + 0.5, post: true }; } return e.leash ? this.leaderPos(e.leash) : null; }
   updateLeashLines() {
     const g = this.game;
@@ -69,7 +75,7 @@ BC.Animals = class Animals {
   splash(x, y, z) { const g = this.game; if (!this.splashTex) { const c = document.createElement('canvas'); c.width = c.height = 64; const cg = c.getContext('2d'); cg.strokeStyle = 'rgba(255,255,255,0.9)'; cg.lineWidth = 6; cg.beginPath(); cg.arc(32, 32, 22, 0, 6.283); cg.stroke(); cg.fillStyle = 'rgba(255,255,255,0.35)'; cg.beginPath(); cg.arc(32, 32, 12, 0, 6.283); cg.fill(); this.splashTex = new THREE.CanvasTexture(c); }
     const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: this.splashTex, transparent: true, depthWrite: false, fog: false })); m.rotation.x = -Math.PI / 2; m.position.set(x, y + 0.02, z); g.scene.add(m); (this.splashes = this.splashes || []).push({ m, t: 0 }); }
   tickSplashes(dt) { if (!this.splashes || !this.splashes.length) return; for (let i = this.splashes.length - 1; i >= 0; i--) { const s = this.splashes[i]; s.t += dt; const k = s.t / 0.6; if (k >= 1) { this.game.scene.remove(s.m); s.m.geometry.dispose(); s.m.material.dispose(); this.splashes.splice(i, 1); continue; } s.m.scale.setScalar(0.5 + k * 1.6); s.m.material.opacity = 1 - k; } }
-  walkable(e, x, z) { const w = this.game.world; if (x < 1 || z < 1 || x >= w.W - 1 || z >= w.D - 1) return false; const t = w.top(x | 0, z | 0); const under = w.get(x | 0, t, z | 0); const above = w.get(x | 0, t + 1, z | 0); if (e.def.aquatic) return above === 15; if (above === 15 && !(e.def.id === 'moose' || e.def.id === 'frog' || e.def.id === 'heron' || e.def.flies)) return false; if (above === 15 && w.get(x | 0, t + 2, z | 0) === 15) return false; if (BC.BLOCKS[under] && BC.BLOCKS[under].fence) return false; if (Math.abs(t + 1 - e.y) > 1.6 && !e.def.flies) return false; return true; }
+  walkable(e, x, z) { const w = this.game.world; if (x < 1 || z < 1 || x >= w.W - 1 || z >= w.D - 1) return false; const t = this.groundAt(x, z, e.def.flies ? e.y + 0.5 : e.y + 1.2); const under = w.get(x | 0, t, z | 0); const above = w.get(x | 0, t + 1, z | 0); if (e.def.aquatic) return above === 15; if (above === 15 && !(e.def.id === 'moose' || e.def.id === 'frog' || e.def.id === 'heron' || e.def.flies)) return false; if (above === 15 && w.get(x | 0, t + 2, z | 0) === 15) return false; const bA = BC.BLOCKS[above]; if (bA && bA.solid) return false; /* a trunk or wall in the way */ const bA2 = BC.BLOCKS[w.get(x | 0, t + 2, z | 0)]; if (bA2 && bA2.solid && !bA2.leaves && !e.def.flies && !(BC.isSmallAnimal && BC.isSmallAnimal(e.def))) return false; /* big animals need headroom */ if (BC.BLOCKS[under] && BC.BLOCKS[under].fence) return false; if (Math.abs(t + 1 - e.y) > 1.6 && !e.def.flies) return false; return true; }
   update(dt) {
     this.tickSplashes(dt);
     const w = this.game.world; const pl = this.game.player.pos; const stats = this.game.stats; const others = this.game.peerPositions();
@@ -82,6 +88,8 @@ BC.Animals = class Animals {
       // on a rope: follow the leader, nothing else
       if (e.leash) { const lp = this.leaderPos(e.leash); if (!lp) e.leash = null; else { const dx = lp.x - e.x, dz = lp.z - e.z; const dist = Math.hypot(dx, dz); e.state = 'idle'; e.timer = 1; e.plant = null; const near = BC.PERK === 'ranger' ? 1.3 : 1.8, far = BC.PERK === 'ranger' ? 2.3 : 3.2; if (dist > near) { e.target = [lp.x - dx / dist * (near - 0.4), lp.z - dz / dist * (near - 0.4)]; } else e.target = null; if (dist > far) { const k = (dist - (far - 0.2)) / dist; e.x += dx * k; e.z += dz * k; e.target = e.target || [lp.x, lp.z]; } } }
       if (e.tether) { const a = this.anchor(e); const dx = a.x - e.x, dz = a.z - e.z; const dist = Math.hypot(dx, dz); e.plant = null; if (dist > 2.6) { const k = (dist - 2.4) / dist; e.x += dx * k; e.z += dz * k; e.target = null; e.state = 'idle'; e.timer = 1; } }
+      // hitched to a wagon with nobody driving: stand still facing the way the wagon points, so it is not dragged about or turned to stare at you
+      if (!e.driver && this.game.wagons) { const wg = this.game.wagons.list.find(w2 => w2.hitch === e.uid); if (wg) { e.target = null; e.plant = null; e.state = 'idle'; e.timer = 1; const want = Math.atan2(e.x - wg.x, e.z - wg.z); let da = want - e.yaw; da = Math.atan2(Math.sin(da), Math.cos(da)); e.yaw += da * Math.min(1, dt * 3); } }
       // behaviour selection
       if (!e.leash && (e.state === 'idle' || e.state === 'wander')) {
         if (e.timer <= 0) {
@@ -113,7 +121,7 @@ BC.Animals = class Animals {
         }
       }
       // ground follow
-      const t = w.top(e.x | 0, e.z | 0); let gy = w.standY(e.x | 0, e.z | 0); if (w.get(e.x | 0, t + 1, e.z | 0) === 15) { if (d.aquatic) { const ws = w.waterSurface(e.x | 0, e.z | 0); const top = (ws < 0 ? t + 1 : ws); gy = Math.max(t + 0.6, top - 0.35 + Math.sin(e.bob * 0.5) * 0.15); } else gy = t + 1.6; } // fish cruise about a block under the surface (water block ws spans ws..ws+1)
+      const t = this.groundAt(e.x | 0, e.z | 0, e.y + (d.flies ? 0.5 : 1.2)); let gy = t + BC.blockTop(w.get(e.x | 0, t, e.z | 0)); if (w.get(e.x | 0, t + 1, e.z | 0) === 15) { if (d.aquatic) { const ws = w.waterSurface(e.x | 0, e.z | 0); const top = (ws < 0 ? t + 1 : ws); gy = Math.max(t + 0.6, top - 0.35 + Math.sin(e.bob * 0.5) * 0.15); } else gy = t + 1.6; } // fish cruise about a block under the surface (water block ws spans ws..ws+1)
       const targetY = gy + (d.flies ? e.fly + Math.sin(e.bob * 2) * 0.2 : 0); e.y += (targetY - e.y) * Math.min(1, 8 * dt);
       let jump = 0; if (JUMPERS.has(d.id)) { if (e.jt === undefined) e.jt = 3 + Math.random() * 10; if (!e.jumping) { e.jt -= dt; const sw = w.waterSurface(e.x | 0, e.z | 0) + 0.98; if (e.jt <= 0) { e.jumping = 0.001; e.jt = 7 + Math.random() * 14; this.splash(e.x, sw, e.z); } } else { const sw = w.waterSurface(e.x | 0, e.z | 0) + 0.98; e.jumping += dt / 0.9; if (e.jumping >= 1) { e.jumping = 0; this.splash(e.x, sw, e.z); } else jump = Math.sin(e.jumping * Math.PI) * 2.2; } }
       const hop = jump + ((d.id === 'cottontail' || d.id === 'hare' || d.id === 'frog' || d.id === 'dart_frog') && e.target ? Math.abs(Math.sin(e.bob * 8)) * 0.25 : (e.target && !d.flies ? Math.abs(Math.sin(e.bob * 10)) * 0.04 : 0));

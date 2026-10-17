@@ -345,6 +345,16 @@ BC.World = class World {
     const meta = []; this.meta.forEach((m, k) => meta.push([k, m]));
     return { v: 2, W: this.W, D: this.D, H: this.H, diffs, plants, removed, trees, moist, soil, hives, chests, wl, meta };
   }
+  // After a saved world is laid over freshly generated terrain (generation changes between versions), set every plant back on the ground that is there now, or drop it if its ground is gone.
+  reseatPlants() {
+    const moved = [], gone = [];
+    this.plants.forEach(p => { if (p.onBark) return; const d = BC.PLANT_BY_ID[p.id]; if (!d) return; const here = this.get(p.x, p.y, p.z), below = BC.BLOCKS[this.get(p.x, p.y - 1, p.z)];
+      if (d.water === 'aquatic') { if (here === 15 || (below && below.solid && here === 0)) return; gone.push(p); return; }
+      if (here === 0 && below && below.solid && !below.leaves && !below.log) return;
+      const t = this.top(p.x, p.z); const tb = BC.BLOCKS[this.get(p.x, t, p.z)]; if (tb && (tb.soil || tb.id === 16 || tb.id === 5) && this.get(p.x, t + 1, p.z) === 0 && !this.plantAt(p.x, t + 1, p.z)) moved.push([p, t + 1]); else gone.push(p); });
+    gone.forEach(p => this.removePlant(p)); moved.forEach(([p, y]) => { this.removePlant(p); p.y = y; this.addPlant(p); });
+    return { moved: moved.length, gone: gone.length };
+  }
   restore(s) {
     const prev = this.remote; this.remote = true; let waterTouched = false;
     for (let i = 0; i < s.diffs.length; i += 2) { const k = s.diffs[i], v = s.diffs[i + 1]; if (this.blocks[k] !== v) { if (v === 15 || this.blocks[k] === 15) waterTouched = true; this.blocks[k] = v; const c = this.coords(k); this.markDirty(c[0], c[2]); } this.diffs.set(k, v); }
@@ -366,6 +376,7 @@ BC.World = class World {
       if (s.moist) for (let i = 0; i < s.moist.length; i++) this.moisture[i] = s.moist[i] / 100;
     }
     this.remote = prev;
+    if (!this.generating) { const rs = this.reseatPlants(); if (rs.moved || rs.gone) console.log('reseated plants', rs); }
   }
   coords(i) { const y = Math.floor(i / (this.W * this.D)); const r = i % (this.W * this.D); return [r % this.W, y, Math.floor(r / this.W)]; }
 };
