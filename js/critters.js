@@ -3,15 +3,15 @@ window.BC = window.BC || {};
 // (snouts, ears, antlers, beaks, fins, shells, claws) and procedural gaits. Used up close; the old merged mesh stays for distance.
 BC.Critters = (function () {
   const Part = () => new BC.Avatar.Part(); const shade = BC.Avatar.shade;
-  const BIRDS = new Set(['chickadee', 'hummingbird', 'toucan', 'scarlet_macaw', 'wild_turkey', 'roadrunner', 'heron', 'mallard', 'canada_goose', 'blue_jay', 'cardinal', 'robin', 'bald_eagle', 'great_horned_owl', 'red_tailed_hawk', 'sandhill_crane', 'woodpecker', 'loon', 'kingfisher', 'pelican']);
-  const INSECTS = new Set(['bumblebee', 'monarch', 'dragonfly']); const FISH = new Set(['bluegill', 'catfish', 'trout', 'piranha', 'largemouth_bass', 'salmon', 'koi', 'desert_pupfish']);
-  const HOPPERS = new Set(['cottontail', 'hare', 'jackrabbit']); const FROGS = new Set(['frog', 'dart_frog']); const SHELLS = new Set(['box_turtle', 'desert_tortoise', 'snapping_turtle', 'sea_turtle']); const BATS = new Set(['little_brown_bat', 'long_nosed_bat']);
-  const GRAZERS = new Set(['deer', 'moose', 'bison', 'pronghorn', 'caribou', 'capybara', 'prairie_dog', 'cottontail', 'hare', 'jackrabbit', 'wild_turkey', 'horse', 'donkey', 'camel', 'elk', 'bighorn', 'llama']);
+  const BIRDS = new Set(['snowy_owl', 'rock_ptarmigan', 'snow_bunting', 'arctic_tern', 'gyrfalcon', 'common_raven', 'canada_jay', 'spruce_grouse', 'bohemian_waxwing', 'western_meadowlark', 'burrowing_owl', 'prairie_chicken', 'barn_owl', 'gambels_quail', 'cactus_wren', 'turkey_vulture', 'red_winged_blackbird', 'wood_duck', 'great_egret', 'roseate_spoonbill', 'harpy_eagle', 'quetzal', 'hoatzin', 'barred_owl', 'eastern_bluebird', 'chickadee', 'hummingbird', 'toucan', 'scarlet_macaw', 'wild_turkey', 'roadrunner', 'heron', 'mallard', 'canada_goose', 'blue_jay', 'cardinal', 'robin', 'bald_eagle', 'great_horned_owl', 'red_tailed_hawk', 'sandhill_crane', 'woodpecker', 'loon', 'kingfisher', 'pelican']);
+  const INSECTS = new Set(['bumblebee', 'monarch', 'dragonfly']); const FISH = new Set(['bluegill', 'catfish', 'trout', 'piranha', 'largemouth_bass', 'salmon', 'koi', 'desert_pupfish', 'arctic_char']);
+  const HOPPERS = new Set(['arctic_hare', 'lemming', 'cottontail', 'hare', 'jackrabbit']); const FROGS = new Set(['frog', 'dart_frog']); const SHELLS = new Set(['box_turtle', 'desert_tortoise', 'snapping_turtle', 'sea_turtle']); const BATS = new Set(['little_brown_bat', 'long_nosed_bat']);
+  const GRAZERS = new Set(['musk_ox', 'enchanted_horse', 'deer', 'moose', 'bison', 'pronghorn', 'caribou', 'capybara', 'prairie_dog', 'cottontail', 'hare', 'jackrabbit', 'wild_turkey', 'horse', 'donkey', 'camel', 'elk', 'bighorn', 'llama']);
   function kindOf(id) { if (BIRDS.has(id)) return 'bird'; if (INSECTS.has(id)) return 'insect'; if (FISH.has(id)) return 'fish'; if (HOPPERS.has(id)) return 'hopper'; if (FROGS.has(id)) return 'frog'; if (SHELLS.has(id)) return 'shell'; if (BATS.has(id)) return 'bat'; if (id === 'earthworm') return 'worm'; if (id === 'blue_crab') return 'crab'; if (id === 'alligator' || id === 'lizard' || id === 'salamander') return 'reptile'; if (id === 'crayfish') return 'crab'; if (id === 'manatee') return 'fish'; return 'quad'; }
   const pivot = (parent, x, y, z, part) => { const g = new THREE.Group(); g.position.set(x, y, z); const m = part.mesh(); if (m) g.add(m); parent.add(g); return g; };
   const eyes = (p, hw, hh, hl, y, z, sideways) => { for (const sx of [-1, 1]) { if (sideways) { p.box(0.02, hh * 0.26, hw * 0.26, sx * hw * 0.5, y, z, '#ffffff'); p.box(0.015, hh * 0.16, hw * 0.14, sx * hw * 0.505, y, z + 0.005, '#101010'); } else { p.box(hw * 0.24, hh * 0.24, 0.02, sx * hw * 0.3, y, z, '#ffffff'); p.box(hw * 0.13, hh * 0.16, 0.015, sx * hw * 0.3 + sx * 0.005, y, z + 0.006, '#101010'); p.box(0.015, 0.015, 0.012, sx * hw * 0.3 - 0.01, y + hh * 0.06, z + 0.01, '#ffffff'); } } };
 
-  function build(def) {
+  function build(def, opts) {
     const id = def.id, kind = kindOf(id); const [bw, bh, bl] = def.body; const [hw, hh, hl] = def.head; const legH = def.legH; const c = def.colors; const s = def.scale || 1;
     const root = new THREE.Group(); const rig = { root, kind, id, legs: [], wings: [], tail: null, head: null, t: Math.random() * 10, graze: 0, grazeT: 2 + Math.random() * 5, eyesT: 0 };
     const bodyC = c.body, headC = c.head, legC = c.legs, acc = c.accent; const dark = '#1a1a1a';
@@ -24,7 +24,7 @@ BC.Critters = (function () {
       if (id === 'pronghorn') { body.box(bw * 1.01, bh * 0.2, bl * 0.12, 0, y0 + bh * 0.5, bl * 0.3, '#f4ecdc'); body.box(bw * 1.01, bh * 0.2, bl * 0.12, 0, y0 + bh * 0.5, bl * 0.05, '#f4ecdc'); }
       if (id === 'caribou') body.box(bw * 1.02, bh * 0.5, bl * 0.3, 0, y0 + bh * 0.4, bl * 0.42, '#e8e2d4');
       if (id === 'red_fox') body.box(bw * 0.7, bh * 0.5, bl * 0.2, 0, y0 + bh * 0.35, bl * 0.45, '#f4ece0');
-      if (id === 'horse' || id === 'donkey') body.box(bw * 0.3, bh * 0.4, bl * 0.5, 0, y0 + bh * 1.1, bl * 0.25, acc); if (id === 'camel') { body.box(bw * 0.8, bh * 0.5, bl * 0.4, 0, y0 + bh * 1.05, -bl * 0.05, shade(bodyC, 0.95)); } if (id === 'skunk') body.box(bw * 0.4, bh * 0.1, bl * 0.9, 0, y0 + bh * 1.02, 0, acc); if (id === 'raccoon') body.box(bw * 0.5, bh * 0.16, bl * 0.22, 0, y0 + bh * 0.5, -bl * 0.6, acc);
+      if (id === 'horse' || id === 'donkey' || id === 'enchanted_horse') body.box(bw * 0.3, bh * 0.4, bl * 0.5, 0, y0 + bh * 1.1, bl * 0.25, acc); if (id === 'camel') { body.box(bw * 0.8, bh * 0.5, bl * 0.4, 0, y0 + bh * 1.05, -bl * 0.05, shade(bodyC, 0.95)); } if (id === 'skunk') body.box(bw * 0.4, bh * 0.1, bl * 0.9, 0, y0 + bh * 1.02, 0, acc); if (id === 'raccoon') body.box(bw * 0.5, bh * 0.16, bl * 0.22, 0, y0 + bh * 0.5, -bl * 0.6, acc);
       if (kind === 'reptile') { body.box(bw * 0.6, bh * 0.3, bl * 0.9, 0, y0 + bh * 0.95, 0, shade(bodyC, 0.8)); for (let i = 0; i < 4; i++) body.box(bw * 0.25, bh * 0.25, 0.08, 0, y0 + bh * 1.1, -bl * 0.35 + i * bl * 0.22, shade(bodyC, 0.7)); }
       // neck
       const neckL = ['deer', 'pronghorn', 'caribou', 'moose'].includes(id) ? hl * 0.9 : hl * 0.5; if (kind !== 'reptile') body.box(bw * 0.5, bh * 0.55, neckL, 0, y0 + bh * 0.95, bl / 2 + neckL * 0.25, bodyC, { rx: -0.55 });
@@ -38,7 +38,7 @@ BC.Critters = (function () {
       { const p = Part();
         if (id === 'red_fox') { p.box(0.14, 0.14, 0.3, 0, -0.02, -0.15, bodyC); p.box(0.18, 0.18, 0.34, 0, -0.1, -0.42, bodyC); p.box(0.14, 0.14, 0.18, 0, -0.16, -0.66, '#f4ece0'); }
         else if (id === 'beaver') { p.box(0.3, 0.05, 0.42, 0, -0.06, -0.24, '#2a2018'); }
-        else if (id === 'horse' || id === 'donkey' || id === 'camel' || id === 'llama') { p.box(0.1, 0.5, 0.1, 0, -0.26, -0.03, id === 'horse' ? acc : shade(bodyC, 0.7)); }
+        else if (id === 'horse' || id === 'donkey' || id === 'camel' || id === 'llama' || id === 'enchanted_horse') { p.box(0.1, 0.5, 0.1, 0, -0.26, -0.03, id === 'horse' || id === 'enchanted_horse' ? acc : shade(bodyC, 0.7)); }
         else if (id === 'raccoon' || id === 'skunk' || id === 'coyote' || id === 'gray_wolf') { p.box(0.14, 0.14, 0.4, 0, -0.08, -0.2, bodyC); p.box(0.12, 0.12, 0.14, 0, -0.14, -0.44, id === 'skunk' ? acc : shade(bodyC, 0.8)); }
         else if (id === 'river_otter' || id === 'muskrat') { p.box(0.1, 0.08, 0.4, 0, -0.04, -0.2, shade(bodyC, 0.9)); }
         else if (id === 'black_bear' || id === 'capybara' || id === 'prairie_dog' || id === 'sloth') { p.box(0.1, 0.1, 0.1, 0, -0.03, -0.05, shade(bodyC, 0.9)); }
@@ -115,6 +115,9 @@ BC.Critters = (function () {
       body.box(bw, bh, bl, 0, y0 + bh / 2, 0, bodyC); body.box(bw * 0.8, bh * 0.3, bl * 0.8, 0, y0 + bh * 1.05, 0, shade(bodyC, 0.9)); for (const sx of [-1, 1]) { body.box(0.02, bh * 0.6, 0.02, sx * bw * 0.25, y0 + bh * 1.3, bl * 0.4, dark); body.box(0.04, 0.04, 0.04, sx * bw * 0.25, y0 + bh * 1.6, bl * 0.4, dark); for (let i = 0; i < 3; i++) body.box(bw * 0.5, 0.025, 0.025, sx * bw * 0.7, y0 + bh * 0.3, -bl * 0.3 + i * bl * 0.3, legC, { rz: sx * -0.6 }); }
       for (const sx of [-1, 1]) { const p = Part(); p.box(bw * 0.2, bh * 0.3, bl * 0.4, 0, 0, bl * 0.2, legC); p.box(bw * 0.3, bh * 0.45, bl * 0.35, 0, 0, bl * 0.55, acc); p.box(bw * 0.12, bh * 0.15, bl * 0.3, sx * bw * 0.1, 0, bl * 0.85, acc, { ry: sx * 0.3 }); rig.wings.push(pivot(root, sx * bw * 0.45, y0 + bh * 0.4, bl * 0.4, p)); }
     }
+    if (opts && opts.monogram) { // the owner's initial on both flanks
+      const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d'); g.font = 'bold 92px Georgia, serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineWidth = 12; g.strokeStyle = '#1c3a6a'; g.strokeText(opts.monogram, 64, 70); g.fillStyle = '#ffd45a'; g.fillText(opts.monogram, 64, 70);
+      for (const sx of [-1, 1]) { const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; if (sx < 0) { tex.wrapS = THREE.RepeatWrapping; tex.repeat.x = -1; tex.offset.x = 1; } const m = new THREE.Mesh(new THREE.PlaneGeometry(bh * 0.55, bh * 0.55), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false })); m.position.set(sx * (bw * 0.5 + 0.012), y0 + bh * 0.5, -bl * 0.03); m.rotation.y = sx * Math.PI / 2; root.add(m); } }
     const bm = body.mesh(); if (bm) root.add(bm); root.scale.setScalar(def.aquatic && bl < 0.6 ? s * 1.5 : s); rig.body = bm; // small fish drawn half again as big so they show through the water
     root.traverse(o => { if (o.isMesh) o.castShadow = !!BC.SHADOWS; });
     return rig;

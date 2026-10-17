@@ -17,7 +17,7 @@ BC.WONDERS = [
 ];
 BC.WONDER_BY_ID = {}; BC.WONDERS.forEach(w => { BC.WONDER_BY_ID[w.id] = w; });
 // The soil hammer walks a block through every ground type in the game, in climate order.
-BC.SOIL_CYCLE = [1, 2, 3, 4, 7, 8, 9, 10, 11, 12, 13, 5, 6, 17, 16, 14];
+BC.SOIL_CYCLE = [1, 2, 3, 4, 7, 8, 9, 10, 11, 223, 224, 12, 13, 5, 6, 17, 16, 14];
 (function () {
   const P = BC.World.prototype; const LIME = 191, CASING = 192, GRANITE = 193, INCA = 194;
   P.placeWonders = function () {

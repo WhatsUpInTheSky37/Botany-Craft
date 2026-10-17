@@ -110,12 +110,16 @@ window.BC = window.BC || {};
   def(197, { name: 'Copper ore', solid: true, rock: true, ore: true, tex: ['ore_copper', 'ore_copper', 'ore_copper'] });
   def(198, { name: 'Yellow brick', solid: true, rock: true, tex: ['yellowbrick', 'yellowbrick', 'yellowbrick'] });
   def(199, { name: 'Pond liner (puddled clay)', solid: true, tex: ['pondliner', 'pondliner', 'pondliner'], gear: true });
+  def(222, { name: 'Snow', solid: true, snow: true, tex: ['snow', 'snow', 'snow'] });
+  def(223, { name: 'Tundra lichen mat', soil: 'gelisol', horizon: 'O', tex: ['tundra_top', 'tundra_side', 'permafrost'], solid: true, grassTop: true });
+  def(224, { name: 'Permafrost', soil: 'gelisol', horizon: 'Cf', tex: ['permafrost', 'permafrost', 'permafrost'], solid: true });
+  def(225, { name: 'Ice', solid: true, ice: true, transparent: true, cutout: true, shape: [[0, 0, 0, 1, 1, 1, 'ice']], tex: ['ice', 'ice', 'ice'] });
   def(221, { name: 'Black basalt', solid: true, rock: true, tex: ['basalt', 'basalt', 'basalt'] });
   def(220, { name: 'Solar panel', solid: true, special: 'solar', gear: true, shape: [[0, 0, 0, 1, 0.2, 1, 'solar']], tex: ['solar', 'solar', 'solar'] });
   def(146, { name: 'Beehive', wood: true, solid: true, hive: true, tex: ['beehive_top', 'beehive', 'planks'] });
   // ---------- garden gear (25 essentials) ----------
   // tilled soil: one variant per topsoil, keeps that soil's chemistry
-  const TILL = [[147, 1, 'alfisol', 'Tilled forest soil'], [148, 3, 'mollisol', 'Tilled prairie soil'], [149, 5, 'aridisol', 'Tilled desert soil'], [150, 7, 'oxisol', 'Tilled rainforest soil'], [151, 9, 'spodosol', 'Tilled boreal soil'], [152, 12, 'histosol', 'Tilled peat'], [153, 17, 'compost', 'Tilled compost soil']];
+  const TILL = [[147, 1, 'alfisol', 'Tilled forest soil'], [148, 3, 'mollisol', 'Tilled prairie soil'], [149, 5, 'aridisol', 'Tilled desert soil'], [150, 7, 'oxisol', 'Tilled rainforest soil'], [151, 9, 'spodosol', 'Tilled boreal soil'], [152, 12, 'histosol', 'Tilled peat'], [153, 17, 'compost', 'Tilled compost soil'], [226, 223, 'gelisol', 'Tilled tundra soil']];
   BC.TILL_FOR = {}; BC.UNTILL = {}; TILL.forEach(([id, from, soil, name]) => { def(id, { name, soil, horizon: 'Ap', tilled: true, solid: true, grassTop: false, tex: ['tilled', B[from].tex[1], B[from].tex[2]], item: from }); BC.TILL_FOR[from] = id; BC.UNTILL[id] = from; });
   def(154, { name: 'Glass', solid: true, transparent: true, cutout: true, shape: [[0, 0, 0, 1, 1, 1, 'glass']], tex: ['glass', 'glass', 'glass'], gear: true });
   def(155, { name: 'Stone wall', solid: true, fence: true, tex: ['stonewall', 'stonewall', 'stonewall'], gear: true });
@@ -141,7 +145,7 @@ window.BC = window.BC || {};
   BC.BLOCKS = B;
   BC.BLOCK = {
     AIR: 0, GRASS_A: 1, ALFISOL: 2, GRASS_M: 3, MOLLISOL: 4, SAND: 5, CALICHE: 6, FLOOR_O: 7, OXISOL: 8, MOSS: 9, PODZOL_E: 10, PODZOL_B: 11,
-    PEAT: 12, GLEY: 13, STONE: 14, WATER: 15, GRAVEL: 16, COMPOST: 17, FENCE: 18, PLANKS: 19, GLASS: 154, POND_LINER: 199, SOLAR: 220,
+    PEAT: 12, GLEY: 13, STONE: 14, WATER: 15, GRAVEL: 16, COMPOST: 17, FENCE: 18, PLANKS: 19, GLASS: 154, POND_LINER: 199, SOLAR: 220, SNOW: 222, TUNDRA: 223, PERMAFROST: 224, ICE: 225,
   };
   BC.leafIdFor = t => leafIdx(BC.TREES.indexOf(t));
   BC.isSolid = id => !!(B[id] && B[id].solid);

@@ -36,7 +36,7 @@ BC.Animals = class Animals {
   // Pose an animal: the articulated rig within 30 blocks of a player (built on demand), the merged mesh beyond. Both track the same position.
   pose(e, dt, hop, moving, far2) {
     const d = e.def; const g = this.game; const near = far2 < 30 * 30; if (!e.rig && !e.mesh.visible) e.mesh.visible = true;
-    if (near && e.rig === undefined || (near && e.rig === null)) { try { e.rig = BC.Critters.build(d); g.scene.add(e.rig.root); e.mesh.visible = false; } catch (err) { console.warn('rig', d.id, err); e.rig = false; } }
+    if (near && e.rig === undefined || (near && e.rig === null)) { try { e.rig = BC.Critters.build(d, { monogram: e.mono }); g.scene.add(e.rig.root); e.mesh.visible = false; } catch (err) { console.warn('rig', d.id, err); e.rig = false; } }
     else if (!near && e.rig) { g.scene.remove(e.rig.root); e.rig = null; e.mesh.visible = true; }
     const tilt = e.jumping ? -Math.cos(e.jumping * Math.PI) * 0.9 : 0;
     e.mesh.position.set(e.x, e.y + hop, e.z); e.mesh.rotation.y = e.yaw; e.mesh.rotation.z = d.flies ? Math.sin(e.bob * 3) * 0.1 : 0; if (d.wings) e.mesh.rotation.x = Math.sin(e.bob * 20) * 0.15; else if (tilt) e.mesh.rotation.x = tilt;
@@ -46,12 +46,12 @@ BC.Animals = class Animals {
   groundAt(x, z, fromY) { const w = this.game.world; x |= 0; z |= 0; for (let y = Math.min(w.H - 1, Math.floor(fromY) + 1); y >= 0; y--) { const b = BC.BLOCKS[w.get(x, y, z)]; if (b && b.solid && !b.leaves && !b.log) return y; } return 0; }
   // A cell an animal can be put down in: ground with open air above it for land animals, water for swimmers.
   spawnOk(def, x, z) { const w = this.game.world; if (x < 1 || z < 1 || x >= w.W - 1 || z >= w.D - 1) return false; const t = this.groundAt(x, z, w.H - 1); if (t <= 0) return false; const a = w.get(x, t + 1, z); if (def.aquatic) return a === 15; if (a !== 0) return false; const a2 = BC.BLOCKS[w.get(x, t + 2, z)]; return !(a2 && a2.solid && !a2.leaves) || !!def.flies; }
-  spawn(id, x, z, uid) {
+  spawn(id, x, z, uid, extra) {
     const def = BC.ANIMAL_BY_ID[id]; if (!def) return null; const w = this.game.world;
     if (!this.spawnOk(def, x | 0, z | 0)) { let found = null; for (let r = 1; r <= 16 && !found; r++) for (let dz = -r; dz <= r && !found; dz++) for (let dx = -r; dx <= r; dx++) { if (Math.max(Math.abs(dx), Math.abs(dz)) !== r) continue; if (this.spawnOk(def, (x | 0) + dx, (z | 0) + dz)) { found = [(x | 0) + dx + 0.5, (z | 0) + dz + 0.5]; break; } } if (!found) return null; x = found[0]; z = found[1]; }
     const y = this.groundAt(x | 0, z | 0, w.H - 1) + 1;
     const mesh = this.buildMesh(def); mesh.position.set(x, y, z); this.game.scene.add(mesh);
-    const e = { uid: uid || Math.random().toString(36).slice(2, 9), def, mesh, x, y, z, yaw: Math.random() * 6.28, state: 'idle', timer: Math.random() * 3, target: null, cool: 0, bob: Math.random() * 10, fly: def.flies ? 1.5 + Math.random() : 0, home: [x, z], leash: null };
+    const e = { uid: uid || Math.random().toString(36).slice(2, 9), def, mesh, x, y, z, owner: extra && extra.owner || undefined, mono: extra && extra.mono || undefined, yaw: Math.random() * 6.28, state: 'idle', timer: Math.random() * 3, target: null, cool: 0, bob: Math.random() * 10, fly: def.flies ? 1.5 + Math.random() : 0, home: [x, z], leash: null };
     this.list.push(e); return e;
   }
   byUid(uid) { return this.list.find(e => e.uid === uid); }
@@ -143,7 +143,7 @@ BC.Animals = class Animals {
   raycast(origin, dir, maxD) {
     let best = null, bd = maxD; for (const e of this.list) { const c = this.tmp.set(e.x, e.y + 0.5 * (e.def.scale || 1), e.z); const oc = c.clone().sub(origin); const t = oc.dot(dir); if (t < 0 || t > bd) continue; const r = Math.max(0.5, Math.max(e.def.body[1], e.def.body[2]) * (e.def.scale || 1) * 0.8); const d2 = oc.lengthSq() - t * t; if (d2 < r * r) { bd = t; best = e; } } return best ? { entity: best, dist: bd } : null;
   }
-  serialize() { return this.list.map(e => { const o = { id: e.def.id, x: e.x, z: e.z, uid: e.uid }; if (e.tether) o.tether = e.tether; return o; }); }
+  serialize() { return this.list.map(e => { const o = { id: e.def.id, x: e.x, z: e.z, uid: e.uid }; if (e.tether) o.tether = e.tether; if (e.owner) { o.owner = e.owner; o.mono = e.mono; } return o; }); }
 };
 // Minimal geometry merge (positions, normals, colors) so we don't need the examples bundle.
 BC.mergeGeometries = function (geos) {

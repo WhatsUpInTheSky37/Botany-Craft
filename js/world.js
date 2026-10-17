@@ -64,8 +64,9 @@ BC.World = class World {
       let h = 13 + (n(x / 38, z / 38 + 50) - 0.5) * 14 + (n(x / 12, z / 12 + 80) - 0.5) * 3;
       const edge = Math.min(x, z, W - 1 - x, D - 1 - z) / 14; if (edge < 1) h -= (1 - smooth(edge)) * 7;
       let biome;
-      if (temp < 0.34) biome = 'boreal'; else if (temp < 0.66) biome = moist < 0.4 ? 'prairie' : 'temperate'; else biome = moist < 0.44 ? 'desert' : 'rainforest';
+      if (temp < 0.13) biome = 'tundra'; else if (temp < 0.34) biome = 'boreal'; else if (temp < 0.66) biome = moist < 0.4 ? 'prairie' : 'temperate'; else biome = moist < 0.44 ? 'desert' : 'rainforest';
       if (biome === 'desert') h = 13 + (h - 13) * 0.6 + 1; // flatter, higher: no lakes
+      if (biome === 'tundra') h = 13 + (h - 13) * 0.7; // low rolling tundra with shallow lakes
       if (biome !== 'desert' && h >= WL - 1 && h <= WL + 1.2 && moist > 0.38 && temp > 0.2) biome = 'wetland';
       if (biome === 'wetland') h = Math.min(h, WL + 1);
       this.hf[ci] = h; h = BC.util.clamp(Math.round(h), 3, H - 12);
@@ -91,14 +92,16 @@ BC.World = class World {
         case 'rainforest': id = d === 0 ? (under ? B.GLEY : B.FLOOR_O) : B.OXISOL; break;
         case 'boreal': id = d === 0 ? (under ? B.GLEY : B.MOSS) : d === 1 ? B.PODZOL_E : d < 4 ? B.PODZOL_B : B.GRAVEL; break;
         case 'wetland': id = d === 0 ? (under ? B.GLEY : B.PEAT) : d < 2 ? B.PEAT : d < 4 ? B.GLEY : B.GRAVEL; break;
+        case 'tundra': id = d === 0 ? (under ? B.GLEY : (BC.util.hash2(x, z, 313) < 0.38 ? B.SNOW : B.TUNDRA)) : d === 1 ? B.GLEY : d < 4 ? B.PERMAFROST : B.GRAVEL; break; // lichen mat and snow drifts over a thawed layer, then permafrost
       }
       set(y, id);
     }
     for (let y = h + 1; y <= WL; y++) set(y, B.WATER);
+    if (under && biome === 'tundra') set(WL, B.ICE); // tundra lakes and shore are frozen over
   }
   treeOptions(biome) { return BC.TREES.filter(t => !t.fruit && t.biomes[0] === biome || (t.biomes.includes(biome) && this.rand() < 0.3)); }
   placeTrees() {
-    const density = { temperate: 0.032, prairie: 0.004, desert: 0.012, rainforest: 0.055, boreal: 0.05, wetland: 0.02 };
+    const density = { temperate: 0.032, prairie: 0.004, desert: 0.012, rainforest: 0.055, boreal: 0.05, wetland: 0.02, tundra: 0 }; // tundra is above the treeline
     const occupied = new Set();
     for (let z = 3; z < this.D - 3; z += 1) for (let x = 3; x < this.W - 3; x += 1) {
       const biome = this.biomeAt(x, z); const h = this.height[x + z * this.W];
@@ -213,7 +216,7 @@ BC.World = class World {
     }
     const y0 = hy + 1; const put = (x, y, z, id) => { const wx = ox + x, wz = oz + z; if (this.inBounds(wx, y, wz)) this.blocks[this.idx(wx, y, wz)] = id; };
     const ground = (x, z, id) => put(x, hy, z, id);
-    const plankOf = { temperate: 19, prairie: 19, desert: 64, rainforest: 62, boreal: 61, wetland: 63 }[biome] || 19; const P = plankOf;
+    const plankOf = { temperate: 19, prairie: 19, desert: 64, rainforest: 62, boreal: 61, wetland: 63, tundra: 61 }[biome] || 19; const P = plankOf;
     const localPlants = BC.PLANTS.filter(p => p.biomes.includes(biome) && !p.invasive && p.water !== 'aquatic' && !p.epiphyte);
     const crops = localPlants.filter(p => ['tomato', 'potato', 'cabbage', 'cucumber', 'chili', 'corn', 'bean', 'squash', 'basil', 'marigold', 'chives', 'dill', 'nasturtium', 'yarrow', 'sunflower', 'buckwheat', 'alfalfa', 'mustard', 'comfrey', 'coffee', 'banana', 'pineapple', 'blueberry', 'cloudberry', 'prickly_pear', 'agave', 'cacao'].includes(p.id));
     const pool = crops.length >= 4 ? crops : localPlants; const pick = arr => arr[Math.floor(R() * arr.length)];
@@ -298,7 +301,7 @@ BC.World = class World {
     return true;
   }
   placePlants() {
-    const density = { temperate: 0.07, prairie: 0.1, desert: 0.05, rainforest: 0.09, boreal: 0.07, wetland: 0.1 };
+    const density = { temperate: 0.07, prairie: 0.1, desert: 0.05, rainforest: 0.09, boreal: 0.07, wetland: 0.1, tundra: 0.06 };
     for (let z = 1; z < this.D - 1; z++) for (let x = 1; x < this.W - 1; x++) {
       const biome = this.biomeAt(x, z); if (this.rand() > density[biome]) continue;
       const h = this.height[x + z * this.W]; if (this.stream[x + z * this.W]) continue;

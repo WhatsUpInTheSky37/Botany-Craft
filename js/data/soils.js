@@ -127,6 +127,18 @@ BC.SOILS = {
       'Compost returns the nutrients a plant took from the soil. In nature the same job is done by fungi, worms and bacteria.',
     ],
   },
+  gelisol: {
+    id: 'gelisol', name: 'Tundra Permafrost Soil', order: 'Gelisol', ph: 5.6, phRange: [4.5, 6.5],
+    texture: 'Silty, stony, churned by frost', organic: 'High in the thin thawed layer, frozen below', drainage: 'Very poor: permafrost blocks it, so summer ground is boggy',
+    color: '#6a6250',
+    where: 'The Arctic tundra of Alaska, Canada, Greenland and Siberia; the Tibetan plateau; one soil in nine on Earth',
+    horizons: [
+      ['O', 'Lichen and moss mat', 'A few centimetres of living and half-rotted plants. Cold stops decay, so dead material piles up faster than microbes can eat it.'],
+      ['A/Bg', 'Active layer', 'The 30 to 100 cm that thaws each summer and refreezes each autumn. Waterlogged above the ice, it goes grey and blue (gleyed), and the yearly freeze heaves stones to the surface in rings and polygons.'],
+      ['Cf', 'Permafrost', 'Ground that has stayed below 0 °C for at least two years, in places for 40,000. Roots stop here. It can be ice-rich enough to collapse into pits (thermokarst) when it thaws.'],
+    ],
+    facts: ['Gelisols cover 9 percent of the ice-free land on Earth and store about a quarter of all soil carbon.', 'Nothing can be ploughed: a plant here lives in the top half metre and must flower, seed and store food in two months.', 'Frost heave sorts stones into circles and stripes so regular that early explorers thought people had laid them.'],
+  },
   stone: {
     id: 'stone', name: 'Bedrock', order: 'R horizon', ph: 7.0, phRange: [6, 8],
     texture: 'Solid rock', organic: 'None', drainage: 'None', color: '#7d7d7d',
@@ -144,4 +156,4 @@ BC.SOILS = {
 };
 BC.PH_NOTES = 'pH runs from 0 (acid) to 14 (alkaline); 7 is neutral. Each step is ten times stronger. Most garden plants like 6 to 7. Below 5.5, phosphorus and calcium become hard for roots to absorb; above 7.5, iron becomes locked up and leaves turn yellow between the veins (chlorosis).';
 // Baseline available N, P, K per soil (game units, 1 = plenty).
-BC.SOIL_NUTR = { alfisol: [0.6, 0.5, 0.55], mollisol: [0.85, 0.6, 0.75], aridisol: [0.2, 0.3, 0.45], oxisol: [0.3, 0.15, 0.3], spodosol: [0.3, 0.25, 0.3], histosol: [0.55, 0.15, 0.25], gley: [0.4, 0.3, 0.4], compost: [0.8, 0.7, 0.7], stone: [0.05, 0.1, 0.1], sand_subsoil: [0.1, 0.2, 0.3], bark: [0.3, 0.2, 0.3] };
+BC.SOIL_NUTR = { gelisol: [0.25, 0.2, 0.25], alfisol: [0.6, 0.5, 0.55], mollisol: [0.85, 0.6, 0.75], aridisol: [0.2, 0.3, 0.45], oxisol: [0.3, 0.15, 0.3], spodosol: [0.3, 0.25, 0.3], histosol: [0.55, 0.15, 0.25], gley: [0.4, 0.3, 0.4], compost: [0.8, 0.7, 0.7], stone: [0.05, 0.1, 0.1], sand_subsoil: [0.1, 0.2, 0.3], bark: [0.3, 0.2, 0.3] };

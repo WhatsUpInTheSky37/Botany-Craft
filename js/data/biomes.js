@@ -61,6 +61,18 @@ BC.BIOMES = {
       'Beneath much of the taiga is permafrost, permanently frozen ground. Roots stay shallow, and trees in thawing permafrost lean at odd angles ("drunken forests").',
     ],
   },
+  tundra: {
+    id: 'tundra', name: 'Arctic Tundra', short: 'Tundra',
+    places: 'Alaska\'s North Slope, the Canadian Arctic, the Greenland coast, Svalbard, the Siberian and Scandinavian far north',
+    climate: 'Winters of minus 30 °C and a growing season of six to ten weeks. Under 250 mm of precipitation, most of it snow. The ground a metre down never thaws.',
+    soil: 'gelisol', baseMoisture: 0.5, rainChance: 0.3, temp: 'cold',
+    sky: '#c9dbe8', grass: [0xa9b08c, 0x8c9a74],
+    facts: [
+      'Tundra means treeless upland in Sámi. No tree can stand here: the growing season is too short to ripen wood, the wind strips buds, and roots cannot go down through frozen ground. Willows and birches grow instead as ankle-high mats that may be a century old.',
+      'Permafrost holds twice as much carbon as the whole atmosphere, in frozen peat and dead roots. As it thaws, microbes wake and breathe it out as carbon dioxide and methane, which warms the air and thaws more: a feedback loop that worries climate scientists more than almost anything else.',
+      'Life runs in pulses. Lemming numbers boom and crash on a four-year cycle, and in a lemming year snowy owls, foxes and skuas all raise big broods; in a bust year many do not breed at all.',
+    ],
+  },
   wetland: {
     id: 'wetland', name: 'Freshwater Wetland', short: 'Wetland',
     places: 'The Everglades (Florida), the Pantanal (Brazil), the Okavango Delta (Botswana), the Mississippi delta',
@@ -74,13 +86,14 @@ BC.BIOMES = {
     ],
   },
 };
-BC.BIOME_LIST = ['temperate', 'prairie', 'desert', 'rainforest', 'boreal', 'wetland'];
+BC.BIOME_LIST = ['temperate', 'prairie', 'desert', 'rainforest', 'boreal', 'wetland', 'tundra']; // tundra last so saved worlds keep their biome indexes
 // Which climates a plant can tolerate at half speed (frost / heat edge cases).
 BC.CLIMATE_NEIGHBORS = {
   temperate: ['prairie', 'wetland', 'boreal'],
   prairie: ['temperate', 'desert'],
   desert: ['prairie'],
   rainforest: ['wetland'],
-  boreal: ['temperate', 'wetland'],
+  boreal: ['temperate', 'wetland', 'tundra'],
   wetland: ['temperate', 'rainforest', 'boreal', 'prairie'],
+  tundra: ['boreal'],
 };

@@ -21,11 +21,11 @@ The backend is a Supabase project: two tables (`bc_worlds`, `bc_players`) behind
 
 | Topic | In the game |
 |---|---|
-| Soil science | 10 soil types based on USDA soil orders (Alfisol, Mollisol, Aridisol, Oxisol, Spodosol, Histosol, gley, compost, caliche, bedrock), each with real horizons, pH, texture, drainage and where on Earth it occurs. Dig down to see the profile. |
-| Plant requirements | 117 plants and 70 trees (40 of them fruit trees, from apple to starfruit) with real soil, pH, water, light and climate needs. The growth simulation scores all five every tick and explains exactly why a plant is thriving or withering. |
-| Biogeography | Six biomes with their real-world locations, climate and native species. A world map shows how temperature and rainfall decide the biome. |
+| Soil science | 11 soil types based on USDA soil orders (Alfisol, Mollisol, Aridisol, Oxisol, Spodosol, Histosol, Gelisol permafrost, gley, compost, caliche, bedrock), each with real horizons, pH, texture, drainage and where on Earth it occurs. Dig down to see the profile. |
+| Plant requirements | 121 plants and 70 trees (40 of them fruit trees, from apple to starfruit) with real soil, pH, water, light and climate needs. The growth simulation scores all five every tick and explains exactly why a plant is thriving or withering. |
+| Biogeography | Seven biomes, from Arctic tundra with permafrost, snow and frozen lakes to tropical rainforest, with their real-world locations, climate and native species. A world map shows how temperature and rainfall decide the biome. |
 | Ecology | Nitrogen fixation (legumes), pollination (bees, butterflies, hummingbirds visit your flowers and double seed yield), herbivory (deer and hares eat unfenced crops), invasive species, epiphytes, carnivorous plants, succession, fire ecology, composting, the Three Sisters. |
-| Animals | 90 animals, birds, fish and insects, each with its role in the ecosystem. Horses, donkeys, camels, elk, bison, moose and caribou can be ridden, and a wagon hitched to one carries you and your cargo. |
+| Animals | 125 animals, including 45 birds, each placed only in its real habitat and each with its role in the ecosystem. Every player owns an enchanted horse, called with the bridle in the starting bag, that carries only its owner and wears their initial. Horses, donkeys, camels, elk, bison, moose and caribou can be ridden, and a wagon hitched to one carries you and your cargo. |
 | Landmarks | A tenth-scale Giza pyramid complex hidden in the desert, Machu Picchu on a northern ridge, and Atlantis as Plato described it: a ring city in a bay at the edge of the sea, with a drowned quarter. Sail 160 blocks past any edge of the map and the ocean wraps you to the far side. |
 | Building | Craft kits that raise a 7 by 7 koi pond (stone rim, puddled-clay liner, water lilies, six koi) or a solar greenhouse (glass traps heat; the roof panel runs grow lights, a heater and a pump) in one tap. Gold, silver and copper ores in the bedrock pay for it. |
 
@@ -37,7 +37,7 @@ Phone: left thumb drags to move, right thumb drags to look, tap to use, press an
 
 ## Code layout
 
-* `js/data/` botanical content (117 plants, 70 trees, 90 animals): soils, biomes, plants, trees, animals, quests and quizzes.
+* `js/data/` botanical content (121 plants, 70 trees, 125 animals): soils, biomes, plants, trees, animals, quests and quizzes.
 * `js/textures.js` procedural pixel-art atlas (blocks and plant sprites), drawn at load time.
 * `js/world.js` terrain, climate map, soil horizons, trees and wild plants.
 * `js/mesher.js` chunk meshes with ambient occlusion, water and plant sprites.
