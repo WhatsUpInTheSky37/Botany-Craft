@@ -132,14 +132,14 @@ BC.SOILS = {
     texture: 'Solid rock', organic: 'None', drainage: 'None', color: '#7d7d7d',
     where: 'Under every soil on Earth, from a few centimetres to many metres down',
     horizons: [['R', 'Bedrock', 'Unweathered rock. Over thousands of years frost, roots, acids and lichens break it into the mineral part of soil.']],
-    facts: ['Nothing grows directly on bedrock. Lichens are the first colonisers: their acids begin the slow work of making soil.'],
+    facts: ['Nothing grows directly on bedrock. Lichens are the first colonisers: their acids begin the slow work of making soil.', 'It takes 200 to 1,000 years to make 2.5 cm of soil from rock, which is why losing topsoil to erosion matters so much.', 'Where bedrock lies close to the surface, trees root sideways and blow over in storms; deep soil is what holds a forest up.'],
   },
   sand_subsoil: {
     id: 'sand_subsoil', name: 'Caliche Hardpan', order: 'Bk horizon', ph: 8.3, phRange: [8, 9],
     texture: 'Cemented calcium carbonate', organic: 'None', drainage: 'Blocks roots and water', color: '#e8dcc0',
     where: 'Beneath desert soils of the American South-west, Australia and the Middle East',
     horizons: [['Bk', 'Caliche', 'Lime cemented into a rock-hard layer by millennia of evaporation.']],
-    facts: ['Roots cannot penetrate caliche, so desert trees spread their roots wide and shallow, or find cracks.'],
+    facts: ['Roots cannot penetrate caliche, so desert trees spread their roots wide and shallow, or find cracks.', 'Desert gardeners break through it with a bar or an auger before planting a tree, or the hole fills with water like a bathtub and drowns the roots.', 'The word is Spanish, from the Latin for lime; the same layer is called calcrete in Australia and duricrust by geologists.'],
   },
 };
 BC.PH_NOTES = 'pH runs from 0 (acid) to 14 (alkaline); 7 is neutral. Each step is ten times stronger. Most garden plants like 6 to 7. Below 5.5, phosphorus and calcium become hard for roots to absorb; above 7.5, iron becomes locked up and leaves turn yellow between the veins (chlorosis).';
