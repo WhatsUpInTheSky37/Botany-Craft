@@ -7,6 +7,7 @@ BC.UI = class UI {
     this.modal.addEventListener('click', e => { if (e.target === this.modal) this.closeModal(); });
     this.$('btn-exit').onclick = () => this.confirmExit(); this.$('btn-bag').onclick = () => this.showInventory(); this.$('btn-journal').onclick = () => this.showJournal(); this.$('btn-quests').onclick = () => this.showQuests(); this.$('btn-map').onclick = () => this.showMap(); this.$('btn-menu').onclick = () => this.showMenu();
     this.$('btn-jump').addEventListener('touchstart', e => { e.preventDefault(); game.player.jumpQueued = true; }, { passive: false });
+    this.$('btn-ride').addEventListener('touchstart', e => { e.preventDefault(); game.rideTarget(); }, { passive: false });
     this.$('btn-sprint').addEventListener('touchstart', e => { e.preventDefault(); game.player.sprint = !game.player.sprint; this.$('btn-sprint').classList.toggle('on', game.player.sprint); }, { passive: false });
     this.onClose = null; this.lastToast = { msg: '', t: 0 };
   }

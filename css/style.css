@@ -59,6 +59,7 @@ body.touch #lock-hint { display: none; }
 #joystick.active { opacity: 1; } #joystick .knob { position: absolute; left: 30px; top: 30px; width: 46px; height: 46px; border-radius: 50%; background: rgba(255,255,255,0.55); }
 #btn-jump, #btn-sprint { position: absolute; right: 14px; border-radius: 50%; background: rgba(255,255,255,0.14); border: 2px solid rgba(255,255,255,0.3); color: #fff; font-weight: 700; font-size: 13px; }
 #btn-jump { width: 64px; height: 64px; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
+#btn-ride { position: absolute; right: 14px; width: 64px; height: 64px; border-radius: 50%; bottom: calc(150px + env(safe-area-inset-bottom, 0px)); background: rgba(227,166,43,0.55); border: 2px solid rgba(255,230,160,0.8); color: #fff; font-weight: 700; font-size: 14px; } #btn-ride[hidden] { display: none; }
 #btn-sprint { width: 54px; height: 54px; right: 19px; bottom: calc(84px + env(safe-area-inset-bottom, 0px)); } #btn-sprint.on { background: rgba(227,166,43,0.5); }
 body.touch #side-buttons { top: calc(56px + env(safe-area-inset-top, 0px)); right: 10px; gap: 5px; }
 body.touch #side-buttons button { min-width: 0; padding: 6px 10px; font-size: 12px; } body.touch #side-buttons button small { display: none; }
