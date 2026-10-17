@@ -50,6 +50,10 @@ BC.Game = class Game {
     { const parts = []; for (let i = 0; i < 22; i++) { const cx = Math.random() * 300 - 40, cy = 46 + Math.random() * 6, cz = Math.random() * 300 - 40; const n = 3 + Math.floor(Math.random() * 3); for (let k = 0; k < n; k++) { const w = 5 + Math.random() * 10, d = 4 + Math.random() * 7, h = 1.2 + Math.random() * 1.6; const g = new THREE.BoxGeometry(w, h, d); g.setAttribute('color', new THREE.Float32BufferAttribute(new Array(g.attributes.position.count * 3).fill(1), 3)); g.translate(cx + (Math.random() - 0.5) * 12, cy + (k === 0 ? 0 : Math.random() * 1.6), cz + (Math.random() - 0.5) * 8); parts.push(g); } } const merged = BC.mergeGeometries(parts); const m = new THREE.Mesh(merged, cm); m.frustumCulled = false; this.clouds.add(m); } this.scene.add(this.clouds);
     const rp = new Float32Array(900 * 3); for (let i = 0; i < 900; i++) { rp[i * 3] = Math.random() * 30 - 15; rp[i * 3 + 1] = Math.random() * 20; rp[i * 3 + 2] = Math.random() * 30 - 15; }
     const rg = new THREE.BufferGeometry(); rg.setAttribute('position', new THREE.BufferAttribute(rp, 3)); this.rain = new THREE.Points(rg, new THREE.PointsMaterial({ color: 0xbfd8ff, size: 0.12, transparent: true, opacity: 0.7 })); this.rain.visible = false; this.scene.add(this.rain);
+    { const N = 460; const fp = new Float32Array(N * 3), fc = new Float32Array(N * 3); this.flyData = []; for (let i = 0; i < N; i++) this.flyData.push({ x: 0, z: 0, a: Math.random() * 6.283, r: 3 + Math.random() * 36, h: 0.6 + Math.random() * 4.5, ph: Math.random() * 6.283, bl: 0.6 + Math.random() * 1.4, spin: (Math.random() - 0.5) * 0.3, fresh: true });
+      const fg = new THREE.BufferGeometry(); fg.setAttribute('position', new THREE.BufferAttribute(fp, 3)); fg.setAttribute('color', new THREE.BufferAttribute(fc, 3));
+      const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'); const gr = g.createRadialGradient(32, 32, 2, 32, 32, 32); gr.addColorStop(0, 'rgba(255,255,230,1)'); gr.addColorStop(0.2, 'rgba(230,255,150,0.85)'); gr.addColorStop(0.5, 'rgba(180,240,100,0.25)'); gr.addColorStop(1, 'rgba(120,200,60,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); const tex = new THREE.CanvasTexture(c);
+      this.fireflies = new THREE.Points(fg, new THREE.PointsMaterial({ map: tex, vertexColors: true, size: 0.6, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, sizeAttenuation: true })); this.fireflies.visible = false; this.fireflies.frustumCulled = false; this.scene.add(this.fireflies); }
   }
   resize() { const w = window.innerWidth, h = window.innerHeight; this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, this.player.touch ? 1.5 : 2)); this.renderer.setSize(w, h, false); this.camera.aspect = w / h; this.camera.updateProjectionMatrix(); }
   cur() { return this.inventory[this.selected] || BC.HAND; }
@@ -235,13 +239,16 @@ BC.Game = class Game {
   updateSky() {
     const f = this.time.dayFrac; const ang = (f - 0.25) * Math.PI * 2; const elev = Math.sin(ang); const day = BC.util.clamp(elev * 1.6 + 0.15, 0, 1);
     const biome = BC.BIOMES[this.world.biomeAt(this.player.pos.x, this.player.pos.z)]; const skyDay = new THREE.Color(biome.sky), dusk = new THREE.Color(0xe8955a), night = new THREE.Color(0x0b1026);
+    const ff = this.stats.fireflies && !this.player.headInWater ? BC.util.clamp((0.08 - elev) / 0.18, 0, 1) : 0; this.fireflyGlow = ff; // 0 by day, 1 in full night with firefly mode on
     const col = elev > 0.15 ? skyDay.clone().lerp(dusk, BC.util.clamp(1 - (elev - 0.15) / 0.25, 0, 1) * 0.6) : night.clone().lerp(dusk, BC.util.clamp((elev + 0.15) / 0.3, 0, 1));
+    if (ff > 0) col.lerp(new THREE.Color(0x3f5a34), ff * 0.75);
     if (this.weather.raining) col.lerp(new THREE.Color(0x6a7a86), 0.6);
     const under = this.player.headInWater; if (under) { col.set(0x1e5c9a).lerp(new THREE.Color(0x3a86c8), day * 0.6); }
     const haze = under ? col.clone() : col.clone().lerp(new THREE.Color(0xf6e9d2), day * 0.22); const zen = under ? col.clone() : col.clone().lerp(new THREE.Color(0x2d62c9), day * 0.6); if (this.weather.raining && !under) zen.lerp(new THREE.Color(0x4a5a68), 0.5);
     this.scene.background.copy(haze); this.scene.fog.color.copy(haze); this.scene.fog.near = under ? 1 : this.weather.raining ? 20 : 44; this.scene.fog.far = under ? 22 : this.weather.raining ? 80 : 118; this.skyMat.uniforms.bottom.value.copy(haze); this.skyMat.uniforms.top.value.copy(zen); this.skyDome.position.copy(this.camera.position); { const sh = this.matWater.userData.shader; if (sh) sh.uniforms.uSky.value.copy(haze); }
     { const ov = this.ui.$('underwater'); const show = under || (this.player.inWater && this.camera.position.y < this.world.waterSurface(Math.floor(this.player.pos.x), Math.floor(this.player.pos.z)) + 1); if (ov.hidden === show) ov.hidden = !show; }
-    this.sun.intensity = 0.25 + day * (this.weather.raining ? 0.6 : 1.2); this.hemi.intensity = 0.42 + day * 0.78; this.sun.color.setHex(elev < 0.3 ? 0xffc890 : 0xffe6c2);
+    this.sun.intensity = 0.25 + day * (this.weather.raining ? 0.6 : 1.2) + ff * 0.5; this.hemi.intensity = 0.42 + day * 0.78 + ff * 0.95; this.sun.color.setHex(elev < 0.3 ? 0xffc890 : 0xffe6c2); if (ff > 0) { this.sun.color.lerp(new THREE.Color(0xd8ffa0), ff); this.hemi.color.set(0xc6dcff).lerp(new THREE.Color(0xdcff9a), ff); this.hemi.groundColor.set(0x7a6244).lerp(new THREE.Color(0x8aa050), ff); } else if (this._ffLit) { this.hemi.color.set(0xc6dcff); this.hemi.groundColor.set(0x7a6244); } this._ffLit = ff > 0;
+    this.updateFireflies(elev);
     const p = this.player.pos; const sx = Math.cos(ang) * 120, sy = Math.sin(ang) * 120; this.sun.position.set(p.x + sx, p.y + Math.max(sy, 10), p.z + 40); this.sun.target.position.set(p.x, p.y, p.z);
     if (this.sunGlow) { this.sunGlow.position.set(p.x + sx * 1.55, p.y + sy * 1.55, p.z + 58); this.sunGlow.visible = elev > -0.12 && !under; this.sunGlow.material.opacity = this.weather.raining ? 0.25 : 0.55 + 0.45 * BC.util.clamp(1 - elev * 2.5, 0, 1); }
     this.sunMesh.position.set(p.x + sx * 1.6, p.y + sy * 1.6, p.z + 60); this.moonMesh.position.set(p.x - sx * 1.6, p.y - sy * 1.6, p.z - 60); this.sunMesh.visible = elev > -0.1; this.moonMesh.visible = elev < 0.1;
@@ -630,6 +637,20 @@ BC.Game = class Game {
   // Soil hammer: cycle the hit block through every ground type. Tilled soil goes back to its base soil first.
   useHammer(h) { const w = this.world; if (h.type !== 'block') return this.toast('Tap a block of ground with the hammer.', ''); const b = BC.BLOCKS[h.id]; if (b.unbreakable || (h.id === 14 && h.y <= 1)) return this.toast('Bedrock will not change.', ''); let cur = BC.UNTILL[h.id] || h.id; if (b.rock) cur = 14; const i = BC.SOIL_CYCLE.indexOf(cur); if (i < 0 && !b.soil) return this.toast('The hammer changes earth, sand and rock, not ' + b.name.toLowerCase() + '.', ''); const next = BC.SOIL_CYCLE[(i + 1) % BC.SOIL_CYCLE.length]; w.set(h.x, h.y, h.z, next); const nb = BC.BLOCKS[next]; const soil = nb.soil ? BC.SOILS[nb.soil] : null; this.stats.hammered = (this.stats.hammered || 0) + 1; if (soil) this.discover('soil:' + nb.soil, 'hammer'); this.lastInspect = { x: h.x, y: h.y, z: h.z };
     const idx = (i + 1) % BC.SOIL_CYCLE.length; this.toast(`${nb.name}${soil ? ` (${soil.order}): pH ${soil.ph}, ${soil.texture.split(' (')[0].toLowerCase()}, ${soil.drainage.toLowerCase()} drainage` : next === 16 ? ': loose and fast-draining, roots dry out' : ': bare rock, nothing grows'}. ${idx + 1} of ${BC.SOIL_CYCLE.length}: tap again for the next.`, 'good'); }
+  // ---------- firefly mode: on a summer night the whole world glows ----------
+  toggleFireflies() { const on = !this.stats.fireflies; this.stats.fireflies = on; const f = this.time.dayFrac; const elev = Math.sin((f - 0.25) * Math.PI * 2); this.toast(on ? (elev < 0.08 ? 'Firefly mode on. Here they come.' : 'Firefly mode on. They come out at dusk and light the night until dawn.') : 'Firefly mode off. The nights are dark again.', on ? 'good' : ''); }
+  updateFireflies(elev) {
+    const F = this.fireflies; if (!F) return; const ff = this.fireflyGlow || 0; const show = ff > 0.02; if (F.visible !== show) F.visible = show; if (!show) return;
+    const now = performance.now(); const dt = Math.min(0.1, (now - (this._ffLast || now)) / 1000); this._ffLast = now; const t = this.time.t; const p = this.player.pos; const w = this.world;
+    const pos = F.geometry.attributes.position, col = F.geometry.attributes.color; const tint = [0.86, 1.0, 0.45];
+    for (let i = 0; i < this.flyData.length; i++) { const d = this.flyData[i];
+      if (d.fresh || (d.x - p.x) ** 2 + (d.z - p.z) ** 2 > 42 * 42) { d.a = Math.random() * 6.283; d.r = 3 + Math.random() * 36; d.x = p.x + Math.cos(d.a) * d.r; d.z = p.z + Math.sin(d.a) * d.r; d.fresh = false; }
+      d.x += Math.sin(t * 0.6 + d.ph) * 0.9 * dt + d.spin * dt; d.z += Math.cos(t * 0.5 + d.ph * 1.3) * 0.9 * dt; // a lazy wander
+      const gx = Math.max(0, Math.min(w.W - 1, d.x | 0)), gz = Math.max(0, Math.min(w.D - 1, d.z | 0)); const ground = Math.max(w.top(gx, gz) + 1, w.WL + 1); const y = ground + d.h + Math.sin(t * 1.1 + d.ph) * 0.5;
+      pos.setXYZ(i, d.x, y, d.z);
+      const b = ff * (0.25 + 0.75 * Math.pow(Math.max(0, Math.sin(t * d.bl + d.ph)), 1.6)); col.setXYZ(i, tint[0] * b, tint[1] * b, tint[2] * b); }
+    pos.needsUpdate = true; col.needsUpdate = true;
+  }
   // ---------- the player's own enchanted horse ----------
   monogram() { const src = this.mode === 'shared' ? (this.playerLabel || this.playerName) : ((BC.CHARACTER_BY_ID[this.character.id] || {}).name || 'B'); const m = String(src).match(/[A-Za-z]/); return m ? m[0].toUpperCase() : 'B'; }
   mySteed() { return this.animals.list.find(e => e.def.id === 'enchanted_horse' && e.owner === this.playerName); }
