@@ -62,22 +62,37 @@ BC.Sim = (function () {
     const score = min * 0.6 + mean * 0.4;
     return { score, factors, def, soil, soilBlock, moisture: m, light, biome, chem };
   }
-  function tick(game, dt) {
-    const w = game.world; game._pestCensus = null;
-    // moisture relaxes toward biome base; rain raises it
-    const rain = game.weather.raining; const n = w.moisture.length;
-    for (let i = 0; i < n; i += 1) { const base = Math.min(1, BC.BIOMES[BC.BIOME_LIST[w.biome[i]]].baseMoisture + w.wetBonus[i]); let m = w.moisture[i]; if (rain) m += dt * 0.03 * (BC.BIOMES[BC.BIOME_LIST[w.biome[i]]].rainChance + 0.1); const tb = BC.BLOCKS[w.get(i % w.W, w.height[i], (i / w.W) | 0)]; const rate = m > base ? 0.01 * (1 - 0.6 * w.mulch[i]) * (tb && tb.tilled ? 0.7 : 1) : 0.01; m += (base - m) * Math.min(1, dt * rate); w.moisture[i] = BC.util.clamp(m, 0, 1); }
-    game.soilAcc = (game.soilAcc || 0) + dt; if (game.soilAcc >= 10) { const T = game.soilAcc; game.soilAcc = 0; for (let i = 0; i < n; i++) { const nb = w.nutrBase ? [w.nutrBase[i * 3], w.nutrBase[i * 3 + 1], w.nutrBase[i * 3 + 2]] : BC.SOIL_NUTR[BC.BIOMES[BC.BIOME_LIST[w.biome[i]]].soil]; for (let k = 0; k < 3; k++) { const v = w.nutr[i * 3 + k]; if (v < nb[k]) w.nutr[i * 3 + k] = Math.min(nb[k], v + T * 0.0004 * (1 + w.om[i])); } if (w.mulch[i] > 0) w.mulch[i] = Math.max(0, w.mulch[i] - T * 0.0005);
+  function updateSoil(game, dt) {
+    if (!(dt > 0)) return;
+    const w = game.world, n = w.moisture.length, count = 128;
+    if (!w.soilSchedule) w.soilSchedule = { time: 0, rain: 0, cursor: 0, last: new Float64Array(count), lastRain: new Float64Array(count), nutrients: new Float64Array(count) };
+    const s = w.soilSchedule; s.time += dt; if (game.weather.raining) s.rain += dt;
+    const deadline = performance.now() + 2;
+    let processed = 0;
+    do {
+      const bucket = s.cursor; s.cursor = (s.cursor + 1) % count;
+      const start = Math.floor(bucket * n / count), end = Math.floor((bucket + 1) * n / count);
+      const dt = s.time - s.last[bucket], rainTime = s.rain - s.lastRain[bucket];
+      s.last[bucket] = s.time; s.lastRain[bucket] = s.rain;
+    for (let i = start; i < end; i += 1) { const base = Math.min(1, BC.BIOMES[BC.BIOME_LIST[w.biome[i]]].baseMoisture + w.wetBonus[i]); let m = w.moisture[i]; m += rainTime * 0.03 * (BC.BIOMES[BC.BIOME_LIST[w.biome[i]]].rainChance + 0.1); const tb = BC.BLOCKS[w.get(i % w.W, w.height[i], (i / w.W) | 0)]; const rate = m > base ? 0.01 * (1 - 0.6 * w.mulch[i]) * (tb && tb.tilled ? 0.7 : 1) : 0.01; m += (base - m) * Math.min(1, dt * rate); w.moisture[i] = BC.util.clamp(m, 0, 1); }
+      const T = s.time - s.nutrients[bucket];
+      if (T >= 10) { s.nutrients[bucket] = s.time;
+for (let i = start; i < end; i++) { const nb = w.nutrBase ? [w.nutrBase[i * 3], w.nutrBase[i * 3 + 1], w.nutrBase[i * 3 + 2]] : BC.SOIL_NUTR[BC.BIOMES[BC.BIOME_LIST[w.biome[i]]].soil]; for (let k = 0; k < 3; k++) { const v = w.nutr[i * 3 + k]; if (v < nb[k]) w.nutr[i * 3 + k] = Math.min(nb[k], v + T * 0.0004 * (1 + w.om[i])); } if (w.mulch[i] > 0) w.mulch[i] = Math.max(0, w.mulch[i] - T * 0.0005);
         // leaching: saturated soil loses nitrogen downhill to wherever it drains (nitrate is mobile, phosphorus is not)
         if (w.moisture[i] > 0.85 && w.flowDir[i] >= 0 && w.nutr[i * 3] > nb[0]) { const d = w.FLOW_DIRS[w.flowDir[i]]; const x = i % w.W, z = (i / w.W) | 0; const j = (x + d[0]) + (z + d[1]) * w.W; const move = (w.nutr[i * 3] - nb[0]) * 0.02 * T / 10; w.nutr[i * 3] -= move; w.nutr[j * 3] = Math.min(1.2, w.nutr[j * 3] + move * 0.6); } } }
+      processed++;
+    } while (processed < count && performance.now() < deadline);
+  }
+  function tick(game, dt) {
+    const w = game.world; game._pestCensus = null;
     const toRemove = [];
     w.plants.forEach(p => {
       const def = defFor(p); if (!def) { toRemove.push(p); return; }
-      if (p.wild) { if (p.progress < 1) { p.progress = Math.min(1, p.progress + dt / 90); if (p.progress >= 1) w.markDirty(p.x, p.z); } return; }
+      if (p.wild) { if (p.progress < 1) { p.progress = Math.min(1, p.progress + dt / 90); if (p.progress >= 1) w.markPlantsDirty(p.x, p.z); } return; }
       if (p.withered) return;
       const ev = evaluate(w, p); p.lastScore = ev.score;
       const before = BC.Mesher.plantTile(p);
-      if (ev.score < 0.3) { p.health -= dt / 60; if (p.health <= 0) { p.withered = true; w.markDirty(p.x, p.z); game.notify(p.owner, `Your ${game.plantName(p)} withered. Inspect it to learn why.`, 'bad'); return; } }
+      if (ev.score < 0.3) { p.health -= dt / 60; if (p.health <= 0) { p.withered = true; w.markPlantsDirty(p.x, p.z); game.notify(p.owner, `Your ${game.plantName(p)} withered. Inspect it to learn why.`, 'bad'); return; } }
       else if (p.health < 1) p.health = Math.min(1, p.health + dt / 120);
       // soil draw-down and nitrogen fixing
       if (!def.epiphyte) { const ci = w.col(p.x, p.z); const needs = def.needs || (def.hungry ? [0.6, 0.4, 0.5] : def.nFix ? [0.1, 0.3, 0.3] : [0.3, 0.25, 0.3]); if (p.progress < 1) for (let k = 0; k < 3; k++) w.nutr[ci * 3 + k] = Math.max(0, w.nutr[ci * 3 + k] - needs[k] * dt * ev.score * game.growthMult / def.grow * 0.8); if (def.nFix) w.nutr[ci * 3] = Math.min(1, w.nutr[ci * 3] + dt * 0.0015 * game.growthMult); }
@@ -87,15 +102,16 @@ BC.Sim = (function () {
       if (p.progress < 1) {
         const tilledBoost = ev.soilBlock && ev.soilBlock.tilled ? 1.15 : 1; const stage0 = p.progress; p.progress = Math.min(1, p.progress + dt * ev.score * (1 - pestDrag) * tilledBoost * game.growthMult / def.grow);
         if (p.progress >= 1 && stage0 < 1) {
-          if (p.id.startsWith('tree:')) { const t = def; w.removePlant(p); if (w.buildTree(t, p.x, p.y, p.z, false)) { game.credit(p.owner, 'treeGrown', true, true); game.notify(p.owner, `Your ${t.name} sapling grew into a tree!`, 'good'); game.credit(p.owner, 'journal', 'tree:' + t.id); } return; }
+          if (p.id.startsWith('tree:')) { const t = def; if (w.buildTree(t, p.x, p.y, p.z, false)) { w.removePlant(p); game.credit(p.owner, 'treeGrown', true, true); game.notify(p.owner, `Your ${t.name} sapling grew into a tree!`, 'good'); game.credit(p.owner, 'journal', 'tree:' + t.id); } else { p.progress = 0.99; } return; }
           game.credit(p.owner, 'matured', 1); game.notify(p.owner, `Your ${def.name} is mature. Harvest it with your hand.`, 'good');
           if (def.id === 'blueberry' && ev.soil && ev.soil.ph < 5.3 && ev.score > 0.7) game.credit(p.owner, 'blueberryAcid', true, true);
           if (def.id === 'prickly_pear' && ev.soil && ev.soil.id === 'aridisol') game.credit(p.owner, 'cactusInSand', true, true);
         }
       }
-      if (BC.Mesher.plantTile(p) !== before) w.markDirty(p.x, p.z);
+      if (BC.Mesher.plantTile(p) !== before) w.markPlantsDirty(p.x, p.z);
     });
     toRemove.forEach(p => w.removePlant(p));
   }
-  return { evaluate, tick, defFor, WATER_IDEAL };
+  return { evaluate, tick, updateSoil, defFor, WATER_IDEAL };
 })();
+

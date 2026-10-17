@@ -48,10 +48,20 @@ BC.Animals = class Animals {
   }
   mountHeight(e) { const d = e.def; return (d.legH + d.body[1] * 0.95) * (d.scale || 1); }
   // Pose an animal: the articulated rig within 30 blocks of a player (built on demand), the merged mesh beyond. Both track the same position.
+  releaseRig(e) {
+    if (!e.rig) return;
+    this.game.scene.remove(e.rig.root);
+    e.rig.root.traverse(o => {
+      if (o.geometry) o.geometry.dispose();
+      // Monogram planes have private materials/textures; body materials are shared.
+      if (o.material && o.material.map) { o.material.map.dispose(); o.material.dispose(); }
+    });
+    e.rig = null;
+  }
   pose(e, dt, hop, moving, far2) {
-    const d = e.def; const g = this.game; const near = far2 < 30 * 30; if (!e.rig && !e.mesh.visible) e.mesh.visible = true;
+    const d = e.def; const g = this.game; const range = this.game.detailDistance || 30; const near = far2 < (e.rig ? range + 5 : range) ** 2; if (!e.rig && !e.mesh.visible) e.mesh.visible = true;
     if (near && e.rig === undefined || (near && e.rig === null)) { try { e.rig = BC.Critters.build(d, { monogram: e.mono }); g.scene.add(e.rig.root); e.mesh.visible = false; } catch (err) { console.warn('rig', d.id, err); e.rig = false; } }
-    else if (!near && e.rig) { g.scene.remove(e.rig.root); e.rig = null; e.mesh.visible = true; }
+    else if (!near && e.rig) { this.releaseRig(e); e.mesh.visible = true; }
     const tilt = e.jumping ? -Math.cos(e.jumping * Math.PI) * 0.9 : 0;
     e.mesh.position.set(e.x, e.y + hop, e.z); e.mesh.rotation.y = e.yaw; e.mesh.rotation.z = d.flies ? Math.sin(e.bob * 3) * 0.1 : 0; if (d.wings) e.mesh.rotation.x = Math.sin(e.bob * 20) * 0.15; else if (tilt) e.mesh.rotation.x = tilt;
     if (e.rig) { const r = e.rig.root; r.position.set(e.x, e.y + hop, e.z); r.rotation.y = e.yaw; r.rotation.x = tilt || (d.flies && moving ? 0.12 : 0); if (e.rig.kind !== 'fish' && e.rig.kind !== 'crab' && e.rig.kind !== 'worm') r.rotation.z = d.flies ? Math.sin(e.bob * 3) * 0.1 : 0; BC.Critters.animate(e.rig, dt, { moving, speed: d.speed ? Math.min(1.6, d.speed / 1.6) : 1, flying: !!d.flies, hop: hop * 4 }); }
@@ -69,7 +79,7 @@ BC.Animals = class Animals {
     this.list.push(e); return e;
   }
   byUid(uid) { return this.list.find(e => e.uid === uid); }
-  remove(e) { const i = this.list.indexOf(e); if (i < 0) return; this.list.splice(i, 1); this.game.scene.remove(e.mesh); if (e.rig) { this.game.scene.remove(e.rig.root); e.rig = null; } if (e.line) { this.game.scene.remove(e.line); e.line = null; } }
+  remove(e) { const i = this.list.indexOf(e); if (i < 0) return; this.list.splice(i, 1); this.game.scene.remove(e.mesh); if (e.rig) { this.releaseRig(e); } if (e.line) { this.game.scene.remove(e.line); e.line = null; } }
   // Position of the player holding a leash (host resolves by name).
   leaderPos(name) { const g = this.game; if (!name) return null; const n = String(name).toLowerCase(); if (n === String(g.playerName).toLowerCase()) return g.player.pos; let out = null; g.peers.forEach(pe => { if (String(pe.name).toLowerCase() === n) out = pe.group.position; }); return out; }
   anchor(e) { if (e.tether) { const t = e.tether; return { x: t[0] + 0.5, y: this.game.world.top(t[0], t[1]) + 1, z: t[1] + 0.5, post: true }; } return e.leash ? this.leaderPos(e.leash) : null; }
@@ -97,7 +107,7 @@ BC.Animals = class Animals {
       const d = e.def; e.timer -= dt; e.cool -= dt; e.bob += dt;
       let far = (e.x - pl.x) ** 2 + (e.z - pl.z) ** 2; for (const o of others) far = Math.min(far, (e.x - o.x) ** 2 + (e.z - o.z) ** 2);
       if (e.rider || e.driver) { const mine = e.rider === 'me' || e.driver === 'me'; const moving = mine ? this.steer(e, dt) : !!e.rmoving; if (!mine && e.rx !== undefined) { const k = Math.min(1, dt * 6); e.x += (e.rx - e.x) * k; e.y += (e.ry - e.y) * k; e.z += (e.rz - e.z) * k; let da = e.ryaw - e.yaw; da = Math.atan2(Math.sin(da), Math.cos(da)); e.yaw += da * k; } e.leash = null; e.tether = null; e.target = null; e.state = 'idle'; this.pose(e, dt, moving ? Math.abs(Math.sin(e.bob * 9)) * 0.05 : 0, moving, far); if (e.rider === 'me') { pl.set(e.x, e.y + this.mountHeight(e), e.z); this.game.player.vel.set(0, 0, 0); } continue; }
-      if (far > 70 * 70) { if (e.mesh.visible) e.mesh.visible = false; continue; } // sleep far away
+      if (far > 70 * 70) { this.releaseRig(e); if (e.mesh.visible) e.mesh.visible = false; continue; } // sleep far away
       const nearPlayer = (e.x - pl.x) ** 2 + (e.z - pl.z) ** 2 < 3.2 * 3.2; if (nearPlayer && !stats.journal.has('animal:' + d.id)) this.game.discover('animal:' + d.id, 'seen');
       // on a rope: follow the leader, nothing else
       if (e.leash) { const lp = this.leaderPos(e.leash); if (!lp) e.leash = null; else { const dx = lp.x - e.x, dz = lp.z - e.z; const dist = Math.hypot(dx, dz); e.state = 'idle'; e.timer = 1; e.plant = null; const near = BC.PERK === 'ranger' ? 1.3 : 1.8, far = BC.PERK === 'ranger' ? 2.3 : 3.2; if (dist > near) { e.target = [lp.x - dx / dist * (near - 0.4), lp.z - dz / dist * (near - 0.4)]; } else e.target = null; if (dist > far) { const k = (dist - (far - 0.2)) / dist; e.x += dx * k; e.z += dz * k; e.target = e.target || [lp.x, lp.z]; } } }
@@ -165,3 +175,4 @@ BC.mergeGeometries = function (geos) {
   geos.forEach(g => { pos.set(g.attributes.position.array, off * 3); nor.set(g.attributes.normal.array, off * 3); col.set(g.attributes.color.array, off * 3); const gi = g.index.array; for (let i = 0; i < gi.length; i++) idx.push(gi[i] + off); off += g.attributes.position.count; });
   const m = new THREE.BufferGeometry(); m.setAttribute('position', new THREE.BufferAttribute(pos, 3)); m.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); m.setAttribute('color', new THREE.BufferAttribute(col, 3)); m.setIndex(idx); return m;
 };
+
