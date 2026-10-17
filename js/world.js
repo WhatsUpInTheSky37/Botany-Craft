@@ -3,7 +3,7 @@ BC.WRAP = 160; // blocks of open sea beyond each map edge before the world wraps
 // World storage + procedural generation.
 BC.World = class World {
   constructor(seed, W, D, H) {
-    this.W = W || 448; this.D = D || 448; this.H = H || 44; this.seed = seed >>> 0; this.scale = this.W / 224;
+    this.W = W || 896; this.D = D || 896; this.H = H || 44; this.seed = seed >>> 0; this.scale = this.W / 224; // new worlds are 896 across; saved worlds keep the size they were made at
     this.WL = 12; // water level
     this.blocks = new Uint8Array(this.W * this.D * this.H);
     this.biome = new Uint8Array(this.W * this.D);
@@ -187,7 +187,7 @@ BC.World = class World {
     this.villages = []; this.npcNameCount = {}; const R = BC.util.rng((this.seed ^ 0x5151a7) >>> 0); const SZ = 28; const WL = this.WL;
     const sites = []; const taken = [];
     const biomes = BC.BIOME_LIST.slice(); for (let i = biomes.length - 1; i > 0; i--) { const j = Math.floor(R() * (i + 1)); [biomes[i], biomes[j]] = [biomes[j], biomes[i]]; }
-    for (const biome of biomes) {
+    for (const biome of (this.scale >= 4 ? biomes.concat(biomes) : biomes)) { // a big world gets two villages per region
       let best = null;
       for (let tries = 0; tries < 900 && !best; tries++) {
         const ox = 4 + Math.floor(R() * (this.W - SZ - 8)), oz = 4 + Math.floor(R() * (this.D - SZ - 8));
@@ -323,7 +323,7 @@ BC.World = class World {
   pickAnimals() {
     // Water life goes where people walk: streams, ponds and the shoreline (water with land within two blocks), not the open ocean.
     const perBiome = {}, waterBiome = {}, deepBiome = {}; for (let z = 4; z < this.D - 4; z += 3) for (let x = 4; x < this.W - 4; x += 3) { if (this.isReserved(x, z)) continue; const b = this.biomeAt(x, z); const ws = this.waterSurface(x, z); if (ws >= 0) { let shore = false; for (let dz = -2; dz <= 2 && !shore; dz++) for (let dx = -2; dx <= 2; dx++) if (this.waterSurface(x + dx, z + dz) < 0) { shore = true; break; } ((shore ? waterBiome : deepBiome)[b] = (shore ? waterBiome : deepBiome)[b] || []).push([x, z]); continue; } if (this.height[x + z * this.W] < this.WL) continue; (perBiome[b] = perBiome[b] || []).push([x, z]); }
-    BC.ANIMALS.forEach(a => { if (a.hidden) return; a.biomes.forEach((b, bi) => { const cells = a.aquatic ? (waterBiome[b] || deepBiome[b] || perBiome[b]) : perBiome[b]; if (!cells || !cells.length) return; const n = Math.round((a.insect ? (bi === 0 ? 3 : 1) : a.aquatic ? (bi === 0 ? 12 : 5) : (bi === 0 ? 7 : 3)) * this.scale); for (let i = 0; i < n; i++) { const c = cells[Math.floor(this.rand() * cells.length)]; this.spawnAnimals.push({ id: a.id, x: c[0] + 0.5, z: c[1] + 0.5 }); } }); });
+    BC.ANIMALS.forEach(a => { if (a.hidden) return; a.biomes.forEach((b, bi) => { const cells = a.aquatic ? (waterBiome[b] || deepBiome[b] || perBiome[b]) : perBiome[b]; if (!cells || !cells.length) return; const n = Math.round((a.insect ? (bi === 0 ? 3 : 1) : a.aquatic ? (bi === 0 ? 12 : 5) : (bi === 0 ? 7 : 3)) * (this.scale >= 4 ? this.scale * 1.25 : this.scale)); for (let i = 0; i < n; i++) { const c = cells[Math.floor(this.rand() * cells.length)]; this.spawnAnimals.push({ id: a.id, x: c[0] + 0.5, z: c[1] + 0.5 }); } }); });
   }
   openAround(x, z, r) { for (let dz = -r; dz <= r; dz++) for (let dx = -r; dx <= r; dx++) { const h = this.height[(x + dx) + (z + dz) * this.W]; for (let y = h + 1; y <= h + 3; y++) if (this.get(x + dx, y, z + dz) !== 0) return false; } return true; }
   findSpawn(biome) {

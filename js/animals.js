@@ -4,6 +4,7 @@ const JUMPERS = new Set(['bluegill', 'catfish', 'trout', 'piranha', 'largemouth_
 BC.Animals = class Animals {
   constructor(game) { this.game = game; this.list = []; this.mat = new THREE.MeshLambertMaterial({ vertexColors: true }); this.tmp = new THREE.Vector3(); }
   buildMesh(def) {
+    if (!this.geoCache) this.geoCache = new Map(); { const cached = this.geoCache.get(def.id); if (cached) { const m = new THREE.Mesh(cached, this.mat); m.castShadow = !!BC.SHADOWS; return m; } }
     const geos = []; const col = new THREE.Color();
     const box = (w, h, l, x, y, z, color) => { const g = new THREE.BoxGeometry(w, h, l); g.translate(x, y, z); col.set(color); const n = g.attributes.position.count; const c = new Float32Array(n * 3); for (let i = 0; i < n; i++) { const k = g.attributes.normal.getY(i) > 0.5 ? 1 : g.attributes.normal.getY(i) < -0.5 ? 0.55 : 0.8; c[i * 3] = col.r * k; c[i * 3 + 1] = col.g * k; c[i * 3 + 2] = col.b * k; } g.setAttribute('color', new THREE.BufferAttribute(c, 3)); geos.push(g); };
     const [bw, bh, bl] = def.body; const legH = def.legH; const c = def.colors; const s = def.scale || 1;
@@ -20,17 +21,30 @@ BC.Animals = class Animals {
     if (def.id === 'deer' || def.id === 'moose' || def.id === 'bison') box(0.08, 0.2, 0.06, 0, legH + bh * 0.8, -bl / 2 - 0.02, c.accent);
     if (def.id === 'cottontail' || def.id === 'hare') box(0.12, 0.12, 0.12, 0, legH + bh * 0.7, -bl / 2 - 0.04, c.accent);
     if (def.id === 'dart_frog' || def.id === 'lizard' || def.id === 'frog') box(bw * 0.9, bh * 0.4, bl * 0.4, 0, legH + bh * 0.9, -bl * 0.1, c.accent);
-    const merged = BC.mergeGeometries(geos); { const k = def.aquatic && bl < 0.6 ? s * 1.5 : s; merged.scale(k, k, k); } const m = new THREE.Mesh(merged, this.mat); m.castShadow = !!BC.SHADOWS; return m;
+    const merged = BC.mergeGeometries(geos); { const k = def.aquatic && bl < 0.6 ? s * 1.5 : s; merged.scale(k, k, k); } this.geoCache.set(def.id, merged); const m = new THREE.Mesh(merged, this.mat); m.castShadow = !!BC.SHADOWS; return m;
   }
   // Riding: the rider's keys steer the animal like a boat. Used for a mount and for an animal hitched to a wagon the player sits in.
   steer(e, dt) {
     const p = this.game.player, d = e.def; const k = p.keys; let mz = p.joy.y; if (k.KeyW || k.ArrowUp) mz += 1; if (k.KeyS || k.ArrowDown) mz -= 1; mz = Math.max(-1, Math.min(1, mz)); let mx = p.joy.x; if (k.KeyA || k.ArrowLeft) mx -= 1; if (k.KeyD || k.ArrowRight) mx += 1;
-    const max = (d.speed || 1.5) * 2.4 * (p.sprint ? 1.45 : 1); const want = mz * max; e.rideSpeed = (e.rideSpeed || 0) + (want - (e.rideSpeed || 0)) * Math.min(1, dt * 3);
+    const max = (d.speed || 1.5) * 2.4 * (p.sprint ? 1.45 : 1) * (e.swimming ? 0.55 : 1); const want = mz * max; e.rideSpeed = (e.rideSpeed || 0) + (want - (e.rideSpeed || 0)) * Math.min(1, dt * 3);
     let da = p.yaw - e.yaw; da = Math.atan2(Math.sin(da), Math.cos(da)); if (Math.abs(e.rideSpeed) > 0.15 || Math.abs(da) > 0.4) e.yaw += da * Math.min(1, dt * 2.6); if (mx) e.yaw -= mx * dt * 1.8;
-    const sp = e.rideSpeed * dt; const nx = e.x - Math.sin(e.yaw) * sp, nz = e.z - Math.cos(e.yaw) * sp;
-    if (this.walkable(e, nx, e.z)) e.x = nx; else e.rideSpeed *= 0.4; if (this.walkable(e, e.x, nz)) e.z = nz; else e.rideSpeed *= 0.4;
-    const t = this.game.world.top(e.x | 0, e.z | 0); const gy = this.game.world.standY(e.x | 0, e.z | 0); e.y += (gy - e.y) * Math.min(1, dt * 10);
+    const sp = e.rideSpeed * dt; if (sp !== 0 && !this.mountMove(e, -Math.sin(e.yaw) * sp, -Math.cos(e.yaw) * sp)) e.rideSpeed *= 0.5;
+    // ride height: the ground under the canopy, the water surface when swimming, held level while leaping a gap
+    const w = this.game.world; const gx = e.x | 0, gz = e.z | 0; const t = this.groundAt(gx, gz, e.y + 2.6); let gy = t + BC.blockTop(w.get(gx, t, gz)); const ws = w.waterSurface(gx, gz); e.swimming = ws >= 0 && ws >= t && ws + 0.35 > gy; if (e.swimming) gy = ws + 0.35; if (e.leapUntil && this.game.time.t < e.leapUntil) gy = Math.max(gy, e.leapY);
+    e.y += (gy - e.y) * Math.min(1, dt * 10);
     return Math.abs(e.rideSpeed) > 0.15;
+  }
+  // A ridden animal clears what stops it on foot: it climbs two blocks, leaps one-block holes, swims through water and slides round trunks and walls.
+  // Returns 0 blocked, 1 fine, 2 water, 3 a drop too deep to take except as a leap.
+  mountOk(e, x, z) { const w = this.game.world; if (x < 1 || z < 1 || x >= w.W - 1 || z >= w.D - 1) return 0; const t = this.groundAt(x, z, e.y + 2.6); const above = w.get(x | 0, t + 1, z | 0), above2 = w.get(x | 0, t + 2, z | 0); if (above === 15 || above2 === 15) return 2; /* water: swim it */ const bA = BC.BLOCKS[above]; if (bA && bA.solid) return 0; const bA2 = BC.BLOCKS[above2]; if (bA2 && bA2.solid && !bA2.leaves) return 0; const rise = t + 1 - e.y; if (rise > 2.3) return 0; if (rise < -3.2) return 3; return 1; }
+  mountMove(e, dx, dz) {
+    const L = Math.hypot(dx, dz); if (!L) return true; const ux = dx / L, uz = dz / L;
+    const tryStep = (ox, oz) => { const nx = e.x + ox, nz = e.z + oz; const ok = this.mountOk(e, nx, nz); if (ok === 0) return false;
+      if (ok === 3) { const far = this.mountOk(e, nx + ox / Math.hypot(ox, oz) * 1.2, nz + oz / Math.hypot(ox, oz) * 1.2); if (far !== 1 && far !== 2) return false; e.leapUntil = this.game.time.t + 0.5; e.leapY = e.y; }
+      e.x = nx; e.z = nz; return true; };
+    if (tryStep(dx, dz)) return true; if (Math.abs(dx) > 1e-6 && tryStep(dx, 0)) return true; if (Math.abs(dz) > 1e-6 && tryStep(0, dz)) return true;
+    const a = Math.atan2(ux, uz); for (const da of [0.7, -0.7, 1.2, -1.2, 1.5708, -1.5708]) if (tryStep(Math.sin(a + da) * L, Math.cos(a + da) * L)) return true; // slide sideways along a wall of trunks until there is a way through
+    return false;
   }
   mountHeight(e) { const d = e.def; return (d.legH + d.body[1] * 0.95) * (d.scale || 1); }
   // Pose an animal: the articulated rig within 30 blocks of a player (built on demand), the merged mesh beyond. Both track the same position.
@@ -130,7 +144,7 @@ BC.Animals = class Animals {
     this.updateLeashLines();
   }
   // Host -> guests: compact positions. Guests interpolate toward them.
-  snapshot() { const out = []; this.list.forEach(e => { out.push(e.uid, Math.round(e.x * 20) / 20, Math.round(e.y * 20) / 20, Math.round(e.z * 20) / 20, Math.round(e.yaw * 100) / 100); }); return out; }
+  snapshot(near) { const out = []; this.list.forEach(e => { if (near && near.length && !near.some(q => (e.x - q.x) ** 2 + (e.z - q.z) ** 2 < 90 * 90)) return; out.push(e.uid, Math.round(e.x * 20) / 20, Math.round(e.y * 20) / 20, Math.round(e.z * 20) / 20, Math.round(e.yaw * 100) / 100); }); return out; }
   applyRemote(list) { const m = new Map(this.list.map(e => [e.uid, e])); for (let i = 0; i < list.length; i += 5) { const e = m.get(list[i]); if (!e || e.rider === 'me' || e.driver === 'me') continue; e.rx = list[i + 1]; e.ry = list[i + 2]; e.rz = list[i + 3]; e.ryaw = list[i + 4]; if (e.rx === undefined || e.first === undefined) { e.x = e.rx; e.y = e.ry; e.z = e.rz; e.yaw = e.ryaw; e.first = 1; } } }
   updateGuest(dt) {
     const pl = this.game.player.pos; const stats = this.game.stats;

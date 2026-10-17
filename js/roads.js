@@ -33,7 +33,11 @@ BC.ORE_TEACH = {
     const lay = (x, z) => { if (x < 1 || z < 1 || x >= W - 1 || z >= D - 1) return; const ci = x + z * W; if (laid.has(ci)) return; if (this.isReserved(x, z)) return; for (const v of vs) if (inBox(x, z, [v.x, v.z, v.x + 28, v.z + 28])) return; const t = this.height[ci]; const top = this.blocks[this.idx(x, t, z)]; const tb = BC.BLOCKS[top];
       let y = t; if (t <= WL || top === 15) { y = WL + 1; } else if (!tb || tb.log || tb.leaves || tb.wood || tb.plank || tb.fence) return;
       if (y < t) return; this.blocks[this.idx(x, y, z)] = BRICK; if (y > t) this.height[ci] = y; const pk = this.idx(x, y + 1, z); if (this.plants.has(pk)) this.plants.delete(pk); if (this.blocks[pk] === 15) this.blocks[pk] = 0; laid.add(ci); this.roads.push(x, z); };
-    for (let a = 0; a < vs.length; a++) for (let b = a + 1; b < vs.length; b++) {
+    // a road network rather than every pair: a spanning tree so every town reaches every other, plus each town's two nearest neighbours
+    const pairs = new Set(); const dist = (a, b) => Math.hypot(vs[a].cx - vs[b].cx, vs[a].cz - vs[b].cz); const key = (a, b) => Math.min(a, b) + ':' + Math.max(a, b);
+    { const inT = new Set([0]); while (inT.size < vs.length) { let best = null; inT.forEach(a => { for (let b = 0; b < vs.length; b++) if (!inT.has(b)) { const d = dist(a, b); if (!best || d < best[2]) best = [a, b, d]; } }); inT.add(best[1]); pairs.add(key(best[0], best[1])); } }
+    for (let a = 0; a < vs.length; a++) vs.map((v, b) => b).filter(b => b !== a).sort((x, y) => dist(a, x) - dist(a, y)).slice(0, 2).forEach(b => pairs.add(key(a, b)));
+    for (const pk of pairs) { const [a, b] = pk.split(':').map(Number);
       const A = vs[a], B = vs[b]; const [sx, sz] = gate(A, B), [ex, ez] = gate(B, A); const others = vs.filter(v => v !== A && v !== B).map(boxOf);
       const path = astar(sx, sz, ex, ez, others); if (!path) continue;
       for (let i = 0; i < path.length; i++) { const [x0, z0] = path[i]; const [x1, z1] = path[Math.min(path.length - 1, i + 1)]; const n = Math.max(Math.abs(x1 - x0), Math.abs(z1 - z0), 1); for (let s = 0; s <= n; s++) { const x = Math.round(x0 + (x1 - x0) * s / n), z = Math.round(z0 + (z1 - z0) * s / n); lay(x, z); lay(x + 1, z); lay(x, z + 1); lay(x + 1, z + 1); } }

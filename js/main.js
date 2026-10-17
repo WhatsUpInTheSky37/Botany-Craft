@@ -213,7 +213,7 @@ BC.Game = class Game {
     if (a.pos >= 0.2) { a.pos = 0; const p = this.player.pos; const k = `${p.x.toFixed(1)},${p.y.toFixed(1)},${p.z.toFixed(1)},${this.player.yaw.toFixed(1)}`; if (k !== this.lastPosKey) { this.lastPosKey = k; n.send('pos', { x: +p.x.toFixed(2), y: +p.y.toFixed(2), z: +p.z.toFixed(2), yaw: +this.player.yaw.toFixed(2) }); } }
     if (!n.isHost) return;
     if (a.plants >= 1) { a.plants = 0; const list = []; this.world.plants.forEach(p => { if (p.wild && p.progress >= 1) return; const pl = p.pest ? +p.pest.level.toFixed(2) : 0; const sig = `${p.progress.toFixed(3)}|${p.health.toFixed(2)}|${p.withered ? 1 : 0}|${p.pollinated ? 1 : 0}|${p.pest ? p.pest.id : ''}|${pl}|${p.covered ? 1 : 0}`; if (p.netSig !== sig) { p.netSig = sig; list.push([p.key, +p.progress.toFixed(3), +p.health.toFixed(2), p.withered ? 1 : 0, p.pollinated ? 1 : 0, p.pest ? p.pest.id : 0, pl, p.covered ? 1 : 0]); } }); if (list.length && this.peers.size) n.send('plants', { list }); }
-    if (a.animals >= 0.5 && this.peers.size) { a.animals = 0; n.send('animals', { list: this.animals.snapshot() }); }
+    if (a.animals >= 0.5 && this.peers.size) { a.animals = 0; n.send('animals', { list: this.animals.snapshot(this.peerPositions().concat([this.player.pos])) }); } // only the animals near somebody
     if (a.time >= 10 && this.peers.size) { a.time = 0; n.send('time', { t: this.time.t }); }
   }
   // ---------- loop ----------
