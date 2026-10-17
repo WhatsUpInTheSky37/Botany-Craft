@@ -136,6 +136,56 @@ window.BC = window.BC || {};
   def(166, { name: 'Mushroom log', wood: true, solid: true, special: 'mushroom_log', shape: [[0.1, 0, 0.1, 0.9, 0.6, 0.9, { top: 'mushlog', side: 'mushlog', bottom: 'bark_dark' }]], tex: ['mushlog', 'mushlog', 'mushlog'], gear: true });
   def(167, { name: 'Waypoint flag', wood: true, solid: false, special: 'flag', shape: [[0.46, 0, 0.46, 0.54, 1.8, 0.54, 'bark_dark'], [0.54, 1.2, 0.47, 1.1, 1.75, 0.53, 'flag']], tex: ['flag', 'flag', 'flag'], gear: true });
   def(168, { name: 'Clay olla', solid: false, special: 'olla', shape: [[0.3, 0, 0.3, 0.7, 0.35, 0.7, 'terracotta'], [0.38, 0.35, 0.38, 0.62, 0.5, 0.62, 'terracotta']], tex: ['terracotta', 'terracotta', 'terracotta'], gear: true });
+  // ---------- solid metals (ids above 255: world.blocks is a Uint16Array) ----------
+  def(227, { name: 'Gold block', solid: true, metal: true, tex: ['gold_block', 'gold_block', 'gold_block'] });
+  def(228, { name: 'Silver block', solid: true, metal: true, tex: ['silver_block', 'silver_block', 'silver_block'] });
+  def(229, { name: 'Copper block', solid: true, metal: true, tex: ['copper_block', 'copper_block', 'copper_block'] });
+  def(230, { name: 'Weathered copper (verdigris)', solid: true, metal: true, tex: ['verdigris', 'verdigris', 'verdigris'] });
+  // ---------- 20 carpentry shapes for realistic villages and homes ----------
+  // iso: true makes the hotbar draw a little 3-D view of the shape instead of a flat tile.
+  Object.assign(shapes, {
+    upperslab: [[0, 0.5, 0, 1, 1, 1, P]],
+    post: [[0.3, 0, 0.3, 0.7, 1, 0.7, P]],
+    column: [[0.36, 0.1, 0.36, 0.64, 0.9, 0.64, 'column'], [0.2, 0, 0.2, 0.8, 0.1, 0.8, P], [0.2, 0.9, 0.2, 0.8, 1, 0.8, P], [0.3, 0.82, 0.3, 0.7, 0.9, 0.7, P], [0.3, 0.1, 0.3, 0.7, 0.18, 0.7, P]],
+    hatch: [[0, 0, 0, 1, 0.12, 1, { top: 'hatch', side: P, bottom: P }]],
+    beam: [[0, 0.65, 0.3, 1, 1, 0.7, 'beam']],
+    railing: [[0, 0.82, 0.42, 1, 0.95, 0.58, P], [0.06, 0, 0.44, 0.16, 0.82, 0.56, P], [0.3, 0, 0.45, 0.38, 0.82, 0.55, P], [0.54, 0, 0.45, 0.62, 0.82, 0.55, P], [0.78, 0, 0.45, 0.88, 0.82, 0.55, P], [0, 0.12, 0.45, 1, 0.2, 0.55, P]],
+    shutters: [[0, 0.08, 0, 0.42, 0.92, 0.1, 'shutter'], [0.58, 0.08, 0, 1, 0.92, 0.1, 'shutter']],
+    roofslope: [[0, 0, 0, 1, 0.25, 1, 'shingles'], [0, 0.25, 0.25, 1, 0.5, 1, 'shingles'], [0, 0.5, 0.5, 1, 0.75, 1, 'shingles'], [0, 0.75, 0.75, 1, 1, 1, 'shingles']],
+    ridge: [[0, 0, 0, 1, 0.34, 1, 'shingles'], [0, 0.34, 0.17, 1, 0.67, 0.83, 'shingles'], [0, 0.67, 0.34, 1, 1, 0.66, 'shingles']],
+    awning: [[0, 0.8, 0, 1, 0.92, 1, { top: 'shingles', side: 'shingles', bottom: P }], [0.1, 0.55, 0.8, 0.22, 0.8, 1, P], [0.78, 0.55, 0.8, 0.9, 0.8, 1, P], [0.1, 0.55, 0.6, 0.22, 0.65, 1, P], [0.78, 0.55, 0.6, 0.9, 0.65, 1, P]],
+    logwall: [[0, 0, 0.1, 1, 0.33, 0.9, { top: 'bark_dark', side: 'logwall', bottom: 'bark_dark' }], [0, 0.33, 0.06, 1, 0.67, 0.94, { top: 'bark_dark', side: 'logwall', bottom: 'bark_dark' }], [0, 0.67, 0.1, 1, 1, 0.9, { top: 'bark_dark', side: 'logwall', bottom: 'bark_dark' }]],
+    wainscot: [[0, 0, 0.84, 1, 0.56, 1, 'carved'], [0, 0.56, 0.78, 1, 0.64, 1, P], [0, 0, 0.78, 1, 0.08, 1, P]],
+    cupboard: [[0, 0, 0.3, 1, 0.86, 1, { top: P, side: 'cupboard', bottom: P }], [0, 0.86, 0.22, 1, 0.94, 1, { top: 'counter', side: P, bottom: P }]],
+    splitrail: [[0.38, 0.22, 0, 0.62, 0.36, 1, 'beam'], [0.38, 0.58, 0, 0.62, 0.72, 1, 'beam'], [0.34, 0, 0.34, 0.66, 0.9, 0.66, 'bark_dark']],
+    pergola: [[0, 0.82, 0, 1, 1, 0.14, 'beam'], [0, 0.82, 0.43, 1, 1, 0.57, 'beam'], [0, 0.82, 0.86, 1, 1, 1, 'beam'], [0, 0.7, 0.3, 1, 0.82, 0.7, 'beam']],
+    arch: [[0, 0.5, 0.3, 0.22, 1, 0.7, P], [0.78, 0.5, 0.3, 1, 1, 0.7, P], [0.12, 0.68, 0.3, 0.3, 1, 0.7, P], [0.7, 0.68, 0.3, 0.88, 1, 0.7, P], [0.22, 0.82, 0.3, 0.78, 1, 0.7, P]],
+    cornerboards: [[0, 0, 0, 0.14, 1, 1, P], [0, 0, 0, 1, 1, 0.14, P], [0.14, 0, 0.14, 1, 1, 1, 'clapboard']],
+    balcony: [[0, 0, 0, 1, 0.14, 1, { top: 'boardwalk', side: P, bottom: P }], [0, 0.82, 0, 1, 0.94, 0.12, P], [0.05, 0.14, 0.02, 0.15, 0.82, 0.1, P], [0.3, 0.14, 0.03, 0.38, 0.82, 0.09, P], [0.54, 0.14, 0.03, 0.62, 0.82, 0.09, P], [0.8, 0.14, 0.02, 0.9, 0.82, 0.1, P]],
+  });
+  const iso = { iso: true };
+  def(231, { name: 'Upper slab', wood: true, solid: true, shape: shapes.upperslab, tex: [P, P, P], iso: true });
+  def(232, { name: 'Timber post', wood: true, solid: true, shape: shapes.post, tex: [P, P, P], iso: true });
+  def(233, { name: 'Porch column', wood: true, solid: true, shape: shapes.column, tex: [P, 'column', P], iso: true });
+  def(234, { name: 'Timber-frame wall', wood: true, solid: true, tex: ['planks', 'halftimber', 'planks'] });
+  def(235, { name: 'Clapboard siding', wood: true, solid: true, tex: ['planks', 'clapboard', 'planks'] });
+  def(236, { name: 'Floor hatch', wood: true, solid: true, shape: shapes.hatch, tex: ['hatch', 'hatch', P], iso: true });
+  face(240, 'Timber beam', 'beam', { tex: ['beam', 'beam', 'beam'], extra: iso });
+  face(244, 'Porch railing', 'railing', { tex: [P, P, P], extra: iso });
+  face(248, 'Window shutters', 'shutters', { tex: ['shutter', 'shutter', 'shutter'], extra: { iso: true, solid: false } });
+  face(252, 'Roof slope', 'roofslope', { tex: ['shingles', 'shingles', 'shingles'], extra: iso });
+  face(256, 'Roof ridge', 'ridge', { tex: ['shingles', 'shingles', 'shingles'], extra: iso });
+  face(260, 'Awning', 'awning', { tex: ['shingles', 'shingles', P], extra: iso });
+  face(264, 'Log cabin wall', 'logwall', { tex: ['bark_dark', 'logwall', 'bark_dark'], extra: iso });
+  face(268, 'Wainscot panel', 'wainscot', { tex: ['carved', 'carved', 'carved'], extra: { iso: true, solid: false } });
+  face(272, 'Kitchen cupboard', 'cupboard', { tex: ['counter', 'cupboard', P], extra: iso });
+  face(276, 'Split-rail fence', 'splitrail', { tex: ['beam', 'beam', 'beam'], extra: { iso: true, fence: true } });
+  face(280, 'Pergola rafters', 'pergola', { tex: ['beam', 'beam', 'beam'], extra: iso });
+  face(284, 'Arch top', 'arch', { tex: [P, P, P], extra: iso });
+  face(288, 'Corner boards', 'cornerboards', { tex: ['planks', 'clapboard', 'planks'], extra: iso });
+  face(292, 'Balcony', 'balcony', { tex: ['boardwalk', P, P], extra: iso });
+  BC.CARPENTRY = [231, 232, 233, 234, 235, 236, 240, 244, 248, 252, 256, 260, 264, 268, 272, 276, 280, 284, 288, 292];
+  BC.METALS = [227, 228, 229, 230];
   B[83].special = 'birdhouse'; // the birdhouse now attracts birds too
   B[77].special = 'rain_barrel'; // and rain barrels hold rain for sprinklers and drip lines
   // how tall a block really is for standing on (slabs, boardwalks, tables are not full cubes)
@@ -145,7 +195,7 @@ window.BC = window.BC || {};
   BC.BLOCKS = B;
   BC.BLOCK = {
     AIR: 0, GRASS_A: 1, ALFISOL: 2, GRASS_M: 3, MOLLISOL: 4, SAND: 5, CALICHE: 6, FLOOR_O: 7, OXISOL: 8, MOSS: 9, PODZOL_E: 10, PODZOL_B: 11,
-    PEAT: 12, GLEY: 13, STONE: 14, WATER: 15, GRAVEL: 16, COMPOST: 17, FENCE: 18, PLANKS: 19, GLASS: 154, POND_LINER: 199, SOLAR: 220, SNOW: 222, TUNDRA: 223, PERMAFROST: 224, ICE: 225,
+    PEAT: 12, GLEY: 13, STONE: 14, WATER: 15, GRAVEL: 16, COMPOST: 17, FENCE: 18, PLANKS: 19, GLASS: 154, POND_LINER: 199, SOLAR: 220, SNOW: 222, TUNDRA: 223, PERMAFROST: 224, ICE: 225, GOLD: 227, SILVER: 228, COPPER: 229, VERDIGRIS: 230,
   };
   BC.leafIdFor = t => leafIdx(BC.TREES.indexOf(t));
   BC.isSolid = id => !!(B[id] && B[id].solid);

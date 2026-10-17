@@ -5,7 +5,7 @@ BC.World = class World {
   constructor(seed, W, D, H) {
     this.W = W || 896; this.D = D || 896; this.H = H || 44; this.seed = seed >>> 0; this.scale = this.W / 224; // new worlds are 896 across; saved worlds keep the size they were made at
     this.WL = 12; // water level
-    this.blocks = new Uint8Array(this.W * this.D * this.H);
+    this.blocks = new Uint16Array(this.W * this.D * this.H); // 16-bit: carpentry shapes and metals use ids above 255
     this.biome = new Uint8Array(this.W * this.D);
     this.height = new Uint8Array(this.W * this.D);
     this.moisture = new Float32Array(this.W * this.D);
@@ -216,7 +216,7 @@ BC.World = class World {
     }
     const y0 = hy + 1; const put = (x, y, z, id) => { const wx = ox + x, wz = oz + z; if (this.inBounds(wx, y, wz)) this.blocks[this.idx(wx, y, wz)] = id; };
     const ground = (x, z, id) => put(x, hy, z, id);
-    const plankOf = { temperate: 19, prairie: 19, desert: 64, rainforest: 62, boreal: 61, wetland: 63, tundra: 61 }[biome] || 19; const P = plankOf;
+    const plankOf = { temperate: 19, prairie: 19, desert: 64, rainforest: 62, boreal: 61, wetland: 63, tundra: 61 }[biome] || 19; const P = plankOf; const cabin = biome === 'boreal' || biome === 'tundra';
     const localPlants = BC.PLANTS.filter(p => p.biomes.includes(biome) && !p.invasive && p.water !== 'aquatic' && !p.epiphyte);
     const crops = localPlants.filter(p => ['tomato', 'potato', 'cabbage', 'cucumber', 'chili', 'corn', 'bean', 'squash', 'basil', 'marigold', 'chives', 'dill', 'nasturtium', 'yarrow', 'sunflower', 'buckwheat', 'alfalfa', 'mustard', 'comfrey', 'coffee', 'banana', 'pineapple', 'blueberry', 'cloudberry', 'prickly_pear', 'agave', 'cacao'].includes(p.id));
     const pool = crops.length >= 4 ? crops : localPlants; const pick = arr => arr[Math.floor(R() * arr.length)];
@@ -234,15 +234,28 @@ BC.World = class World {
         const edge = x === x0 || x === x0 + w - 1 || z === z0 || z === z0 + d - 1; ground(x, z, edge ? P : 19);
         if (!edge) continue;
         const corner = (x === x0 || x === x0 + w - 1) && (z === z0 || z === z0 + d - 1);
-        for (let y = 0; y < hgt; y++) { let id = P; if (!corner && y === 1 && ((x - x0) % 2 === 1 || (z - z0) % 2 === 1) && !(x === doorX && z === doorZ)) id = (z === z0 || z === z0 + d - 1) ? 86 : 87; put(x, y0 + y, z, id); }
+        const ns = z === z0 || z === z0 + d - 1; // wall runs along x
+        for (let y = 0; y < hgt; y++) {
+          // walls by region: log cabins in the cold north, timber frame in the temperate belt, clapboard on the prairie, local planks elsewhere
+          let id = cabin ? (ns ? 264 : 265) : (y === 1 && !corner ? (biome === 'temperate' ? 234 : biome === 'prairie' ? 235 : P) : P);
+          if (!corner && y === 1 && ((x - x0) % 2 === 1 || (z - z0) % 2 === 1) && !(x === doorX && z === doorZ)) {
+            id = ns ? 86 : 87;
+            // louvred shutters on the outside of every window
+            if (z === z0) put(x, y0 + 1, z - 1, 250); else if (z === z0 + d - 1) put(x, y0 + 1, z + 1, 248); else if (x === x0) put(x - 1, y0 + 1, z, 249); else put(x + 1, y0 + 1, z, 251);
+          }
+          put(x, y0 + y, z, id);
+        }
       }
       put(doorX, y0, doorZ, 118 + front); put(doorX, y0 + 1, doorZ, 0);
-      // roof: shingles with stair eaves
+      // roof: shingles with stair eaves, a ring of shingled slopes above and a ridge along the peak
       for (let x = x0 - 1; x <= x0 + w; x++) for (let z = z0 - 1; z <= z0 + d; z++) { const id = x === x0 - 1 ? 91 : x === x0 + w ? 93 : z === z0 - 1 ? 92 : z === z0 + d ? 90 : 74; put(x, y0 + hgt, z, id); }
-      for (let x = x0 + 1; x < x0 + w - 1; x++) for (let z = z0 + 1; z < z0 + d - 1; z++) put(x, y0 + hgt + 1, z, (x === x0 + 1 || x === x0 + w - 2 || z === z0 + 1 || z === z0 + d - 2) ? 67 : 74);
-      // window boxes under front windows, sign and lantern by the door
-      const fd = BC.FACING_DIR[front]; put(doorX + fd[0] + (fd[0] === 0 ? 1 : 0), y0, doorZ + fd[1] + (fd[1] === 0 ? 1 : 0), 106 + front);
-      put(doorX + fd[0], y0 + 2, doorZ + fd[1], 80);
+      for (let x = x0 + 1; x < x0 + w - 1; x++) for (let z = z0 + 1; z < z0 + d - 1; z++) put(x, y0 + hgt + 1, z, z === z0 + 1 ? 252 : z === z0 + d - 2 ? 254 : x === x0 + w - 2 ? 253 : x === x0 + 1 ? 255 : 74);
+      const iW = w - 4, iD = d - 4;
+      if (iD > 0 && iD % 2 === 1) { const zc = z0 + 2 + (iD >> 1); for (let x = x0 + 2; x <= x0 + w - 3; x++) put(x, y0 + hgt + 2, zc, 256); }
+      else if (iW > 0 && iW % 2 === 1) { const xc = x0 + 2 + (iW >> 1); for (let z = z0 + 2; z <= z0 + d - 3; z++) put(xc, y0 + hgt + 2, z, 257); }
+      // sign beside the door, an awning over it and a lantern hung next to the sign
+      const fd = BC.FACING_DIR[front]; const sx = doorX + fd[0] + (fd[0] === 0 ? 1 : 0), sz = doorZ + fd[1] + (fd[1] === 0 ? 1 : 0); put(sx, y0, sz, 106 + front);
+      put(doorX + fd[0], y0 + 2, doorZ + fd[1], 260 + front); put(sx, y0 + 2, sz, 80);
       // interior
       const ix = x0 + 1, iz = z0 + 1, iw = w - 2, idp = d - 2;
       if (kind === 'cottage') { put(ix, y0, iz, 134 + 2); put(ix, y0, iz + 1, 138 + 2); put(ix + iw - 1, y0, iz, 69); put(ix + iw - 1, y0, iz + 1, 73); put(ix + (iw >> 1), y0, iz + idp - 1, 78); put(ix + (iw >> 1) + 1, y0, iz + idp - 1, 94 + 3); put(ix + 1, y0 + 2, iz + 1, 80); if (iw > 3) put(ix + 1, y0, iz + idp - 1, 79); }

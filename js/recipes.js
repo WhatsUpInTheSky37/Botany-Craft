@@ -139,5 +139,38 @@ BC.RECIPES = [
     { id: 'beehive', cat: 'pest', name: 'Beehive', out: { type: 'block', id: 146, count: 1 }, ins: [{ label: 'planks', n: 6, match: plank }, { label: 'plant fibre (frames)', n: 2, match: fibre }], note: 'A Langstroth box of movable frames. Bees pollinate everything within 3 km and leave honey and wax. Place it near flowers and collect capped comb with your hand.' },
   ];
   R.forEach(r => BC.RECIPES.push(r));
+  // ---------- solid metals: smelt four ore with charcoal ----------
+  const oreOf = id => it => it.type === 'block' && it.id === id;
+  [
+    { id: 'goldblock', cat: 'build', name: 'Gold block', out: { type: 'block', id: 227, count: 1 }, ins: [{ label: 'gold ore', n: 4, match: oreOf(195) }, { label: 'charcoal', n: 1, match: ing('charcoal') }], note: 'Gold is found native, so it needs no chemistry: heat frees it from the quartz. It never tarnishes, which is why a gilded roof still shines after centuries. Plants take up traces: eucalyptus leaves over a deep vein hold measurable gold.' },
+    { id: 'silverblock', cat: 'build', name: 'Silver block', out: { type: 'block', id: 228, count: 1 }, ins: [{ label: 'silver ore', n: 4, match: oreOf(196) }, { label: 'charcoal', n: 1, match: ing('charcoal') }], note: 'Silver smelts from its ore with charcoal, the way it was done for 5,000 years. Polished silver is the best reflector of visible light, so greenhouse growers once lined cold frames with it. It tarnishes black where the air carries sulphur.' },
+    { id: 'copperblock', cat: 'build', name: 'Copper block', out: { type: 'block', id: 229, count: 1 }, ins: [{ label: 'copper ore', n: 4, match: oreOf(197) }, { label: 'charcoal', n: 1, match: ing('charcoal') }], note: 'Copper was the first metal people smelted, around 7,000 years ago. It kills algae and fungus on contact, so copper tape keeps slugs off raised beds and copper rings guard young trees. Bright copper roofs turn brown within a year.' },
+    { id: 'verdigris', cat: 'build', name: 'Weathered copper', out: { type: 'block', id: 230, count: 1 }, ins: [{ label: 'copper block', n: 1, match: oreOf(229) }, { label: 'mineral salts', n: 1, match: ing('mineral_salts') }], note: 'Rain, salt and carbon dioxide turn copper blue-green over twenty years: the Statue of Liberty was brown in 1886. The same copper salt, mixed with lime, is Bordeaux mixture, the fungicide that saved the French vineyards from downy mildew in 1885.' },
+  ].forEach(r => BC.RECIPES.push(r));
+  // ---------- carpentry: 20 shapes for realistic villages and homes ----------
+  const carp = (id, name, blockId, count, planksN, note, extraIns) => ({ id, cat: 'carpentry', name, out: { type: 'block', id: blockId, count }, ins: [{ label: 'planks', n: planksN, match: plank }].concat(extraIns || []), note });
+  [
+    carp('upperslab', 'Upper slab', 231, 2, 1, 'A half block hung from the top of its cell: ceilings, soffits and the underside of a loft floor.'),
+    carp('post', 'Timber post', 232, 2, 1, 'A square post for porches, carports and pergolas. Timber framing carries a roof on posts and beams, so the walls between can be anything, even glass.'),
+    carp('column', 'Porch column', 233, 1, 2, 'A turned column with base and capital. Greek carpenters fluted wooden columns long before they were copied in stone.'),
+    carp('timberframe', 'Timber-frame wall', 234, 2, 2, 'Oak frame with a diagonal brace and plaster infill: the Tudor look. The brace is what keeps a wooden building square in a wind.', [{ label: 'kaolin clay (plaster)', n: 1, match: ing('kaolin_clay') }]),
+    carp('clapboard', 'Clapboard siding', 235, 3, 2, 'Overlapping boards shed rain like feathers. Every board laps the one below, so water never finds a joint to run into.'),
+    carp('hatch', 'Floor hatch', 236, 1, 2, 'A framed trapdoor for cellars and lofts. Root cellars under a hatch stay near 4 °C all year, which is why potatoes and apples keep there until spring.'),
+    carp('beam', 'Timber beam', 240, 2, 2, 'A heavy horizontal timber. Beams carry the floor above; the deeper the beam, the farther it can span. Faces the way you look.'),
+    carp('railing', 'Porch railing', 244, 2, 2, 'Top rail, bottom rail and balusters. Balusters are set under 10 cm apart so a child cannot slip through.'),
+    carp('shutters', 'Window shutters', 248, 2, 1, 'A pair of louvred shutters: place them on the wall beside a window. Louvres let air through while keeping sun and rain out, which is why they are everywhere in hot climates.'),
+    carp('roofslope', 'Roof slope', 252, 2, 2, 'A shingled slope: the low side faces you when placed. Line the roof edge with slopes and the rain runs off instead of soaking in. Cedar shingles last 30 years because the wood is full of natural fungicides.'),
+    carp('ridge', 'Roof ridge', 256, 2, 2, 'The peak where two slopes meet. Run it along the long axis of the house, with slopes below on both sides.'),
+    carp('awning', 'Awning', 260, 1, 2, 'A small shingled hood on brackets. Over a door it keeps rain off the step; over a south window it shades summer sun and lets winter sun in.'),
+    carp('logwall', 'Log cabin wall', 264, 2, 2, 'Stacked round logs, the frontier wall. Logs are notched at the corners so the whole wall locks together without a nail. Faces the way you look.'),
+    carp('wainscot', 'Wainscot panel', 268, 2, 1, 'Carved panelling for the lower half of an indoor wall, with a chair rail on top so chairs do not scuff the plaster.'),
+    carp('cupboard', 'Kitchen cupboard', 272, 1, 3, 'A two-door cupboard with a stone counter. Keeps seed packets dry and out of the light so they stay alive for years.'),
+    carp('splitrail', 'Split-rail fence', 276, 3, 2, 'Two rails on a post, the pioneer fence that needs no nails. It keeps cattle in but lets rabbits through, so garden beds need a picket fence or wire.'),
+    carp('pergola', 'Pergola rafters', 280, 2, 2, 'Open rafters on a beam. Grow grapes, kiwi or wisteria over them: a vine roof shades in summer and drops its leaves to let winter sun through.'),
+    carp('arch', 'Arch top', 284, 1, 2, 'A rounded arch for doorways and garden gates. Arches carry weight by pushing outward into the posts, so build the posts strong.'),
+    carp('cornerboards', 'Corner boards', 288, 2, 2, 'Trim boards that finish the corner where two clapboard walls meet, so the siding has an edge to butt against.'),
+    carp('balcony', 'Balcony', 292, 1, 3, 'A deck with a railing along the front edge: place it hanging off an upper wall. Faces the way you look.'),
+  ].forEach(r => BC.RECIPES.push(r));
+
   BC.RECIPES.forEach(r => { if (!r.cat) r.cat = 'build'; });
 })();

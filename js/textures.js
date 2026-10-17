@@ -34,6 +34,9 @@ BC.Atlas = (function () {
   function cobbles(g, base, seed, cells, seamK, varia) { const r = rng(seed); const n = fbm(seed + 4); const pts = []; for (let i = 0; i < cells; i++) pts.push([r() * TILE, r() * TILE, 0.84 + r() * (varia || 0.3)]); const b = hex(base); pix(g, (x, y) => { let d1 = 1e9, d2 = 1e9, c = pts[0]; for (const p of pts) { for (let ox = -TILE; ox <= TILE; ox += TILE) for (let oy = -TILE; oy <= TILE; oy += TILE) { const dx = p[0] + ox - x, dy = p[1] + oy - y; const d = dx * dx + dy * dy; if (d < d1) { d2 = d1; d1 = d; c = p; } else if (d < d2) d2 = d; } } const seam = Math.sqrt(d2) - Math.sqrt(d1); let k = c[2] * (0.93 + n(x / 4, y / 4) * 0.14); if (seam < 0.9) k *= seamK; else if (seam < 1.9) k *= 1.07; return [b[0] * k, b[1] * k, b[2] * k]; }); }
   // ore: cobbled stone with bright metal nuggets, each lit from the top left
   function ore(g, metal, dark, seed) { cobbles(g, '#6e6e6e', 43, 11, 0.68, 0.22); const r = rng(seed); for (let i = 0; i < 7; i++) { const x = 3 + r() * 26, y = 3 + r() * 26, w = 2 + r() * 2.5, hgt = 1.8 + r() * 2; g.fillStyle = dark; g.fillRect(x + 0.5, y + 0.5, w, hgt); g.fillStyle = metal; g.fillRect(x, y, w, hgt); g.fillStyle = 'rgba(255,255,255,0.55)'; g.fillRect(x, y, w * 0.6, 0.6); g.fillRect(x, y, 0.6, hgt * 0.6); } }
+  // polished metal: soft brushed noise, a lit top-left bevel, a shadowed bottom-right bevel, four rivets
+  function metal(g, base, light, dark, seed) { noise(g, base, 0.09, seed, 2); const r = rng(seed); g.fillStyle = 'rgba(255,255,255,0.08)'; for (let i = 0; i < 9; i++) g.fillRect(0, (r() * TILE) | 0, TILE, 1); g.fillStyle = light; g.globalAlpha = 0.55; g.fillRect(0, 0, TILE, 2); g.fillRect(0, 0, 2, TILE); g.globalAlpha = 1; g.fillStyle = dark; g.globalAlpha = 0.5; g.fillRect(0, 30, TILE, 2); g.fillRect(30, 0, 2, TILE); g.globalAlpha = 1; [[5, 5], [27, 5], [5, 27], [27, 27]].forEach(([x, y]) => { g.fillStyle = dark; g.beginPath(); g.arc(x + 0.5, y + 0.5, 1.8, 0, 6.283); g.fill(); g.fillStyle = light; g.beginPath(); g.arc(x - 0.3, y - 0.3, 1.1, 0, 6.283); g.fill(); }); }
+
   function clear(g) { g.clearRect(0, 0, TILE, TILE); }
 
   const BLOCK_PAINTERS = {
@@ -132,6 +135,21 @@ BC.Atlas = (function () {
     flag: g => { clear(g); g.fillStyle = '#e03030'; g.beginPath(); g.moveTo(0, 2); g.lineTo(30, 10); g.lineTo(0, 20); g.closePath(); g.fill(); g.fillStyle = '#f3efe2'; g.fillRect(4, 8, 8, 5); },
     table_icon: g => { clear(g); g.fillStyle = '#b08a52'; g.fillRect(2, 8, 28, 5); g.fillRect(5, 13, 4, 16); g.fillRect(23, 13, 4, 16); },
     stool_icon: g => { clear(g); g.fillStyle = '#b08a52'; g.fillRect(6, 12, 20, 5); g.fillRect(8, 17, 3, 12); g.fillRect(21, 17, 3, 12); },
+    // ---- solid metals: brushed face, bevelled edge, four rivets ----
+    gold_block: g => metal(g, '#e2b32c', '#fff0a0', '#8a5e10', 81),
+    silver_block: g => metal(g, '#d4d9e0', '#ffffff', '#6a7079', 82),
+    copper_block: g => metal(g, '#c87a3c', '#f4c090', '#5e3014', 83),
+    verdigris: g => { noise(g, '#4f9a84', 0.22, 84, 2); const r = rng(84); for (let i = 0; i < 26; i++) { g.fillStyle = i % 3 ? '#3d7c6a' : '#8e6238'; g.fillRect((r() * 30) | 0, (r() * 30) | 0, 1 + ((r() * 3) | 0), 1 + ((r() * 2) | 0)); } g.fillStyle = 'rgba(255,255,255,0.18)'; g.fillRect(0, 0, TILE, 1); g.fillRect(0, 0, 1, TILE); g.fillStyle = 'rgba(0,0,0,0.25)'; g.fillRect(0, 31, TILE, 1); g.fillRect(31, 0, 1, TILE); },
+    // ---- carpentry ----
+    column: g => { noise(g, '#e6dcc6', 0.08, 85, 1); for (let x = 1; x < TILE; x += 5) { g.fillStyle = 'rgba(0,0,0,0.22)'; g.fillRect(x, 0, 1.5, TILE); g.fillStyle = 'rgba(255,255,255,0.35)'; g.fillRect(x + 2.5, 0, 1, TILE); } },
+    hatch: g => { planks(g, '#9a7244'); g.fillStyle = '#4a3418'; g.fillRect(0, 0, TILE, 2.5); g.fillRect(0, 29.5, TILE, 2.5); g.fillRect(0, 0, 2.5, TILE); g.fillRect(29.5, 0, 2.5, TILE); g.fillStyle = '#2a2a2a'; g.fillRect(4, 6, 8, 2); g.fillRect(4, 24, 8, 2); g.strokeStyle = '#2a2a2a'; g.lineWidth = 1.5; g.beginPath(); g.arc(22, 16, 3.5, 0, 6.283); g.stroke(); },
+    beam: g => { const n = fbm(86); const b = hex('#8c6236'); pix(g, (x, y) => { const k = 0.84 + n(x / 14, y / 2.6) * 0.28 + (n(x * 2, y * 2, 1) - 0.5) * 0.08; return [b[0] * k, b[1] * k, b[2] * k]; }); g.fillStyle = 'rgba(0,0,0,0.3)'; g.fillRect(0, 0, TILE, 1); g.fillRect(0, 31, TILE, 1); g.fillStyle = 'rgba(0,0,0,0.18)'; g.fillRect(0, 10, TILE, 0.7); g.fillRect(0, 21, TILE, 0.7); },
+    shutter: g => { noise(g, '#5b7d5a', 0.12, 87, 1); for (let y = 3; y < 29; y += 3) { g.fillStyle = 'rgba(0,0,0,0.35)'; g.fillRect(3, y, 26, 1.2); g.fillStyle = 'rgba(255,255,255,0.22)'; g.fillRect(3, y + 1.4, 26, 0.7); } g.fillStyle = '#3d5a3c'; g.fillRect(0, 0, TILE, 2.5); g.fillRect(0, 29.5, TILE, 2.5); g.fillRect(0, 0, 2.5, TILE); g.fillRect(29.5, 0, 2.5, TILE); },
+    logwall: g => { const n = fbm(88); const b = hex('#9a7046'); pix(g, (x, y) => { const edge = Math.min(y, TILE - y) / TILE; const k = (0.62 + Math.min(1, edge * 3.2) * 0.42) * (0.88 + n(x / 10, y / 2.2) * 0.22) + (n(x * 2.2, y * 2.2, 1) - 0.5) * 0.08; return [b[0] * k, b[1] * k, b[2] * k]; }); g.fillStyle = 'rgba(40,24,10,0.55)'; g.fillRect(0, 0, TILE, 1.5); g.fillRect(0, 30.5, TILE, 1.5); },
+    cupboard: g => { planks(g, '#a37a4a'); g.strokeStyle = '#5a3a1a'; g.lineWidth = 1.4; g.strokeRect(2.5, 3, 12, 25); g.strokeRect(17.5, 3, 12, 25); g.fillStyle = '#2a2a2a'; g.fillRect(12, 15, 2, 2); g.fillRect(18, 15, 2, 2); g.fillStyle = 'rgba(255,255,255,0.12)'; g.fillRect(4, 4.5, 9, 22); g.fillRect(19, 4.5, 9, 22); },
+    counter: g => { noise(g, '#d9d2c4', 0.1, 89, 1); speck(g, 'rgba(60,60,60,0.35)', 60, 89, 1); speck(g, 'rgba(255,255,255,0.5)', 30, 90, 1); },
+    halftimber: g => { noise(g, '#ebe1cc', 0.1, 91, 2); g.fillStyle = '#4a3220'; g.fillRect(0, 0, TILE, 3.5); g.fillRect(0, 28.5, TILE, 3.5); g.fillRect(0, 0, 3.5, TILE); g.fillRect(28.5, 0, 3.5, TILE); g.save(); g.beginPath(); g.moveTo(1, 31); g.lineTo(4.5, 31); g.lineTo(31, 4.5); g.lineTo(31, 1); g.closePath(); g.fill(); g.restore(); g.fillStyle = 'rgba(255,255,255,0.14)'; g.fillRect(0, 3.5, TILE, 0.8); },
+    clapboard: g => { const n = fbm(92); const b = hex('#cbb98f'); pix(g, (x, y) => { const row = y % 5.333; const k = (0.78 + Math.min(1, row / 4.2) * 0.3) * (0.92 + n(x / 9, y / 30) * 0.16); return [b[0] * k, b[1] * k, b[2] * k]; }); for (let y = 5.333; y < TILE; y += 5.333) { g.fillStyle = 'rgba(0,0,0,0.38)'; g.fillRect(0, y - 1, TILE, 1); } },
     stairs_icon: g => { clear(g); g.fillStyle = '#b08a52'; g.fillRect(2, 16, 28, 14); g.fillRect(16, 2, 14, 14); },
     chair_icon: g => { clear(g); g.fillStyle = '#b08a52'; g.fillRect(6, 14, 20, 4); g.fillRect(22, 2, 4, 16); g.fillRect(7, 18, 3, 11); g.fillRect(22, 18, 3, 11); },
     bench_icon: g => { clear(g); g.fillStyle = '#b08a52'; g.fillRect(1, 15, 30, 4); g.fillRect(1, 8, 30, 3); g.fillRect(4, 19, 3, 10); g.fillRect(25, 19, 3, 10); },
@@ -293,6 +311,24 @@ BC.Atlas = (function () {
   function uv(name) { const i = tiles[name]; if (i === undefined) throw new Error('missing tile ' + name); const W = ATLAS_W / RES, H = ATLAS_H / RES; const x0 = (i % COLS) * CELL + PAD, y0 = Math.floor(i / COLS) * CELL + PAD; const e = 0.3; return [(x0 + e) / W, 1 - (y0 + e) / H, (x0 + TILE - e) / W, 1 - (y0 + TILE - e) / H]; }
   function spriteCanvas(p, stage, size, withered) { const c = document.createElement('canvas'); c.width = c.height = size; const g = c.getContext('2d'); g.imageSmoothingEnabled = false; drawPlant(g, p, stage, size, withered); return c; }
   function tileCanvas(name, size) { const c = document.createElement('canvas'); c.width = c.height = size; const g = c.getContext('2d'); g.imageSmoothingEnabled = false; const i = tiles[name]; g.drawImage(canvas, ((i % COLS) * CELL + PAD) * RES, (Math.floor(i / COLS) * CELL + PAD) * RES, TILE * RES, TILE * RES, 0, 0, size, size); return c; }
+  // Little 3-D view of a shaped block for the hotbar: boxes drawn back to front with flat-shaded faces in each tile's average colour.
+  const avgCache = {};
+  function tileAvg(name) { if (avgCache[name]) return avgCache[name]; const c = tileCanvas(name, 8); const d = c.getContext('2d').getImageData(0, 0, 8, 8).data; let r = 0, gg = 0, b = 0, n = 0; for (let i = 0; i < d.length; i += 4) { if (d[i + 3] < 40) continue; r += d[i]; gg += d[i + 1]; b += d[i + 2]; n++; } return (avgCache[name] = n ? [r / n, gg / n, b / n] : [160, 130, 90]); }
+  function shapeCanvas(b, size) {
+    const c = document.createElement('canvas'); c.width = c.height = size; const g = c.getContext('2d'); if (!b.shape) return c;
+    let maxY = 1; b.shape.forEach(bx => { maxY = Math.max(maxY, bx[4]); });
+    const a = size * 0.3, h = Math.min(size * 0.42, size * 0.62 / maxY); const cx = size / 2, cy = size * 0.92 - a * 0.5 - (maxY > 1 ? 0 : size * 0.08);
+    const P = (x, y, z) => [cx + (x - z) * a, cy + (x + z) * a * 0.5 - y * h];
+    const poly = (pts, col, k) => { g.fillStyle = rgb([col[0] * k, col[1] * k, col[2] * k]); g.beginPath(); pts.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.closePath(); g.fill(); };
+    const boxes = b.shape.slice().sort((p, q) => (p[0] - p[5] + p[1] * 0.5) - (q[0] - q[5] + q[1] * 0.5));
+    boxes.forEach(([x0, y0, z0, x1, y1, z1, t]) => {
+      const tiles = typeof t === 'string' ? [t, t, t] : [t.top, t.side, t.bottom];
+      poly([P(x0, y1, z0), P(x1, y1, z0), P(x1, y1, z1), P(x0, y1, z1)], tileAvg(tiles[0]), 1.0);
+      poly([P(x0, y0, z0), P(x1, y0, z0), P(x1, y1, z0), P(x0, y1, z0)], tileAvg(tiles[1]), 0.8);
+      poly([P(x1, y0, z0), P(x1, y0, z1), P(x1, y1, z1), P(x1, y1, z0)], tileAvg(tiles[1]), 0.62);
+    });
+    return c;
+  }
   // Icon for an ingredient: a glyph per group tinted by a stable colour from its name.
   function ingredientCanvas(ing, size) { const c = document.createElement('canvas'); c.width = c.height = size; const g = c.getContext('2d'); const k = size / 32; const h = hash(ing.id); const col = `hsl(${h % 360},${45 + (h >> 8) % 30}%,${38 + (h >> 16) % 20}%)`; g.save(); g.scale(k, k);
     if (ing.group === 'control') { g.fillStyle = '#e8eef0'; g.fillRect(11, 4, 10, 6); g.fillStyle = col; g.beginPath(); g.moveTo(8, 10); g.lineTo(24, 10); g.lineTo(26, 30); g.lineTo(6, 30); g.closePath(); g.fill(); g.fillStyle = 'rgba(255,255,255,0.35)'; g.fillRect(9, 13, 3, 14); }
@@ -305,5 +341,5 @@ BC.Atlas = (function () {
   function waterTexture() { const N = 128; const c = document.createElement('canvas'); c.width = c.height = N; const g = c.getContext('2d'); const img = g.createImageData(N, N); const d = img.data; const b = hex('#2f74c4'); const T = Math.PI * 2 / N;
     for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { const w1 = Math.sin(x * T * 3 + Math.sin(y * T * 2) * 1.6), w2 = Math.sin(y * T * 4 + Math.sin(x * T * 3) * 1.4), w3 = Math.sin((x + y) * T * 5 + Math.cos((x - y) * T * 2) * 1.2); let k = 0.92 + w1 * 0.05 + w2 * 0.05; const ca = Math.max(0, (w1 + w2 + w3) / 3 - 0.45) * 1.6; k += ca * ca * 0.35; const o = (y * N + x) * 4; d[o] = Math.min(255, b[0] * k + ca * 55); d[o + 1] = Math.min(255, b[1] * k + ca * 50); d[o + 2] = Math.min(255, b[2] * k + ca * 35); d[o + 3] = 255; }
     g.putImageData(img, 0, 0); const t = new THREE.CanvasTexture(c); t.magFilter = THREE.LinearFilter; t.minFilter = THREE.LinearMipmapLinearFilter; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; return t; }
-  return { build, uv, spriteCanvas, tileCanvas, ingredientCanvas, waterTexture, TILE, COLS, has: n => tiles[n] !== undefined, shade, mix, get count() { return count; }, get capacity() { return COLS * ROWS; } };
+  return { build, uv, spriteCanvas, tileCanvas, shapeCanvas, ingredientCanvas, waterTexture, TILE, COLS, has: n => tiles[n] !== undefined, shade, mix, get count() { return count; }, get capacity() { return COLS * ROWS; } };
 })();
