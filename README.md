@@ -22,7 +22,7 @@ The backend is a Supabase project: two tables (`bc_worlds`, `bc_players`) behind
 | Topic | In the game |
 |---|---|
 | Soil science | 11 soil types based on USDA soil orders (Alfisol, Mollisol, Aridisol, Oxisol, Spodosol, Histosol, Gelisol permafrost, gley, compost, caliche, bedrock), each with real horizons, pH, texture, drainage and where on Earth it occurs. Dig down to see the profile. |
-| Plant requirements | 121 plants and 70 trees (40 of them fruit trees, from apple to starfruit) with real soil, pH, water, light and climate needs. The growth simulation scores all five every tick and explains exactly why a plant is thriving or withering. |
+| Plant requirements | 148 plants and 78 trees (48 of them fruit and nut trees, from apple to starfruit, almond to pecan), including the 50 most-grown vegetable, fruit and nut crops in the United States by USDA acreage with real soil, pH, water, light and climate needs. The growth simulation scores all five every tick and explains exactly why a plant is thriving or withering. |
 | Biogeography | A world 896 blocks across with seven biomes, from Arctic tundra with permafrost, snow and frozen lakes to tropical rainforest, with their real-world locations, climate and native species. A world map shows how temperature and rainfall decide the biome. |
 | Ecology | Nitrogen fixation (legumes), pollination (bees, butterflies, hummingbirds visit your flowers and double seed yield), herbivory (deer and hares eat unfenced crops), invasive species, epiphytes, carnivorous plants, succession, fire ecology, composting, the Three Sisters. |
 | Animals | 125 animals, including 45 birds, each placed only in its real habitat and each with its role in the ecosystem. Every player owns an enchanted horse, called with the bridle in the starting bag, that carries only its owner and wears their initial. Horses, donkeys, camels, elk, bison, moose and caribou can be ridden, and a wagon hitched to one carries you and your cargo. |
@@ -39,7 +39,7 @@ Phone: left thumb drags to move, right thumb drags to look, tap to use, press an
 
 ## Code layout
 
-* `js/data/` botanical content (121 plants, 70 trees, 125 animals): soils, biomes, plants, trees, animals, quests and quizzes.
+* `js/data/` botanical content (148 plants, 78 trees, 125 animals): soils, biomes, plants, trees, animals, quests and quizzes.
 * `js/textures.js` procedural pixel-art atlas (blocks and plant sprites), drawn at load time.
 * `js/world.js` terrain, climate map, soil horizons, trees and wild plants.
 * `js/mesher.js` chunk meshes with ambient occlusion, water and plant sprites.

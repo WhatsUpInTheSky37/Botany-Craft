@@ -26,7 +26,7 @@ window.BC = window.BC || {};
   const logs = { oak: 20, birch: 21, spruce: 22, tropical: 23, cypress: 24, cactus: 25, mesquite: 26, paloverde: 27, palm: 28 };
   Object.keys(logs).forEach(k => def(logs[k], { name: k === 'cactus' ? 'Saguaro trunk' : { oak: 'Oak log', birch: 'Birch log', spruce: 'Spruce log', tropical: 'Hardwood log', cypress: 'Cypress log', mesquite: 'Mesquite log', paloverde: 'Palo verde log', palm: 'Palm trunk' }[k], log: k, tex: [k === 'cactus' ? 'cactus_top' : 'log_top_' + k, k === 'cactus' ? 'cactus' : 'log_' + k, k === 'cactus' ? 'cactus_top' : 'log_top_' + k], solid: true }));
   BC.LOG_IDS = logs;
-  BC.LEAF_BASE = 30; const leafIdx = i => i < 30 ? 30 + i : i < 50 ? 170 + (i - 30) : 200 + (i - 50); // 200-219: fruit trees added after the ore ids
+  BC.LEAF_BASE = 30; const leafIdx = i => i < 30 ? 30 + i : i < 50 ? 170 + (i - 30) : i < 70 ? 200 + (i - 50) : 300 + (i - 70); // 200-219: fruit trees added after the ore ids; 300+: trees added once ids went 16-bit
   BC.TREES.forEach((t, i) => { if (t.leaf) def(leafIdx(i), { name: 'Leaves', leaves: true, tree: t.id, tex: ['leaves_' + t.id, 'leaves_' + t.id, 'leaves_' + t.id], solid: true }); });
   // ---------- planks by species (19 = oak) ----------
   B[19].name = 'Oak planks'; B[19].plank = true; B[19].wood = true; B[18].wood = true;
