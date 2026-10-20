@@ -1,6 +1,6 @@
 window.BC = window.BC || {};
 // Cache-bust the worker with the same version stamp as this script so a rebuilt world.js is never paired with a stale worker.
-const BG_VER = (document.currentScript && document.currentScript.src.split('?v=')[1]) || 'dev';
+const BG_VER = (typeof document !== 'undefined' && document.currentScript && document.currentScript.src.split('?v=')[1]) || 'dev';
 BC.Background = {
   next: 0, jobs: new Map(), worker: null, broken: false, // broken: the worker could not load (single-file build, blocked workers); fall back to the main thread
   run(kind, args) {
