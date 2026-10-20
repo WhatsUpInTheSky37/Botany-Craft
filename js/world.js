@@ -12,7 +12,7 @@ BC.World = class World {
     this.nutr = new Float32Array(this.W * this.D * 3); this.phShift = new Float32Array(this.W * this.D); this.om = new Float32Array(this.W * this.D); this.mulch = new Float32Array(this.W * this.D); this.hives = new Map(); this.chests = new Map(); this.special = new Map(); this.meta = new Map();
     this.hf = new Float32Array(this.W * this.D); this.nutrBase = null; this.flowDir = new Int8Array(this.W * this.D).fill(-1); this.flowAcc = new Float32Array(this.W * this.D); this.wetBonus = new Float32Array(this.W * this.D); this.wlvl = new Uint8Array(this.W * this.D * this.H); this.waterQueue = []; this.stream = new Uint8Array(this.W * this.D);
     this.plants = new Map(); this.treeAt = new Map(); this.diffs = new Map();
-    this.dirty = new Set(); this.CX = Math.ceil(this.W / 16); this.CZ = Math.ceil(this.D / 16);
+    this.dirty = new Set(); this.plantDirty = new Set(); this.plantsByChunk = new Map(); this.CX = Math.ceil(this.W / 16); this.CZ = Math.ceil(this.D / 16);
     this.rand = BC.util.rng(this.seed);
     this.noise = BC.util.noise2(this.seed);
     this.spawnAnimals = [];
@@ -33,6 +33,13 @@ BC.World = class World {
     this.markDirty(x, z); if ((x & 15) === 0) this.markDirty(x - 1, z); if ((x & 15) === 15) this.markDirty(x + 1, z); if ((z & 15) === 0) this.markDirty(x, z - 1); if ((z & 15) === 15) this.markDirty(x, z + 1);
   }
   markDirty(x, z) { if (x < 0 || z < 0 || x >= this.W || z >= this.D) return; this.dirty.add((x >> 4) + (z >> 4) * this.CX); }
+  markPlantsDirty(x, z) { if (x >= 0 && z >= 0 && x < this.W && z < this.D) this.plantDirty.add((x >> 4) + (z >> 4) * this.CX); }
+  indexPlant(p, remove) {
+    const ci = (p.x >> 4) + (p.z >> 4) * this.CX;
+    if (remove) { const bucket = this.plantsByChunk.get(ci); if (bucket) { bucket.delete(p.key); if (!bucket.size) this.plantsByChunk.delete(ci); } }
+    else { if (!this.plantsByChunk.has(ci)) this.plantsByChunk.set(ci, new Map()); this.plantsByChunk.get(ci).set(p.key, p); }
+  }
+  reindexPlants() { this.plantsByChunk.clear(); this.plants.forEach(p => this.indexPlant(p, false)); }
   biomeAt(x, z) { x = BC.util.clamp(x | 0, 0, this.W - 1); z = BC.util.clamp(z | 0, 0, this.D - 1); return BC.BIOME_LIST[this.biome[x + z * this.W]]; }
   // y of the surface you stand on at a column (top block plus its real height)
   standY(x, z) { const t = this.top(x, z); return t + BC.blockTop(this.get(x, t, z)); }
@@ -46,8 +53,8 @@ BC.World = class World {
   // Apply an ingredient to a soil column. Returns a description of what changed.
   amend(x, z, ing) { const i = this.col(x, z); const out = []; const npk = ing.npk || [0, 0, 0]; ['N', 'P', 'K'].forEach((nm, k) => { if (npk[k]) { const before = this.nutr[i * 3 + k]; this.nutr[i * 3 + k] = Math.min(1.2, before + npk[k] * 0.5); out.push(nm + ' +' + Math.round((this.nutr[i * 3 + k] - before) * 100)); } }); if (ing.ph) { this.phShift[i] = BC.util.clamp(this.phShift[i] + ing.ph, -2.5, 2.5); out.push('pH ' + (ing.ph > 0 ? 'up' : 'down') + ' ' + Math.abs(ing.ph).toFixed(1)); } if (ing.om) { this.om[i] = Math.min(1, this.om[i] + ing.om); out.push('humus +' + Math.round(ing.om * 100)); } if (ing.moisture) { this.mulch[i] = Math.min(1, this.mulch[i] + ing.moisture); out.push('mulch'); } this.markDirty(x, z); return out; }
   plantAt(x, y, z) { return this.plants.get(this.idx(x, y, z)); }
-  addPlant(p) { p.key = this.idx(p.x, p.y, p.z); this.plants.set(p.key, p); this.markDirty(p.x, p.z); if (this.onPlant && !this.remote && !this.generating) this.onPlant(p, false); return p; }
-  removePlant(p) { this.plants.delete(p.key); this.markDirty(p.x, p.z); if (this.onPlant && !this.remote && !this.generating) this.onPlant(p, true); }
+  addPlant(p) { p.key = this.idx(p.x, p.y, p.z); this.plants.set(p.key, p); if (!this.generating) this.indexPlant(p, false); this.markPlantsDirty(p.x, p.z); if (this.onPlant && !this.remote && !this.generating) this.onPlant(p, false); return p; }
+  removePlant(p) { this.plants.delete(p.key); this.indexPlant(p, true); this.markPlantsDirty(p.x, p.z); if (this.onPlant && !this.remote && !this.generating) this.onPlant(p, true); }
   // light reaching a cell: 1 = open sky, lower under leaves.
   lightAt(x, y, z) { let l = 1; for (let yy = y + 1; yy < this.H; yy++) { const b = BC.BLOCKS[this.get(x, yy, z)]; if (!b || b.id === 0 || b.liquid) continue; if (b.transparent) continue; if (b.leaves) l *= 0.55; else if (b.fence || b.shape || b.cutout) l *= 0.9; else l *= 0.25; if (l < 0.05) break; } return l; }
 
@@ -77,7 +84,7 @@ BC.World = class World {
     }
     this.placeWonders(); this.computeFlow(); this.carveStreams(); this.placeTrees(); this.placePlants(); if (this.reserved && this.reserved.size) { const gone = []; this.plants.forEach((p, k) => { if (this.reserved.has(p.x + p.z * this.W)) gone.push(k); }); gone.forEach(k => this.plants.delete(k)); } this.placeVillages(); this.computeWetness(); this.pickAnimals(); this.placeOrchards(); this.placeRoads();
     this.pruneFloating(); this.diffs.clear(); this.generating = false;
-    this.genPlantKeys = new Set(this.plants.keys()); this.genTreeKeys = new Set(this.treeAt.keys());
+    this.reindexPlants(); this.genPlants = new Map(Array.from(this.plants, ([k, p]) => [k, { ...p }])); this.genPlantKeys = new Set(this.plants.keys()); this.genTreeKeys = new Set(this.treeAt.keys());
   }
   fillColumn(x, z, h, biome) {
     const B = BC.BLOCK, WL = this.WL; const under = h < WL;
@@ -169,14 +176,14 @@ BC.World = class World {
   levelOf(i) { return this.wlvl[i]; } // 0 = source (lakes, streams), 1..7 flowing
   tickWater(max) {
     let n = 0; const q = this.waterQueue; const prev = this.remote; this.remote = true;
-    while (q.length && n < (max || 150)) {
-      const i = q.shift(); n++; if (this.blocks[i] !== 15) continue; const [x, y, z] = this.coords(i); const L = y <= this.WL || this.stream[x + z * this.W] ? 0 : this.wlvl[i];
+    while (n < q.length && n < (max || 150)) {
+      const i = q[n++]; if (this.blocks[i] !== 15) continue; const [x, y, z] = this.coords(i); const L = y <= this.WL || this.stream[x + z * this.W] ? 0 : this.wlvl[i];
       const below = y > 0 ? this.get(x, y - 1, z) : 1;
       if (below === 0) { const j = this.idx(x, y - 1, z); this.wlvl[j] = 7; this.set(x, y - 1, z, 15); this.flooded(x, y - 1, z); continue; }
       const spread = L === 0 ? 7 : L - 1; if (spread < 1) continue;
       for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = x + dx, nz = z + dz; if (!this.inBounds(nx, y, nz)) continue; if (this.get(nx, y, nz) !== 0) continue; const j = this.idx(nx, y, nz); this.wlvl[j] = spread; this.set(nx, y, nz, 15); this.flooded(nx, y, nz); }
     }
-    this.remote = prev; return n;
+    q.splice(0, n); this.remote = prev; return n;
   }
   flooded(x, y, z) { const p = this.plantAt(x, y, z); if (p && !(BC.PLANT_BY_ID[p.id] && BC.PLANT_BY_ID[p.id].water === 'aquatic')) this.removePlant(p); if (this.onFlood) this.onFlood(x, y, z); }
   waterSurface(x, z) { for (let y = this.H - 1; y >= 0; y--) { const b = this.get(x, y, z); if (b === 15) return y; if (b !== 0) return -1; } return -1; }
@@ -375,7 +382,10 @@ BC.World = class World {
     const prev = this.remote; this.remote = true; let waterTouched = false;
     for (let i = 0; i < s.diffs.length; i += 2) { const k = s.diffs[i], v = s.diffs[i + 1]; if (this.blocks[k] !== v) { if (v === 15 || this.blocks[k] === 15) waterTouched = true; this.blocks[k] = v; const c = this.coords(k); this.markDirty(c[0], c[2]); } this.diffs.set(k, v); }
     if (waterTouched) this.computeWetness();
+    this.plants.forEach(p => this.markPlantsDirty(p.x, p.z));
+    this.plants.clear(); this.plantsByChunk.clear();
     if (s.v === 2) {
+      (this.genPlants || new Map()).forEach(p => this.addPlant({ ...p }));
       (s.removed || []).forEach(k => { const p = this.plants.get(k); if (p) this.removePlant(p); });
       s.plants.forEach(p => { const ex = this.plants.get(this.idx(p.x, p.y, p.z)); if (ex) this.removePlant(ex); this.addPlant(p); });
       for (let i = 0; i < s.trees.length; i += 2) this.treeAt.set(s.trees[i], s.trees[i + 1]);
@@ -396,3 +406,4 @@ BC.World = class World {
   }
   coords(i) { const y = Math.floor(i / (this.W * this.D)); const r = i % (this.W * this.D); return [r % this.W, y, Math.floor(r / this.W)]; }
 };
+

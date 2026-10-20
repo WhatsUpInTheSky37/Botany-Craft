@@ -88,7 +88,7 @@ BC.Mesher = (function () {
   }
   function buildPlants(world, cx, cz) {
     const b = new Builder(); b.sway = []; const x0 = cx * 16, z0 = cz * 16;
-    world.plants.forEach(p => {
+    (world.plantsByChunk.get(cx + cz * world.CX) || new Map()).forEach(p => {
       if (p.x < x0 || p.x >= x0 + 16 || p.z < z0 || p.z >= z0 + 16) return;
       const def = BC.PLANT_BY_ID[p.id]; const uvr = BC.Atlas.uv(plantTile(p));
       const h = BC.util.hash2(p.x, p.z, 7); const ox = p.x + 0.5 + (h - 0.5) * 0.3, oz = p.z + 0.5 + (BC.util.hash2(p.z, p.x, 9) - 0.5) * 0.3;
@@ -106,3 +106,4 @@ BC.Mesher = (function () {
   }
   return { buildChunk, buildPlants, plantTile };
 })();
+

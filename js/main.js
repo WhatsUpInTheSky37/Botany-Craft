@@ -12,11 +12,22 @@ BC.Game = class Game {
     this.mode = 'solo'; this.playerName = 'me'; this.peers = new Map(); this.netAcc = { pos: 0, plants: 0, animals: 0, time: 0 }; this.worldVersion = 0; this.syncRequested = false;
     this.DAY = 600; this.SAVE_KEY = 'botanycraft_save_v1'; this.SHARED_KEY = 'botanycraft_shared_v1'; this.WORLDS_KEY = 'botanycraft_worlds_v1';
     this.resetStats();
-    this.setupScene(); this.resize(); window.addEventListener('resize', () => this.resize());
+    document.addEventListener('click', e => {
+      if (!this.running || !this.sharedPaused()) return;
+      const target = e.target.closest && e.target.closest('button, select, input, a');
+      const allowed = new Set(['btn-menu', 'm-save', 'm-exit', 'm-leave', 'm-reconnect', 'x-yes', 'x-no']);
+      if (target && !allowed.has(target.id)) { e.preventDefault(); e.stopImmediatePropagation(); this.toast('World paused while reconnecting or synchronizing. Use Menu to reconnect.', 'bad'); }
+    }, true);
+    try { this.quality = localStorage.getItem('bc_quality') || (this.player.touch ? 'low' : 'medium'); } catch (e) { this.quality = 'medium'; }
+    this.setupScene(); this.setQuality(this.quality); this.resize(); window.addEventListener('resize', () => this.resize());
     this.player.bindDesktop(this.canvas); if (this.player.touch) this.player.bindTouch(this.canvas, document.getElementById('joystick'));
-    window.addEventListener('beforeunload', () => { if (this.running) { this.save(); if (this.mode === 'shared' && this.net.creds) { try { navigator.sendBeacon && navigator.sendBeacon(BC.CONFIG.supabaseUrl + '/rest/v1/rpc/bc_player_offline?apikey=' + encodeURIComponent(BC.CONFIG.supabaseKey), new Blob([JSON.stringify({ p_world: this.net.creds.world, p_pin: this.net.creds.pin, p_player: this.net.creds.player })], { type: 'application/json' })); } catch (e) { } } } }); document.addEventListener('visibilitychange', () => { if (document.hidden && this.running) this.save(); });
+    window.addEventListener('beforeunload', e => { if (this.running) { e.preventDefault(); e.returnValue = '';  this.save().catch(() => {}); if (this.mode === 'shared' && this.net.creds) { try { navigator.sendBeacon && navigator.sendBeacon(BC.CONFIG.supabaseUrl + '/rest/v1/rpc/bc_player_offline?apikey=' + encodeURIComponent(BC.CONFIG.supabaseKey), new Blob([JSON.stringify({ p_world: this.net.creds.world, p_pin: this.net.creds.pin, p_player: this.net.creds.player })], { type: 'application/json' })); } catch (e) { } } } }); document.addEventListener('visibilitychange', () => { if (document.hidden && this.running) this.save().catch(() => {}); });
     let hasSave = false, shared = null; try { hasSave = !!localStorage.getItem(this.SAVE_KEY); shared = JSON.parse(localStorage.getItem(this.SHARED_KEY)); } catch (e) { }
-    this.ui.showStart({ hasSave, shared, known: this.knownWorlds(), onNew: region => this.newGame(region), onContinue: () => this.load() || this.newGame('temperate'), onShared: opts => this.startShared(opts), onForget: id => { this.forgetWorld(id); this.ui.renderKnownWorlds(this.knownWorlds()); } });
+    this.ui.showStart({ hasSave, shared, known: this.knownWorlds(), onNew: region => this.newGame(region), onContinue: async () => { try { if (!await this.load()) this.newGame('temperate'); } catch (e) { this.toast('Could not load: ' + e.message, 'bad'); } }, onShared: opts => this.startShared(opts), onForget: id => { this.forgetWorld(id); this.ui.renderKnownWorlds(this.knownWorlds()); } }); this.checkStoredSave();
+  }
+  async checkStoredSave() {
+    try { const data = await BC.Storage.read(this.SAVE_KEY); if (data) document.getElementById('continue-wrap').hidden = false; }
+    catch (e) { console.warn('Save storage unavailable', e); }
   }
   resetStats() {
     this.stats = { inspected: new Set(), seedSpecies: new Set(), maxDig: 0, plantedGood: 0, watered: 0, matured: 0, legumesPlanted: 0, threeSisters: false, pollinated: false, blueberryAcid: false, cactusInSand: false, compostMade: 0, compostUsed: false, biomesVisited: new Set(), treeGrown: false, fenced: false, invasiveRemoved: 0, journal: new Set(), questsDone: new Set(), harvests: 0, compostMaterial: 0, planted: 0, amendmentsUsed: new Set(), pestsSeen: 0, pestsTreated: 0, beneficialWin: 0, companionPlanted: false, fertilised: 0, honey: 0, leashed: 0, logsChopped: 0, crafted: 0, woodPlaced: 0, treesPlanted: 0, aquaticPlanted: 0, sold: 0, coinsEarned: 0, npcsMet: new Set(), story: {}, fishCaught: 0, fishSpecies: new Set(), fruitSpecies: new Set(), treasures: 0, waterFlowed: 0, floodplainSeen: false, blackouts: 0, boatRides: 0, booksRead: new Set(), booksReturned: 0, toolsReturned: 0, barters: 0, quizzesPassed: 0 }; this.loans = [];
@@ -42,7 +53,7 @@ BC.Game = class Game {
     // real sun shadows on desktop; phones keep the baked ambient occlusion only
     BC.PERK = this.character.id;
     this.shadows = !this.player.touch && (navigator.hardwareConcurrency || 4) >= 4; BC.SHADOWS = this.shadows;
-    if (this.shadows) { this.renderer.shadowMap.enabled = true; this.renderer.shadowMap.type = THREE.PCFSoftShadowMap; this.sun.castShadow = true; this.sun.shadow.mapSize.set(2048, 2048); const sc = this.sun.shadow.camera; sc.left = -46; sc.right = 46; sc.top = 46; sc.bottom = -46; sc.near = 1; sc.far = 330; sc.updateProjectionMatrix(); this.sun.shadow.bias = -0.0004; this.sun.shadow.normalBias = 0.05; this.depthPlant = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: this.atlas, alphaTest: 0.5 }); wind(this.depthPlant); }
+    { this.renderer.shadowMap.enabled = this.shadows; this.renderer.shadowMap.type = THREE.PCFSoftShadowMap; this.sun.castShadow = true; this.sun.shadow.mapSize.set(2048, 2048); const sc = this.sun.shadow.camera; sc.left = -46; sc.right = 46; sc.top = 46; sc.bottom = -46; sc.near = 1; sc.far = 330; sc.updateProjectionMatrix(); this.sun.shadow.bias = -0.0004; this.sun.shadow.normalBias = 0.05; this.depthPlant = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: this.atlas, alphaTest: 0.5 }); wind(this.depthPlant); }
     this.sunMesh = new THREE.Mesh(new THREE.SphereGeometry(4, 12, 12), new THREE.MeshBasicMaterial({ color: 0xfff6d8, fog: false })); this.scene.add(this.sunMesh);
     { const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d'); const gr = g.createRadialGradient(64, 64, 4, 64, 64, 64); gr.addColorStop(0, 'rgba(255,244,210,0.95)'); gr.addColorStop(0.25, 'rgba(255,220,150,0.45)'); gr.addColorStop(0.6, 'rgba(255,190,110,0.12)'); gr.addColorStop(1, 'rgba(255,170,90,0)'); g.fillStyle = gr; g.fillRect(0, 0, 128, 128); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; this.sunGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: true, fog: false, transparent: true })); this.sunGlow.scale.set(60, 60, 1); this.sunGlow.renderOrder = -5; this.scene.add(this.sunGlow); }
     this.moonMesh = new THREE.Mesh(new THREE.SphereGeometry(2.5, 12, 12), new THREE.MeshBasicMaterial({ color: 0xdde6f5, fog: false })); this.scene.add(this.moonMesh);
@@ -55,18 +66,33 @@ BC.Game = class Game {
       const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'); const gr = g.createRadialGradient(32, 32, 2, 32, 32, 32); gr.addColorStop(0, 'rgba(255,255,230,1)'); gr.addColorStop(0.2, 'rgba(230,255,150,0.85)'); gr.addColorStop(0.5, 'rgba(180,240,100,0.25)'); gr.addColorStop(1, 'rgba(120,200,60,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); const tex = new THREE.CanvasTexture(c);
       this.fireflies = new THREE.Points(fg, new THREE.PointsMaterial({ map: tex, vertexColors: true, size: 0.6, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, sizeAttenuation: true })); this.fireflies.visible = false; this.fireflies.frustumCulled = false; this.scene.add(this.fireflies); }
   }
-  resize() { const w = window.innerWidth, h = window.innerHeight; this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, this.player.touch ? 1.5 : 2)); this.renderer.setSize(w, h, false); this.camera.aspect = w / h; this.camera.updateProjectionMatrix(); }
+  setQuality(level) {
+    const presets = { low: { radius: 4, ratio: 1, detail: 16, shadow: false, size: 512 }, medium: { radius: 6, ratio: 1.5, detail: 24, shadow: true, size: 1024 }, high: { radius: 7, ratio: 2, detail: 30, shadow: true, size: 2048 } };
+    this.quality = presets[level] ? level : 'medium'; const p = presets[this.quality];
+    this.RADIUS = p.radius; this.pixelRatioLimit = p.ratio; this.detailDistance = p.detail;
+    this.shadows = p.shadow; BC.SHADOWS = p.shadow; this.renderer.shadowMap.enabled = p.shadow; this.sun.castShadow = p.shadow;
+    this.sun.shadow.mapSize.set(p.size, p.size);
+    if (this.sun.shadow.map) { this.sun.shadow.map.dispose(); this.sun.shadow.map = null; }
+    if (p.shadow && !this.depthPlant) this.depthPlant = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: this.atlas, alphaTest: 0.5 });
+    this.scene.traverse(o => { if (o.isMesh && o.material !== this.matWater && o.material !== this.skyMat && o !== this.sunMesh && o !== this.moonMesh && o.parent !== this.clouds) { o.castShadow = p.shadow; o.receiveShadow = p.shadow; if (o.material === this.matPlant) o.customDepthMaterial = this.depthPlant; } });
+    try { localStorage.setItem('bc_quality', this.quality); } catch (e) { }
+    this.resize();
+  }
+  resize() { const w = window.innerWidth, h = window.innerHeight; this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, this.pixelRatioLimit || 1.5)); this.renderer.setSize(w, h, false); this.camera.aspect = w / h; this.camera.updateProjectionMatrix(); }
   cur() { return this.inventory[this.selected] || BC.HAND; }
-  isAuthority() { return this.mode === 'solo' || !this.net.live || this.net.isHost; }
+  sharedPaused() { return this.mode === 'shared' && (!this.net.live || this.syncRequested || this.syncApplying || this.recovering); }
+  isAuthority() { return this.mode === 'solo' || (this.net.live && this.net.isHost && !this.syncRequested && !this.syncApplying && !this.recovering); }
   // ---------- lifecycle ----------
   newGame(region) {
     this.worldW = this.worldD = undefined; this.mode = 'solo'; this.playerName = 'me'; this.resetStats(); this.time = { t: this.DAY * 0.3, day: 1, dayFrac: 0.3 }; this.region = region;
     this.seed = (Math.random() * 4294967295) >>> 0; this.startWorld(() => { const s = this.world.findSpawn(region); this.player.spawn(s[0], s[1], s[2]); this.player.yaw = Math.PI; this.spawnAnimals(this.world.spawnAnimals); this.begin(); this.welcome(region); });
   }
   welcome(region) { const b = BC.BIOMES[region]; this.toast(`Welcome to the ${b.name.toLowerCase()}. Walk up to a plant and tap it to collect seeds.`, 'good'); const nv = this.npcs.nearestVillage(this.player.pos.x, this.player.pos.z); if (nv) setTimeout(() => this.toast(`There is a village, ${nv.village.name}, about ${Math.round(nv.dist)} blocks away. Follow the pointer at the top of the screen: the folk there trade, teach and will work for you.`, ''), 10000); setTimeout(() => this.toast(this.player.touch ? 'Drag left to move, right to look. Press and hold to inspect anything.' : 'Click the world to look around. Right-click inspects anything.', ''), 5000); }
-  startWorld(then) {
+  async startWorld(then) {
     const loading = document.getElementById('loading'); loading.hidden = false;
-    setTimeout(() => { this.world = new BC.World(this.seed, this.worldW, this.worldD); this.world.generate(); this.hookWorld(); this.clearChunks(); this.clearAnimals(); loading.hidden = true; then(); }, 30);
+    try { this.world = await BC.Background.generate(this.seed, this.worldW, this.worldD); this.hookWorld(); this.clearChunks(); this.clearAnimals(); then(); }
+    catch (e) { this.toast('Could not open world: ' + e.message, 'bad'); }
+    finally { loading.hidden = true; }
   }
   // the open sea beyond the map: four water planes out to the horizon, so the world looks like an island in an ocean that wraps around
   buildOcean() {
@@ -83,17 +109,23 @@ BC.Game = class Game {
     w.onPlant = (p, removed) => { if (this.mode === 'shared') this.net.send('plant', removed ? { key: p.key, rm: true } : { key: p.key, p: this.packPlant(p) }); };
   }
   packPlant(p) { return { id: p.id, x: p.x, y: p.y, z: p.z, wild: p.wild, progress: p.progress, health: p.health, pollinated: p.pollinated, withered: p.withered, onBark: p.onBark, owner: p.owner, pest: p.pest || undefined, covered: p.covered || undefined, shaded: p.shaded || undefined, frostCover: p.frostCover || undefined }; }
-  begin() { this.clearChunks(); this.world.dirty.clear(); this.streamChunks(true); this.ui.hideStart(); this.ui.renderHotbar(); this.ui.updateQuestTracker(); this.ui.setLockHint(true); this.ui.updateShared(); this.ui.updateHUD(); this.running = true; this.last = performance.now(); if (!this.loopStarted) { this.loopStarted = true; requestAnimationFrame(t => this.loop(t)); } }
+  begin() { this.clearChunks(); this.world.dirty.clear(); this.streamChunks(false); this.ui.hideStart(); this.ui.renderHotbar(); this.ui.updateQuestTracker(); this.ui.setLockHint(true); this.ui.updateShared(); this.ui.updateHUD(); this.running = true; if (this.isAuthority()) this.topUpAnimals(); this.last = performance.now(); if (!this.loopStarted) { this.loopStarted = true; requestAnimationFrame(t => this.loop(t)); } }
   clearChunks() { Array.from(this.chunks.keys()).forEach(ci => this.unloadChunk(ci)); this.chunks.clear(); }
-  clearAnimals() { this.animals.list.forEach(e => { this.scene.remove(e.mesh); if (e.rig) this.scene.remove(e.rig.root); if (e.line) this.scene.remove(e.line); }); this.animals.list = []; this.npcs.clear(); this.boats.clear(); this.wagons.clear(); this.hires = []; this.stopFishing(); }
+  clearAnimals() { this.animals.list.forEach(e => { this.scene.remove(e.mesh); if (e.rig) this.animals.releaseRig(e); if (e.line) this.scene.remove(e.line); }); this.animals.list = []; this.npcs.clear(); this.boats.clear(); this.wagons.clear(); this.hires = []; this.stopFishing(); }
   unloadChunk(ci) { const c = this.chunks.get(ci); if (!c) return; ['solid', 'water', 'plants', 'cutout'].forEach(k => { if (c[k]) { this.scene.remove(c[k]); c[k].geometry.dispose(); } }); this.chunks.delete(ci); }
   // Only chunks near the player are meshed. `initial` builds the nearest ring synchronously so the world is never empty on arrival.
-  streamChunks(initial) {
+  streamChunks(initial, deadline = performance.now() + 4) {
     const w = this.world; const R = this.RADIUS || 7; const pcx = Math.floor(this.player.pos.x / 16), pcz = Math.floor(this.player.pos.z / 16);
     this.chunks.forEach((c, ci) => { const cx = ci % w.CX, cz = Math.floor(ci / w.CX); if (Math.max(Math.abs(cx - pcx), Math.abs(cz - pcz)) > R + 2) this.unloadChunk(ci); });
     const want = []; for (let dz = -R; dz <= R; dz++) for (let dx = -R; dx <= R; dx++) { const cx = pcx + dx, cz = pcz + dz; if (cx < 0 || cz < 0 || cx >= w.CX || cz >= w.CZ) continue; const ci = cx + cz * w.CX; if (!this.chunks.has(ci)) want.push([dx * dx + dz * dz, ci]); }
     if (!want.length) return; want.sort((a, b) => a[0] - b[0]);
-    const budget = initial ? want.filter(x => x[0] <= 9).length : 2; for (let i = 0; i < Math.min(budget, want.length); i++) { this.rebuildChunk(want[i][1]); w.dirty.delete(want[i][1]); }
+    const budget = initial ? want.filter(x => x[0] <= 9).length : 2; for (let i = 0; i < Math.min(budget, want.length) && performance.now() < deadline; i++) { this.rebuildChunk(want[i][1]); w.dirty.delete(want[i][1]); w.plantDirty.delete(want[i][1]); }
+  }
+  rebuildPlants(ci) {
+    const c = this.chunks.get(ci); if (!c) return;
+    if (c.plants) { this.scene.remove(c.plants); c.plants.geometry.dispose(); c.plants = null; }
+    const geo = BC.Mesher.buildPlants(this.world, ci % this.world.CX, Math.floor(ci / this.world.CX));
+    if (geo) { c.plants = new THREE.Mesh(geo, this.matPlant); c.plants.castShadow = this.shadows; c.plants.receiveShadow = this.shadows; if (this.depthPlant) c.plants.customDepthMaterial = this.depthPlant; this.scene.add(c.plants); }
   }
   rebuildChunk(ci) {
     const cx = ci % this.world.CX, cz = Math.floor(ci / this.world.CX); let c = this.chunks.get(ci); if (!c) { c = {}; this.chunks.set(ci, c); }
@@ -104,11 +136,11 @@ BC.Game = class Game {
   spawnAnimals(list) { list.forEach(a => { const e = this.animals.spawn(a.id, a.x, a.z, a.uid, { owner: a.owner, mono: a.mono }); if (e && a.tether) e.tether = a.tether; }); this.npcs.spawnFromWorld(); }
   // Older saves have far fewer animals than new worlds, and none of the newer species: bring every species up to at least half its generated count.
   topUpAnimals() { if (!this.isAuthority()) return; const want = {}; (this.world.spawnAnimals || []).forEach(a => { (want[a.id] = want[a.id] || []).push(a); }); const have = {}; this.animals.list.forEach(e => { have[e.def.id] = (have[e.def.id] || 0) + 1; }); let added = 0; Object.keys(want).forEach(id => { const target = Math.ceil(want[id].length / 2); let n = have[id] || 0; for (let i = 0; i < want[id].length && n < target; i++) { const a = want[id][i]; const e = this.animals.spawn(a.id, a.x, a.z); if (e) { n++; added++; if (this.mode === 'shared') this.net.send('animal_add', { uid: e.uid, id: e.def.id, x: e.x, z: e.z }); } } }); return added; }
-  reset() { try { if (this.mode === 'shared') localStorage.removeItem(this.SHARED_KEY); else localStorage.removeItem(this.SAVE_KEY); } catch (e) { } location.reload(); }
+  async reset() { if (this.mode !== 'shared') { try { await BC.Storage.remove(this.SAVE_KEY); } catch (e) { this.toast('Could not erase save: ' + e.message, 'bad'); return; } } try { if (this.mode === 'shared') localStorage.removeItem(this.SHARED_KEY); else localStorage.removeItem(this.SAVE_KEY); } catch (e) { } location.reload(); }
   // Save, disconnect and return to the title screen (the world stays available via Continue / Rejoin).
-  async exitToTitle() { this.running = false; if (document.exitPointerLock) document.exitPointerLock(); try { await this.save(true); } catch (e) { } if (this.mode === 'shared') { try { await this.net.leave(); } catch (e) { } } location.reload(); }
+  async exitToTitle() { this.running = false; if (document.exitPointerLock) document.exitPointerLock(); try { await this.save(true); } catch (e) { this.running = true; this.ui.showMenu(); return; } if (this.mode === 'shared') { try { await this.net.leave(); } catch (e) { } } location.reload(); }
   async deleteSharedWorld() { if (this.mode !== 'shared') return; this.running = false; try { await this.net.deleteWorld(); } catch (e) { this.running = true; this.toast('Could not delete: ' + this.net.friendly(e), 'bad'); return; } try { await this.net.leave(); } catch (e) { } this.forgetWorld(this.net.creds.world + '|' + this.net.creds.player); try { localStorage.removeItem(this.SHARED_KEY); } catch (e) { } location.reload(); }
-  async leaveShared() { this.running = false; try { await this.save(true); } catch (e) { } await this.net.leave(); try { localStorage.removeItem(this.SHARED_KEY); } catch (e) { } location.reload(); }
+  async leaveShared() { this.running = false; try { await this.save(true); } catch (e) { this.running = true; this.ui.showMenu(); return; } await this.net.leave(); try { localStorage.removeItem(this.SHARED_KEY); } catch (e) { } location.reload(); }
   // ---------- shared worlds remembered on this device ----------
   knownWorlds() { try { return JSON.parse(localStorage.getItem(this.WORLDS_KEY)) || []; } catch (e) { return []; } }
   rememberWorld(c) { const list = this.knownWorlds().filter(k => !(k.world === c.world && k.player === c.player)); list.unshift({ world: c.world, display: c.display || c.world, pin: c.pin, player: c.player, color: c.color, region: this.region, last: Date.now() }); try { localStorage.setItem(this.WORLDS_KEY, JSON.stringify(list.slice(0, 20))); } catch (e) { } }
@@ -123,12 +155,12 @@ BC.Game = class Game {
       let data;
       if (opts.action === 'create') {
         status('Growing a new world…'); this.seed = (Math.random() * 4294967295) >>> 0; this.region = opts.region || 'temperate';
-        await new Promise(r => setTimeout(r, 30)); this.world = new BC.World(this.seed); this.world.generate(); this.hookWorld();
+        await new Promise(r => setTimeout(r, 30)); this.world = await BC.Background.generate(this.seed); this.hookWorld();
         this.time = { t: this.DAY * 0.3, day: 1, dayFrac: 0.3 }; this.weather = { raining: false, timer: 90 };
-        status('Saving it to the cloud…'); const res = await this.net.createWorld(opts.world, opts.pin, this.seed, this.region, this.sharedState()); this.worldVersion = res.version; this.net.creds.world = res.id;
+        status('Saving it to the cloud…'); const res = await this.net.createWorld(opts.world, opts.pin, this.seed, this.region, await this.sharedStateAsync()); this.worldVersion = res.version; this.net.creds.world = res.id;
       } else {
         status('Looking up that world…'); data = await this.net.loadWorld(opts.world, opts.pin); this.net.creds.world = data.id;
-        status('Growing the world…'); await new Promise(r => setTimeout(r, 30)); this.seed = Number(data.seed); this.region = data.region; const ws = (data.state && data.state.world) || {}; this.world = new BC.World(this.seed, ws.W || 224, ws.D || 224, ws.H || 44); this.world.generate(); this.hookWorld(); this.applySharedState(data.state); this.worldVersion = data.version;
+        status('Growing the world…'); await new Promise(r => setTimeout(r, 30)); this.seed = Number(data.seed); this.region = data.region; const ws = (data.state && data.state.world) || {}; this.world = await BC.Background.generate(this.seed, ws.W || 224, ws.D || 224, ws.H || 44); this.hookWorld(); await this.applySharedState(data.state, true); this.worldVersion = data.version;
       }
       this.mode = 'shared'; this.playerName = player.toLowerCase(); this.playerLabel = player; this.clearChunks(); this.clearAnimals();
       status('Loading your journal…'); this.resetStats(); const ps = await this.net.loadPlayer();
@@ -138,12 +170,22 @@ BC.Game = class Game {
       status('Connecting to the live session…'); this.bindNetEvents(); let liveError = null;
       try { await this.net.join(this.net.creds.world, player, this.myColor, this.character.look); } catch (e) { liveError = e; await this.net.leave(); }
       status(''); this.begin(); if (!ps || !ps.inventory) this.welcome(this.region);
-      if (liveError) { this.liveWasDown = true; this.toast('Live session failed: ' + this.net.friendly(liveError) + ' You can still play; the world saves to the cloud. Open Menu to retry.', 'bad'); }
+      if (liveError) { this.liveWasDown = true; this.toast('Live session failed: ' + this.net.friendly(liveError) + ' The world is paused to protect your progress. Open Menu to reconnect.', 'bad'); }
       else this.toast(`Shared world "${this.net.creds.display}". Others join with the same name and PIN.`, 'good');
     } catch (e) { console.error(e); status(''); this.mode = 'solo'; await this.net.leave(); this.ui.sharedError(this.net.friendly(e)); }
   }
   sharedState() { return { world: this.world.serialize(), time: this.time, weather: this.weather, animals: this.animals.list.length ? this.animals.serialize() : (this.world.spawnAnimals || []), boats: this.boats.serialize(), wagons: this.wagons.serialize() }; }
-  applySharedState(state) { if (!state || !state.world) return; this.world.restore(state.world); if (state.time) this.time = state.time; if (state.weather) { this.weather = state.weather; this.rain.visible = !!this.weather.raining; } this.sharedAnimals = state.animals; if (state.boats) this.boats.restore(state.boats); if (state.wagons) this.wagons.restore(state.wagons); }
+  async applySharedState(state, fresh = false) { if (!state || !state.world) return;
+    if (!fresh) {
+      const ws = state.world;
+      this.world = await BC.Background.generate(this.seed, ws.W || 224, ws.D || 224, ws.H || 44);
+      this.hookWorld(); this.clearChunks();
+    }
+    this.world.restore(state.world); if (state.time) this.time = state.time; if (state.weather) { this.weather = state.weather; this.rain.visible = !!this.weather.raining; } this.sharedAnimals = state.animals; if (!fresh && state.animals) { this.player.riding = null; this.clearAnimals(); this.spawnAnimals(state.animals); } if (state.boats) this.boats.restore(state.boats); if (state.wagons) this.wagons.restore(state.wagons); }
+  async sharedStateAsync() {
+    const state = { time: { ...this.time }, weather: { ...this.weather }, animals: this.animals.list.length ? this.animals.serialize() : (this.world.spawnAnimals || []), boats: this.boats.serialize(), wagons: this.wagons.serialize() };
+    state.world = await BC.Background.serialize(this.world); return state;
+  }
   playerState() { const st = this.stats; const S = o => Array.from(o); return { inventory: this.inventory, selected: this.selected, points: this.points, pos: { x: this.player.pos.x, y: this.player.pos.y, z: this.player.pos.z, yaw: this.player.yaw, pitch: this.player.pitch }, stats: Object.assign({}, st, { inspected: S(st.inspected), seedSpecies: S(st.seedSpecies), biomesVisited: S(st.biomesVisited), journal: S(st.journal), questsDone: S(st.questsDone), amendmentsUsed: S(st.amendmentsUsed || []), npcsMet: S(st.npcsMet || []), fishSpecies: S(st.fishSpecies || []), fruitSpecies: S(st.fruitSpecies || []), booksRead: S(st.booksRead || []) }), loans: this.loans }; }
   applyPlayerState(ps) { const st = ps.stats; this.stats = Object.assign(this.stats, st, { inspected: new Set(st.inspected), seedSpecies: new Set(st.seedSpecies), biomesVisited: new Set(st.biomesVisited), journal: new Set(st.journal), questsDone: new Set(st.questsDone), amendmentsUsed: new Set(st.amendmentsUsed || []), npcsMet: new Set(st.npcsMet || []), story: st.story || {}, fishSpecies: new Set(st.fishSpecies || []), fruitSpecies: new Set(st.fruitSpecies || []), booksRead: new Set(st.booksRead || []) }); this.loans = ps.loans || []; this.inventory = ps.inventory || []; while (this.inventory.length < 9) this.inventory.push(null); if (!this.inventory.some(i => i && i.type === 'tool' && i.id === 'axe')) this.give({ type: 'tool', id: 'axe' }); if (!st.ropeGift && !this.inventory.some(i => i && i.type === 'material' && i.id === 'rope')) { this.stats.ropeGift = true; this.give({ type: 'material', id: 'rope', count: 2 }); } this.selected = Math.min(ps.selected || 0, 8); this.points = ps.points || 0; if (ps.pos) { this.player.pos.set(ps.pos.x, ps.pos.y, ps.pos.z); this.player.yaw = ps.pos.yaw; this.player.pitch = ps.pos.pitch; }  if (!this.inventory.some(it => it && it.type === 'steed')) this.give({ type: 'steed', count: 1 }); }
   bindNetEvents() {
@@ -154,25 +196,25 @@ BC.Game = class Game {
       block: m => remote(W => { const above = W.plantAt(m.x, m.y + 1, m.z); if (m.id !== 0 && above) W.removePlant(above); W.set(m.x, m.y, m.z, m.id); }),
       blocks: m => remote(W => { m.list.forEach(b => { W.set(b[0], b[1], b[2], b[3]); W.treeAt.set(W.idx(b[0], b[1], b[2]), m.tid); }); }),
       plant: m => remote(W => { const ex = W.plants.get(m.key); if (m.rm) { if (ex) W.removePlant(ex); } else { if (ex) W.removePlant(ex); W.addPlant(m.p); } }),
-      plants: m => { const W = w(); m.list.forEach(u => { const p = W.plants.get(u[0]); if (!p) return; const before = BC.Mesher.plantTile(p); const pestBefore = p.pest ? p.pest.id + '|' + Math.round(p.pest.level * 4) : ''; p.progress = u[1]; p.health = u[2]; p.withered = !!u[3]; p.pollinated = !!u[4]; if (u.length > 5) { p.pest = u[5] ? { id: u[5], level: u[6] } : null; const cov = !!u[7]; if (cov !== !!p.covered) W.markDirty(p.x, p.z); p.covered = cov; } const pestAfter = p.pest ? p.pest.id + '|' + Math.round(p.pest.level * 4) : ''; if (BC.Mesher.plantTile(p) !== before || pestBefore !== pestAfter) W.markDirty(p.x, p.z); }); },
+      plants: m => { const W = w(); m.list.forEach(u => { const p = W.plants.get(u[0]); if (!p) return; const before = BC.Mesher.plantTile(p); const pestBefore = p.pest ? p.pest.id + '|' + Math.round(p.pest.level * 4) : ''; p.progress = u[1]; p.health = u[2]; p.withered = !!u[3]; p.pollinated = !!u[4]; if (u.length > 5) { p.pest = u[5] ? { id: u[5], level: u[6] } : null; const cov = !!u[7]; if (cov !== !!p.covered) W.markPlantsDirty(p.x, p.z); p.covered = cov; } const pestAfter = p.pest ? p.pest.id + '|' + Math.round(p.pest.level * 4) : ''; if (BC.Mesher.plantTile(p) !== before || pestBefore !== pestAfter) W.markPlantsDirty(p.x, p.z); }); },
       amend: m => { const W = w(); const ing = BC.INGREDIENT_BY_ID[m.id]; if (ing) W.amend(m.x, m.z, ing); },
       hive: m => { const W = w(); if (m.rm) W.hives.delete(m.key); else W.hives.set(m.key, m.h); },
       chest: m => { const W = w(); if (m.rm) W.chests.delete(m.key); else W.chests.set(m.key, m.slots.map(s => s || null)); if (this.ui.openChestKey === m.key) this.ui.showChest(m.key, true); },
       water: m => this.applyWater(m.x, m.z, false),
     };
     Object.keys(apply).forEach(ev => n.on(ev, m => { if (this.syncBuffer) this.syncBuffer.push([ev, m]); else apply[ev](m); }));
-    this.replaySync = () => { const buf = this.syncBuffer || []; this.syncBuffer = null; buf.forEach(([ev, m]) => { try { apply[ev](m); } catch (e) { console.warn(e); } }); };
+    this.replaySync = () => { const buf = this.syncBuffer || []; this.syncBuffer = null; const deferred = this.deferredNet || []; this.deferredNet = []; buf.forEach(([ev, m]) => { try { apply[ev](m); } catch (e) { console.warn(e); } }); deferred.forEach(fn => { try { fn(); } catch (e) { console.warn(e); } }); };
     n.on('animals', m => { if (!n.isHost) this.animals.applyRemote(m.list); });
     n.on('animal_rm', m => { const e = this.animals.byUid(m.uid); if (e) this.animals.remove(e); });
     n.on('animal_add', m => { if (!this.animals.byUid(m.uid)) this.animals.spawn(m.id, m.x, m.z, m.uid, { owner: m.owner, mono: m.mono }); });
-    n.on('steed', m => { const e = this.animals.byUid(m.uid); if (e) { if (e.rider === 'me') return; e.x = m.x; e.z = m.z; e.y = this.animals.groundAt(m.x | 0, m.z | 0, this.world.H - 1) + 1; e.rx = undefined; e.owner = m.owner; e.mono = m.mono; if (e.rig) { this.scene.remove(e.rig.root); e.rig = undefined; } } else this.animals.spawn('enchanted_horse', m.x, m.z, m.uid, { owner: m.owner, mono: m.mono }); });
+    n.on('steed', m => { const e = this.animals.byUid(m.uid); if (e) { if (e.rider === 'me') return; e.x = m.x; e.z = m.z; e.y = this.animals.groundAt(m.x | 0, m.z | 0, this.world.H - 1) + 1; e.rx = undefined; e.owner = m.owner; e.mono = m.mono; if (e.rig) { this.animals.releaseRig(e); e.rig = undefined; } } else this.animals.spawn('enchanted_horse', m.x, m.z, m.uid, { owner: m.owner, mono: m.mono }); });
     n.on('leash', m => { const e = this.animals.byUid(m.uid); if (e) e.leash = m.by; });
     n.on('tether', m => { const e = this.animals.byUid(m.uid); if (e) { e.tether = m.at || null; if (m.at) e.leash = null; } });
     n.on('pos', (m, from) => { const pe = this.peers.get(from); if (pe) { pe.target.set(m.x, m.y, m.z); pe.yaw = m.yaw; } });
     n.on('time', m => { if (!n.isHost && Math.abs(m.t - this.time.t) > 3) this.time.t = m.t; });
     n.on('weather', m => { if (!n.isHost) { this.weather = m.w; this.rain.visible = !!m.w.raining; } });
-    n.on('need_sync', async () => { if (n.isHost) { try { const r = await n.saveWorld(this.sharedState()); this.worldVersion = r.version; n.send('synced', { version: r.version }); } catch (e) { console.warn(e); } } });
-    n.on('synced', async m => { if (!this.syncRequested) return; this.syncRequested = false; clearTimeout(this.syncTimer); try { if (m.version > this.worldVersion) { const d = await n.loadWorld(n.creds.world, n.creds.pin); this.applySharedState(d.state); this.worldVersion = d.version; } } catch (e) { console.warn(e); } this.replaySync(); });
+    n.on('need_sync', async () => { if (this.isAuthority()) { try { await this.save(); n.send('synced', { version: this.worldVersion }); } catch (e) { console.warn(e); } } });
+    n.on('synced', async m => { if (!this.syncRequested || this.syncApplying) return; this.syncApplying = true; clearTimeout(this.syncTimer); try { if (m.version > this.worldVersion) { const d = await n.loadWorld(n.creds.world, n.creds.pin); await this.applySharedState(d.state); this.worldVersion = d.version; } } catch (e) { await n.leave(); this.liveWasDown = true; this.toast('World synchronization failed: ' + e.message, 'bad'); } finally { this.syncRequested = false; this.syncApplying = false; this.replaySync(); } });
     n.on('stat', m => { if (m.to === this.playerName) this.applyCredit(m.key, m.val, m.set); });
     n.on('toast', m => { if (m.to === this.playerName) this.toast(m.msg, m.kind); });
     n.on('give', m => { if (m.to === this.playerName) { this.give(m.item); this.obtained(m.item); } });
@@ -190,13 +232,24 @@ BC.Game = class Game {
     n.on('hive_take', (m, from) => { if (n.isHost) this.takeHoney(m.key, m.by); });
     n.on('hello', (m, from) => { const pe = this.peers.get(from); if (pe) { pe.target.set(m.x, m.y, m.z); pe.group.position.copy(pe.target); } });
   }
-  requestSync() { if (this.syncRequested) return; this.syncRequested = true; this.syncBuffer = []; this.net.send('need_sync', {}); clearTimeout(this.syncTimer); this.syncTimer = setTimeout(() => { if (this.syncRequested) { this.syncRequested = false; this.replaySync(); } }, 20000); }
-  onLiveChange() { this.ui.updateShared(); if (this.mode !== 'shared' || !this.running) return; if (this.net.live && this.liveWasDown) { this.liveWasDown = false; this.toast('Live session connected.', 'good'); } else if (!this.net.live && this.net.lastError) { this.liveWasDown = true; } }
-  async reconnectLive() { if (this.mode !== 'shared') return; this.toast('Reconnecting…', ''); try { await this.net.leave(); this.peers.forEach(pe => this.scene.remove(pe.group)); this.peers.clear(); this.firstSyncDone = false; await this.net.join(this.net.creds.world, this.net.creds.player, this.myColor, this.character.look); this.toast('Live session connected.', 'good'); } catch (e) { this.toast(this.net.friendly(e), 'bad'); } this.ui.updateShared(); }
+  requestSync() { if (this.syncRequested) return; this.syncRequested = true; this.syncBuffer = []; this.net.send('need_sync', {}); clearTimeout(this.syncTimer); this.syncTimer = setTimeout(() => { if (this.syncRequested) { this.syncRequested = false; this.net.leave().catch(() => {}); this.liveWasDown = true; this.replaySync(); this.toast('World sync timed out. Reconnect from the menu.', 'bad'); } }, 20000); }
+  onLiveChange() { this.ui.updateShared(); if (this.mode !== 'shared' || !this.running) return; if (this.net.live && this.liveWasDown) { this.liveWasDown = false; this.recoverShared().catch(e => this.toast(e.message, 'bad')); } else if (!this.net.live && this.net.lastError) { this.liveWasDown = true; this.player.resetInput(); this.toast('Connection lost. World paused; reconnect from the menu.', 'bad'); } }
+  async recoverShared() {
+    if (this.recovering) return;
+    this.recovering = true; clearTimeout(this.syncTimer); this.syncRequested = false; this.syncApplying = false; this.syncBuffer = []; this.firstSyncDone = false;
+    try {
+      const d = await this.net.loadWorld(this.net.creds.world, this.net.creds.pin);
+      await this.applySharedState(d.state); this.worldVersion = d.version; this.replaySync();
+      if (!this.net.isHost) this.requestSync();
+      this.toast('Live session connected; world refreshed.', 'good');
+    } catch (e) { await this.net.leave(); this.liveWasDown = true; throw e; }
+    finally { this.recovering = false; }
+  }
+  async reconnectLive() { if (this.mode !== 'shared') return; this.toast('Reconnecting…', ''); this.liveWasDown = true; try { await this.net.leave(); this.peers.forEach(pe => this.scene.remove(pe.group)); this.peers.clear(); this.firstSyncDone = false; await this.net.join(this.net.creds.world, this.net.creds.player, this.myColor, this.character.look); this.toast('Live session connected.', 'good'); } catch (e) { this.toast(this.net.friendly(e), 'bad'); } this.ui.updateShared(); }
   onPeerLook(key, look) { const pe = this.peers.get(key); if (!pe) return; const g = this.buildAvatar(pe.name, pe.color, look); g.position.copy(pe.group.position); g.rotation.y = pe.group.rotation.y; this.scene.remove(pe.group); this.scene.add(g); pe.group = g; pe.look = look; }
   onPeerJoined(key, name, color, look) { color = color || BC.PLAYER_COLORS[BC.util.hashStr(name) % BC.PLAYER_COLORS.length]; const g = this.buildAvatar(name, color, look); g.position.copy(this.player.pos); this.scene.add(g); this.peers.set(key, { name, color, look, group: g, target: this.player.pos.clone(), yaw: 0 }); if (this.running) this.toast(`${name} joined the world.`, 'good'); this.net.send('hello', { x: this.player.pos.x, y: this.player.pos.y, z: this.player.pos.z }); this.ui.updateShared(); }
   onPeerLeft(key) { const pe = this.peers.get(key); if (pe) { this.scene.remove(pe.group); this.toast(`${pe.name} left the world.`, ''); this.peers.delete(key); } this.ui.updateShared(); }
-  onPresence(list, isHost, wasHost) { if (!isHost && list.length > 1 && !this.firstSyncDone) { this.firstSyncDone = true; this.requestSync(); } if (isHost && !wasHost && this.running && list.length > 1) this.toast('You are now hosting the simulation for this world.', ''); if (isHost) this.firstSyncDone = true; this.ui.updateShared(); }
+  onPresence(list, isHost, wasHost) { if (!this.recovering && !this.liveWasDown && !isHost && list.length > 1 && !this.firstSyncDone) { this.firstSyncDone = true; this.requestSync(); } if (isHost && !wasHost && this.running && list.length > 1) this.toast('You are now hosting the simulation for this world.', ''); if (isHost) { if (this.syncRequested && !this.syncApplying) { clearTimeout(this.syncTimer); this.syncRequested = false; this.replaySync(); } this.firstSyncDone = true; if (this.running && !this.recovering && !wasHost) this.topUpAnimals(); } this.ui.updateShared(); }
   goToPeer(key) { const pe = this.peers.get(key); if (!pe) return; const w = this.world; const px = Math.floor(pe.group.position.x), pz = Math.floor(pe.group.position.z); for (const [dx, dz] of [[2, 0], [-2, 0], [0, 2], [0, -2], [2, 2], [-2, -2], [1, 0], [0, 1]]) { const x = px + dx, z = pz + dz; if (x < 1 || z < 1 || x >= w.W - 1 || z >= w.D - 1) continue; const t = w.top(x, z); if (w.get(x, t + 1, z) === 0 && w.get(x, t + 2, z) === 0) { this.player.pos.set(x + 0.5, t + 1.01, z + 0.5); this.player.vel.set(0, 0, 0); this.player.yaw = Math.atan2(-(pe.group.position.x - this.player.pos.x), -(pe.group.position.z - this.player.pos.z)); this.toast(`You are now next to ${pe.name}.`, 'good'); return; } } this.toast(`Could not find solid ground next to ${pe.name}.`, 'bad'); }
   peerPositions() { const out = []; this.peers.forEach(pe => out.push(pe.group.position)); return out; }
   buildAvatar(name, color, look) {
@@ -220,6 +273,7 @@ BC.Game = class Game {
   loop(now) {
     requestAnimationFrame(t => this.loop(t)); if (!this.running) return;
     let dt = Math.min(0.05, (now - this.last) / 1000); this.last = now; if (this.ui.modalOpen() && this.mode === 'solo') dt = 0;
+    if (this.mode === 'shared' && (!this.net.live || this.syncRequested || this.syncApplying || this.recovering)) { this.renderer.render(this.scene, this.camera); return; }
     const auth = this.isAuthority();
     this.boats.update(this.ui.modalOpen() ? 0 : dt); this.wagons.update(this.ui.modalOpen() ? 0 : dt); this.player.update(this.ui.modalOpen() ? 0 : dt); this.tickFishing(dt); this.ui.updateWaterHUD();
     if (this.holdPrimary && !this.ui.modalOpen() && now - (this.lastPrimary || 0) > 320) { const it = this.cur(); if (this.isDigTool(it)) { const h = this.raycast(); if (h && h.type === 'block') this.primary(); } } if (auth) this.animals.update(dt); else this.animals.updateGuest(dt);
@@ -227,15 +281,33 @@ BC.Game = class Game {
     { const sh = this.matWater.userData.shader; if (sh) sh.uniforms.uTime.value = now / 1000; const ps = this.matPlant.userData.shader; if (ps) ps.uniforms.uTime.value = now / 1000; const ds = this.depthPlant && this.depthPlant.userData.shader; if (ds) ds.uniforms.uTime.value = now / 1000; } if (this.world.waterQueue.length) this.world.tickWater(120);
     this.time.t += dt; this.time.dayFrac = (this.time.t / this.DAY) % 1; this.time.day = Math.floor(this.time.t / this.DAY) + 1;
     if (this.ffTimer > 0) { this.ffTimer -= dt; if (this.ffTimer <= 0) { this.growthMult = 1; this.toast('Fast-forward finished.', ''); } }
+    if (auth) BC.Sim.updateSoil(this, dt);
     this.simAcc += dt; if (this.simAcc >= 0.5) { if (auth) { BC.Sim.tick(this, this.simAcc); this.updateWeather(this.simAcc); } this.simAcc = 0; }
     if (this.mode === 'shared' && this.net.live) { this.netTick(dt); this.updatePeers(dt); this.ui.updateCompass(); }
     this.questAcc += dt; if (this.questAcc >= 1) { this.questAcc = 0; this.checkQuests(); this.checkBiome(); this.checkWonders(); this.checkRoad(); }
-    this.saveAcc += dt; if (this.saveAcc >= 30) { this.saveAcc = 0; this.save(); }
+    this.saveAcc += dt; if (this.saveAcc >= 30) { this.saveAcc = 0; this.save().catch(() => {}); }
     this.hudAcc += dt; if (this.hudAcc >= 0.25) { this.hudAcc = 0; this.ui.updateHUD(); }
     this.updateSky(); this.updateDirtyChunks(); this.updateTarget();
     this.renderer.render(this.scene, this.camera);
   }
-  updateDirtyChunks() { this.streamChunks(false); if (!this.world.dirty.size) return; this.world.dirty.forEach(ci => { if (!this.chunks.has(ci)) this.world.dirty.delete(ci); }); if (!this.world.dirty.size) return; const px = this.player.pos.x, pz = this.player.pos.z; const arr = Array.from(this.world.dirty); arr.sort((a, b) => { const da = ((a % this.world.CX) * 16 - px) ** 2 + (Math.floor(a / this.world.CX) * 16 - pz) ** 2; const db = ((b % this.world.CX) * 16 - px) ** 2 + (Math.floor(b / this.world.CX) * 16 - pz) ** 2; return da - db; }); for (let i = 0; i < Math.min(3, arr.length); i++) { this.rebuildChunk(arr[i]); this.world.dirty.delete(arr[i]); } }
+  updateDirtyChunks() {
+    const deadline = performance.now() + (this.meshBudget || 4);
+    this.streamChunks(false, deadline);
+    const w = this.world, px = this.player.pos.x, pz = this.player.pos.z;
+    const pending = new Set([...w.dirty, ...w.plantDirty]);
+    const arr = [...pending].filter(ci => {
+      if (this.chunks.has(ci)) return true;
+      w.dirty.delete(ci); w.plantDirty.delete(ci); return false;
+    });
+    const dist = ci => ((ci % w.CX) * 16 - px) ** 2 + (Math.floor(ci / w.CX) * 16 - pz) ** 2;
+    arr.sort((a, b) => dist(a) - dist(b));
+    for (const ci of arr) {
+      if (performance.now() >= deadline) break;
+      if (w.dirty.has(ci)) this.rebuildChunk(ci); else this.rebuildPlants(ci);
+      w.dirty.delete(ci); w.plantDirty.delete(ci);
+    }
+  }
+
   updateSky() {
     const f = this.time.dayFrac; const ang = (f - 0.25) * Math.PI * 2; const elev = Math.sin(ang); const day = BC.util.clamp(elev * 1.6 + 0.15, 0, 1);
     const biome = BC.BIOMES[this.world.biomeAt(this.player.pos.x, this.player.pos.z)]; const skyDay = new THREE.Color(biome.sky), dusk = new THREE.Color(0xe8955a), night = new THREE.Color(0x0b1026);
@@ -245,7 +317,7 @@ BC.Game = class Game {
     if (this.weather.raining) col.lerp(new THREE.Color(0x6a7a86), 0.6);
     const under = this.player.headInWater; if (under) { col.set(0x1e5c9a).lerp(new THREE.Color(0x3a86c8), day * 0.6); }
     const haze = under ? col.clone() : col.clone().lerp(new THREE.Color(0xf6e9d2), day * 0.22); const zen = under ? col.clone() : col.clone().lerp(new THREE.Color(0x2d62c9), day * 0.6); if (this.weather.raining && !under) zen.lerp(new THREE.Color(0x4a5a68), 0.5);
-    this.scene.background.copy(haze); this.scene.fog.color.copy(haze); this.scene.fog.near = under ? 1 : this.weather.raining ? 20 : 44; this.scene.fog.far = under ? 22 : this.weather.raining ? 80 : 118; this.skyMat.uniforms.bottom.value.copy(haze); this.skyMat.uniforms.top.value.copy(zen); this.skyDome.position.copy(this.camera.position); { const sh = this.matWater.userData.shader; if (sh) sh.uniforms.uSky.value.copy(haze); }
+    this.scene.background.copy(haze); this.scene.fog.color.copy(haze); this.scene.fog.near = under ? 1 : this.weather.raining ? 20 : 44; this.scene.fog.far = under ? 22 : Math.min(this.weather.raining ? 80 : 118, (this.RADIUS - 1) * 16); this.skyMat.uniforms.bottom.value.copy(haze); this.skyMat.uniforms.top.value.copy(zen); this.skyDome.position.copy(this.camera.position); { const sh = this.matWater.userData.shader; if (sh) sh.uniforms.uSky.value.copy(haze); }
     { const ov = this.ui.$('underwater'); const show = under || (this.player.inWater && this.camera.position.y < this.world.waterSurface(Math.floor(this.player.pos.x), Math.floor(this.player.pos.z)) + 1); if (ov.hidden === show) ov.hidden = !show; }
     this.sun.intensity = 0.25 + day * (this.weather.raining ? 0.6 : 1.2) + ff * 0.5; this.hemi.intensity = 0.42 + day * 0.78 + ff * 0.95; this.sun.color.setHex(elev < 0.3 ? 0xffc890 : 0xffe6c2); if (ff > 0) { this.sun.color.lerp(new THREE.Color(0xd8ffa0), ff); this.hemi.color.set(0xc6dcff).lerp(new THREE.Color(0xdcff9a), ff); this.hemi.groundColor.set(0x7a6244).lerp(new THREE.Color(0x8aa050), ff); } else if (this._ffLit) { this.hemi.color.set(0xc6dcff); this.hemi.groundColor.set(0x7a6244); } this._ffLit = ff > 0;
     this.updateFireflies(elev);
@@ -362,6 +434,7 @@ BC.Game = class Game {
   // ---------- actions ----------
   applyWater(x, z, local) { const w = this.world; for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) { const xx = x + dx, zz = z + dz; if (xx >= 0 && zz >= 0 && xx < w.W && zz < w.D) w.moisture[xx + zz * w.W] = Math.min(1, w.moisture[xx + zz * w.W] + (dx === 0 && dz === 0 ? 1 : 0.5)); } w.markDirty(x, z); if (local && this.mode === 'shared') this.net.send('water', { x, z }); }
   primary() {
+    if (this.mode === 'shared' && (!this.net.live || this.syncRequested || this.syncApplying || this.recovering)) { this.toast('Reconnect and sync before changing the world.', 'bad'); return; }
     if (this.ui.modalOpen()) return; { const b0 = this.cur(); if (b0 && b0.type === 'book') return this.readBook(b0); } const h = this.raycast(); if (!h) return; const it = this.cur(); const w = this.world; const st = this.stats;
     if (this.fishing && it.type === 'tool' && it.id === 'rod') return this.fishTap();
     if (h.type === 'boat') { if (it.type === 'tool' && it.id === 'axe') { const b = h.entity; if (b.rider) return this.toast('Someone is in that boat.', ''); this.boats.remove(b); if (this.mode === 'shared') this.net.send('boat_rm', { uid: b.uid }); this.give({ type: 'boat', count: 1 }); return this.toast('Hauled the boat out.', 'good'); } return this.rideBoat(h.entity); }
@@ -829,19 +902,47 @@ BC.Game = class Game {
   toggleFastForward() { if (this.growthMult > 1) { this.growthMult = 1; this.ffTimer = 0; } else { this.growthMult = 5; this.ffTimer = 120; this.toast('Fast-forward: plants grow 5× faster for 2 minutes.', 'good'); } }
   onKey(e) {
     if (e.code === 'Escape') { if (!this.ui.modal.hidden) this.ui.closeModal(); else if (document.getElementById('start').hidden) this.ui.showMenu(); return; }
-    if (this.ui.modalOpen()) return;
+    if (this.ui.modalOpen() || this.sharedPaused()) return;
     if (e.code === 'KeyE') this.ui.showInventory(); else if (e.code === 'KeyJ') this.ui.showJournal(); else if (e.code === 'KeyQ') this.ui.showQuests(); else if (e.code === 'KeyM') this.ui.showMap(); else if (e.code === 'KeyF') this.primary(); else if (e.code === 'KeyR') this.secondary();
     else if (/^Digit[1-9]$/.test(e.code)) this.select(+e.code.slice(5) - 1);
   }
   // ---------- save / load ----------
-  save(goingOffline) {
-    if (!this.world) return;
-    if (this.mode === 'shared') { const jobs = [this.net.savePlayer(this.playerState(), !goingOffline)]; if (this.isAuthority()) jobs.push(this.net.saveWorld(this.sharedState()).then(r => { this.worldVersion = r.version; })); return Promise.all(jobs).catch(e => console.warn('cloud save failed', e)); }
-    const data = { v: 1, seed: this.seed, region: this.region, time: this.time, world: this.world.serialize(), animals: this.animals.serialize(), boats: this.boats.serialize(), wagons: this.wagons.serialize(), weather: this.weather, player: this.playerState() };
-    try { localStorage.setItem(this.SAVE_KEY, JSON.stringify(data)); } catch (e) { console.warn('save failed', e); }
+  setSaveStatus(status) {
+    this.saveStatus = status;
+    let el = document.getElementById('save-status');
+    if (!el) { el = document.createElement('div'); el.id = 'save-status'; el.setAttribute('role', 'status'); el.style.cssText = 'position:fixed;bottom:8px;left:50%;transform:translateX(-50%);padding:3px 10px;background:#17251ddd;color:white;border-radius:8px;font:12px sans-serif;pointer-events:none;z-index:20'; document.body.appendChild(el); }
+    el.textContent = status;
   }
-  load() {
-    let data = null; try { data = JSON.parse(localStorage.getItem(this.SAVE_KEY)); } catch (e) { } if (!data || data.v !== 1) return false;
+  save(goingOffline) {
+    const run = async () => {
+      if (!this.world) return;
+      this.setSaveStatus('Saving…');
+      try {
+        const player = structuredClone(this.playerState());
+        if (this.mode === 'shared') {
+          // A recovery copy is local; a disconnected guest must never publish a world snapshot.
+          if (!this.net.live || this.syncRequested || this.syncApplying || this.recovering) { await BC.Storage.write('recovery:' + this.net.creds.world + ':' + this.playerName, { player, state: await this.sharedStateAsync() }); throw new Error('A recovery copy was saved on this device. Reconnect and finish syncing before cloud saving.'); }
+          const host = this.isAuthority();
+          const state = host ? await this.sharedStateAsync() : null;
+          await BC.Storage.write('shared:' + this.net.creds.world + ':' + this.playerName, { player, state });
+          await this.net.savePlayer(player, !goingOffline);
+          if (host) { const r = await this.net.saveWorld(state); this.worldVersion = r.version; }
+        } else {
+          const data = { v: 1, seed: this.seed, region: this.region, time: { ...this.time }, animals: this.animals.serialize(), boats: this.boats.serialize(), wagons: this.wagons.serialize(), weather: { ...this.weather }, player };
+          data.world = await BC.Background.serialize(this.world);
+          await BC.Storage.write(this.SAVE_KEY, data);
+        }
+        this.setSaveStatus('Saved');
+      } catch (e) { this.setSaveStatus('Save failed'); this.toast('Save failed: ' + e.message + ' Your game is still open; retry saving.', 'bad'); throw e; }
+    };
+    const job = (this.saveQueue || Promise.resolve()).catch(() => {}).then(run);
+    this.saveQueue = job; return job;
+  }
+
+  async load() {
+    let data = null; try { data = await BC.Storage.read(this.SAVE_KEY); } catch (e) { console.warn(e); }
+    if (!data) { try { data = JSON.parse(localStorage.getItem(this.SAVE_KEY)); } catch (e) { } }
+    if (!data) { try { data = await BC.Storage.read(this.SAVE_KEY + ':backup'); } catch (e) { } } if (!data || data.v !== 1) return false;
     this.mode = 'solo'; this.playerName = 'me'; this.seed = data.seed; this.region = data.region; this.time = data.time; this.weather = data.weather || this.weather; this.rain.visible = this.weather.raining;
     this.worldW = data.world.W || 224; this.worldD = data.world.D || 224;
     this.startWorld(() => {
@@ -854,3 +955,4 @@ BC.Game = class Game {
   }
 };
 window.addEventListener('DOMContentLoaded', () => { try { window.game = new BC.Game(); } catch (e) { console.error(e); const el = document.getElementById('fatal'); el.hidden = false; el.textContent = 'Botany World could not start: ' + e.message + '. This browser may not support WebGL.'; } });
+

@@ -2,7 +2,7 @@ window.BC = window.BC || {};
 BC.util = {
   clamp: (v, a, b) => v < a ? a : v > b ? b : v,
   lerp: (a, b, t) => a + (b - a) * t,
-  rng(seed) { let s = (seed >>> 0) || 1; return () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296; },
+  rng(seed) { let s = (seed >>> 0) || 1; const next = () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296; next.state = () => s; next.restore = value => { s = value >>> 0; }; return next; },
   hash2(x, y, seed) { let h = (x * 374761393 + y * 668265263 + seed * 1442695041) | 0; h = (h ^ (h >>> 13)) * 1274126177; h = h ^ (h >>> 16); return (h >>> 0) / 4294967296; },
   // 2D fractal value noise, output ~0..1
   noise2(seed) {
@@ -21,3 +21,4 @@ BC.MATERIALS = { fibre: { name: 'Plant fibre', desc: 'Stringy leaves and stems. 
 BC.CHEST_SLOTS = 37;
 BC.isSmallAnimal = d => !!(d.flies || (d.scale && d.scale <= 0.6));
 BC.HAND = { type: 'tool', id: 'hand' };
+

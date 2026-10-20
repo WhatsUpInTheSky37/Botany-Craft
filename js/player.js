@@ -8,14 +8,15 @@ BC.Player = class Player {
     this.jumpQueued = false; this.sprint = false;
   }
   spawn(x, y, z) { this.pos.set(x + 0.5, y + 1.01, z + 0.5); this.vel.set(0, 0, 0); }
+  resetInput() { this.keys = {}; this.sprint = false; this.jumpQueued = false; this.joy.x = this.joy.y = 0; this.game.holdPrimary = false; }
   bindDesktop(canvas) {
     canvas.addEventListener('click', () => { if (!this.game.ui.modalOpen() && !this.touch && document.pointerLockElement !== canvas) canvas.requestPointerLock && canvas.requestPointerLock(); });
-    document.addEventListener('pointerlockchange', () => { this.locked = document.pointerLockElement === canvas; this.game.ui.setLockHint(!this.locked); });
+    document.addEventListener('pointerlockchange', () => { this.locked = document.pointerLockElement === canvas; if (!this.locked) this.resetInput(); this.game.ui.setLockHint(!this.locked); });
     document.addEventListener('mousemove', e => { if (!this.locked) return; this.yaw -= e.movementX * 0.0022; this.pitch = BC.util.clamp(this.pitch - e.movementY * 0.0022, -1.5, 1.5); });
-    window.addEventListener('keydown', e => { if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return; this.keys[e.code] = true; if (e.code === 'Space') { this.jumpQueued = true; e.preventDefault(); } if (e.code === 'ShiftLeft') this.sprint = true; this.game.onKey(e); });
+    window.addEventListener('keydown', e => { if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT')) return; this.keys[e.code] = true; if (e.code === 'Space') { this.jumpQueued = true; e.preventDefault(); } if (e.code === 'ShiftLeft') this.sprint = true; this.game.onKey(e); });
     window.addEventListener('keyup', e => { this.keys[e.code] = false; if (e.code === 'ShiftLeft') this.sprint = false; });
     canvas.addEventListener('mousedown', e => { if (!this.locked || this.game.ui.modalOpen()) return; e.preventDefault(); if (e.button === 0) { this.game.holdPrimary = true; this.game.primary(); } else if (e.button === 2) this.game.secondary(); });
-    window.addEventListener('mouseup', e => { if (e.button === 0) this.game.holdPrimary = false; }); window.addEventListener('blur', () => { this.game.holdPrimary = false; });
+    window.addEventListener('mouseup', e => { if (e.button === 0) this.game.holdPrimary = false; }); window.addEventListener('blur', () => this.resetInput());
     canvas.addEventListener('contextmenu', e => e.preventDefault());
     window.addEventListener('wheel', e => { if (this.locked) this.game.scrollHotbar(Math.sign(e.deltaY)); }, { passive: true });
   }
@@ -64,7 +65,7 @@ BC.Player = class Player {
     const accel = this.onGround ? 14 : 5; this.vel.x += (vx - this.vel.x) * Math.min(1, accel * dt); this.vel.z += (vz - this.vel.z) * Math.min(1, accel * dt);
     const onLadder = (BC.BLOCKS[feet] && BC.BLOCKS[feet].climb) || (BC.BLOCKS[head] && BC.BLOCKS[head].climb);
     if (onLadder) { const up = this.jumpQueued || k.Space || mz > 0.3; const down = k.ShiftLeft || mz < -0.3; this.vel.y = up ? 3 : down ? -3 : -0.6; this.vel.x *= 0.5; this.vel.z *= 0.5; }
-    else if (this.inWater) { const up = this.jumpQueued || k.Space || (this.touch && this.joy.y > 0.85); const down = k.ShiftLeft && !this.sprint; const want = this.headInWater ? (up ? 3.6 : down ? -2.8 : -0.9) : (up ? 4.2 : -0.6); this.vel.y += (want - this.vel.y) * Math.min(1, 4 * dt);
+    else if (this.inWater) { const up = this.jumpQueued || k.Space || (this.touch && this.joy.y > 0.85); const down = k.ShiftLeft; const want = this.headInWater ? (up ? 3.6 : down ? -2.8 : -0.9) : (up ? 4.2 : -0.6); this.vel.y += (want - this.vel.y) * Math.min(1, 4 * dt);
       // climbing out: moving toward a bank that is one or two blocks above the water line lifts you onto it
       if (mx || mz) { const ax = this.pos.x + (vx / speed) * 0.55, az = this.pos.z + (vz / speed) * 0.55; if (this.solidAt(ax, this.pos.y + 0.4, az) && !this.solidAt(ax, this.pos.y + 1.45, az) && !this.solidAt(ax, this.pos.y + 2.3, az)) this.vel.y = Math.max(this.vel.y, 5.2); else if (this.solidAt(ax, this.pos.y + 0.4, az) && this.headInWater) this.vel.y = Math.max(this.vel.y, 3.0); else if (up && this.solidAt(ax, this.pos.y + 1.45, az) && !this.solidAt(ax, this.pos.y + 2.4, az) && !this.solidAt(ax, this.pos.y + 3.2, az) && !this.headInWater) this.vel.y = Math.max(this.vel.y, 7.4); } } else { this.vel.y -= 22 * dt; if (this.jumpQueued && this.onGround) { this.vel.y = 7.6; this.onGround = false; } }
     this.jumpQueued = false; if (this.vel.y < -40) this.vel.y = -40;
@@ -88,3 +89,4 @@ BC.Player = class Player {
   }
   dir() { const d = new THREE.Vector3(0, 0, -1); d.applyEuler(new THREE.Euler(this.pitch, this.yaw, 0, 'YXZ')); return d; }
 };
+

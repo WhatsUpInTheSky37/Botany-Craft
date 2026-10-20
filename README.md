@@ -46,4 +46,9 @@ Phone: left thumb drags to move, right thumb drags to look, tap to use, press an
 * `js/sim.js` growth simulation and plant diagnosis.
 * `js/player.js`, `js/animals.js`, `js/ui.js`, `js/main.js` controls, creatures, interface and game loop.
 
-Rendering uses [three.js](https://threejs.org/) from a CDN. Progress saves to the browser's local storage.
+Rendering uses [three.js](https://threejs.org/) from a CDN. Progress saves asynchronously to IndexedDB in the browser, retaining the previous successful save. Older local-storage saves are still supported. Use **Save and exit game** to wait for saving before leaving. Graphics quality can be changed in the menu.
+
+
+## Development checks
+
+Run `node --test tests/regression.test.cjs` with Node 22 or newer. See [performance and save reliability](docs/performance-and-save-fixes.md) for implementation details, browser checks, and the separate Supabase backend requirements.

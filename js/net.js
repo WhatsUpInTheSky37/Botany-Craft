@@ -12,7 +12,7 @@ BC.Net = class Net {
   // ---- cloud save ----
   createWorld(name, pin, seed, region, state) { return this.rpc('bc_world_create', { p_name: name, p_pin: pin, p_seed: seed, p_region: region, p_state: state }); }
   loadWorld(name, pin) { return this.rpc('bc_world_load', { p_name: name, p_pin: pin }); }
-  saveWorld(state) { return this.rpc('bc_world_save', { p_name: this.creds.world, p_pin: this.creds.pin, p_state: state }); }
+  saveWorld(state) { if (!this.game.isAuthority()) return Promise.reject(new Error('Only the connected, synchronized host can save the world.')); return this.rpc('bc_world_save', { p_name: this.creds.world, p_pin: this.creds.pin, p_state: state }); }
   worldVersion() { return this.rpc('bc_world_version', { p_name: this.creds.world, p_pin: this.creds.pin }); }
   loadPlayer() { return this.rpc('bc_player_load', { p_world: this.creds.world, p_pin: this.creds.pin, p_player: this.creds.player }); }
   savePlayer(state, online) { return this.rpc('bc_player_save', { p_world: this.creds.world, p_pin: this.creds.pin, p_player: this.creds.player, p_state: state, p_online: online !== false }); }
@@ -21,7 +21,14 @@ BC.Net = class Net {
   deleteWorld() { return this.rpc('bc_world_delete', { p_name: this.creds.world, p_pin: this.creds.pin }); }
   listPlayers() { return this.rpc('bc_world_players', { p_world: this.creds.world, p_pin: this.creds.pin }); }
   // ---- realtime ----
-  on(event, fn) { this.handlers[event] = fn; }
+  on(event, fn) {
+    const core = new Set(['block', 'blocks', 'plant', 'plants', 'amend', 'hive', 'chest', 'water', 'need_sync', 'synced', 'pos', 'hello', 'toast']);
+    this.handlers[event] = (...args) => {
+      if (!core.has(event) && (this.game.syncRequested || this.game.syncApplying || this.game.recovering)) {
+        (this.game.deferredNet || (this.game.deferredNet = [])).push(() => fn(...args));
+      } else fn(...args);
+    };
+  }
   join(worldId, playerName, color, look) {
     return new Promise((resolve, reject) => {
       const sb = this.client(); this.joinedAt = Date.now(); this.me = playerName; this.myColor = color || '#4f7a3a'; this.myLook = look || null; this.lastError = null; this.status = 'connecting'; let settled = false;
@@ -57,3 +64,4 @@ BC.Net = class Net {
   send(event, payload) { if (!this.channel) return; payload = payload || {}; payload.from = this.myKey; this.outbox++; this.channel.send({ type: 'broadcast', event, payload }).catch(() => { }); }
   async leave() { this.live = false; this.status = 'off'; if (this.channel) { try { await this.channel.untrack(); await this.client().removeChannel(this.channel); } catch (e) { } this.channel = null; } this.peers.clear(); this.isHost = false; }
 };
+
