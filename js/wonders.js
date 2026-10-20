@@ -15,6 +15,10 @@ BC.WONDERS = [
     teach: 'Plato told the story in two dialogues around 360 BC: an island empire beyond the Pillars of Heracles, 9,000 years before his day, whose capital was built in rings. Poseidon cut the hill where his mortal wife Cleito lived into three rings of water and two of land; the kings bridged them, tunnelled ship canals through the land rings and sheathed each ring in metal, brass outside, tin in the middle and red-glowing orichalcum around the citadel. At the centre stood the temple of Poseidon, clad in silver with golden pinnacles, beside a hot spring and a cold one, with a racecourse a stadion wide running round the outer ring. The Atlanteans grew greedy and warlike, Athens defeated them, and in a single day and night of earthquakes and floods the island sank. Plato meant it as a lesson about pride, not a map, which is why nobody has found it. The rings, the bridge, the metal walls and the drowning are built here as he described them.',
     facts: ['Plato is the only ancient source; every later Atlantis is a retelling of his. His pupil Aristotle is said to have remarked that the man who invented it also made it disappear.', 'The Bronze Age eruption of Thera (Santorini) around 1600 BC buried a Minoan town under ash and sent tsunamis across Crete; many think a memory of it fed the tale.', 'Orichalcum was a real alloy, probably a kind of brass; ingots of it were raised from a 2,600-year-old shipwreck off Sicily in 2015.'] },
 ];
+BC.WONDERS.push({ id: 'crystal_fort', name: 'The Crystal Vault', sci: 'A sunken fort of six gems · 80 by 40 blocks, hidden under the sea', tile: 'gem_amethyst', region: 'the deep sea', radius: 50,
+  hint: 'Sail the deep water on the far side of the sea from the ring city and watch for coloured glints a block beneath the surface. On the sea floor at one end a single glowing amethyst marks a dark pit. Dive in, follow the tunnel, and come up inside.',
+  teach: 'A vault of crystal buried under sand on the sea floor, 80 blocks long and 40 wide, built from every gem in the ground: onyx floors inlaid with opal, sapphire walls banded with emerald, diamond pillars and an amethyst roof under a diamond skylight. Crystals are atoms stacked in a repeating lattice, which is why they grow flat faces and sharp angles by themselves. Light slows and bends as it enters one, and a cut gem sparkles because every facet is a tiny mirror. Opal is the odd one out: no lattice at all, only silica spheres with water between them, and grasses make the same stuff in their leaves.',
+  facts: ['Diamond and the graphite in a pencil are both pure carbon; only the stacking differs. Diamond forms 150 km down and reaches the surface in volcanic kimberlite pipes.', 'Sapphire and ruby are the same mineral, corundum, coloured by different trace metals; emerald and aquamarine are both beryl.', 'The entrance is a moon pool: water cannot rise above its own level, so a room with its only door in the floor stays dry, the trick divers use in underwater habitats.'] });
 BC.WONDER_BY_ID = {}; BC.WONDERS.forEach(w => { BC.WONDER_BY_ID[w.id] = w; });
 // The soil hammer walks a block through every ground type in the game, in climate order.
 BC.SOIL_CYCLE = [1, 2, 3, 4, 7, 8, 9, 10, 11, 223, 224, 12, 13, 5, 6, 17, 16, 14];
@@ -25,6 +29,7 @@ BC.SOIL_CYCLE = [1, 2, 3, 4, 7, 8, 9, 10, 11, 223, 224, 12, 13, 5, 6, 17, 16, 14
     try { this.buildGiza(); } catch (e) { console.warn('giza', e); }
     try { this.buildMachuPicchu(); } catch (e) { console.warn('machu picchu', e); }
     try { this.buildAtlantis(); } catch (e) { console.warn('atlantis', e); }
+    try { this.buildCrystalFort(); } catch (e) { console.warn('crystal fort', e); }
   };
   P.isReserved = function (x, z) { return this.reserved && this.reserved.has(x + z * this.W); };
   // Reset a column to a new ground height, keeping that column's own biome layering.
@@ -200,4 +205,50 @@ BC.SOIL_CYCLE = [1, 2, 3, 4, 7, 8, 9, 10, 11, 223, 224, 12, 13, 5, 6, 17, 16, 14
   };
   // lore: the elders drop a hint about each landmark
   if (BC.REGION_LORE) { ['wetland', 'temperate', 'rainforest'].forEach(k => { if (BC.REGION_LORE[k]) BC.REGION_LORE[k].topics.push(['The ring city', 'Fishermen say that out along the edge of the sea there is a bay where the water runs in circles between walls of red metal, and a white bridge leads to a temple in the middle. It sank in a night, long ago, they say, and a quarter of it is under the water still.']); }); if (BC.REGION_LORE.desert) BC.REGION_LORE.desert.topics.push(['The old kings', 'Far out where the sand goes flat there are hills too square to be hills. My grandmother said kings sleep under them and that the river that fed their builders is a thousand miles away.']); if (BC.REGION_LORE.boreal) BC.REGION_LORE.boreal.topics.push(['The city on the ridge', 'Follow the high ground north until a peak stands up like a finger. In the saddle below it someone built a whole town of fitted stone and farmed the cliffs in steps. Nobody here remembers who.']); }
+  // The Crystal Vault: an 80 by 40 fort of gem blocks on the floor of a deep basin at a map edge, roofed just below the surface and dusted with sand.
+  P.buildCrystalFort = function () {
+    const W = this.W, D = this.D, WL = this.WL; const L = 80, Wd = 40, F = 10; const SEA = 3; const G = BC.GEM_BLOCK; if (!G) return;
+    const atl = (this.wonders || []).find(w => w.id === 'atlantis');
+    const cands = []; for (let i = 14; i <= W - L - 14; i += 8) { cands.push({ ox: i, oz: 14, alongX: true }); cands.push({ ox: i, oz: D - Wd - 14, alongX: true }); } for (let i = 14; i <= D - L - 14; i += 8) { cands.push({ ox: 14, oz: i, alongX: false }); cands.push({ ox: W - Wd - 14, oz: i, alongX: false }); }
+    let best = null, bs = -1e9;
+    for (const c of cands) { const w = c.alongX ? L : Wd, d = c.alongX ? Wd : L; const cx = c.ox + w / 2, cz = c.oz + d / 2; if (atl && Math.hypot(cx - atl.x, cz - atl.z) < 160) continue; let wet = 0, n = 0, res = 0, sum = 0; for (let z = -F; z < d + F; z += 3) for (let x = -F; x < w + F; x += 3) { const wx = c.ox + x, wz = c.oz + z; if (wx < 0 || wz < 0 || wx >= W || wz >= D) continue; const ci = wx + wz * W; if (this.reserved.has(ci)) res++; n++; const h = this.height[ci]; sum += h; if (h < WL) wet++; } if (res || !n) continue; const score = (wet / n) * 10 - (sum / n - WL) * 0.3; if (score > bs) { bs = score; best = Object.assign({}, c, { w, d, cx: Math.round(cx), cz: Math.round(cz) }); } }
+    if (!best) return;
+    const { ox, oz, w, d, cx, cz, alongX } = best;
+    // the basin: a flat floor three blocks up from bedrock, feathered into the surrounding sea bed
+    for (let z = -F; z < d + F; z++) for (let x = -F; x < w + F; x++) { const wx = ox + x, wz = oz + z; if (wx < 0 || wz < 0 || wx >= W || wz >= D) continue; const ci = wx + wz * W; const out = Math.max(x < 0 ? -x : 0, z < 0 ? -z : 0, x >= w ? x - w + 1 : 0, z >= d ? z - d + 1 : 0); let h; if (out <= 0) h = SEA; else { const t = Math.min(1, out / F); h = SEA * (1 - t) + this.height[ci] * t; if (this.height[ci] <= SEA) h = this.height[ci]; } this.reshape(wx, wz, h); if (out <= 0) this.reserved.add(ci); }
+    // a: along the long side (-40..39), c: across (-20..19)
+    const P = (a, c, y, id) => { const x = alongX ? cx + a : cx + c, z = alongX ? cz + c : cz + a; if (this.inBounds(x, y, z)) this.blocks[this.idx(x, y, z)] = id; };
+    const K = (a, c, y) => { const x = alongX ? cx + a : cx + c, z = alongX ? cz + c : cz + a; return this.idx(x, y, z); };
+    const DIA = G.diamond, SAP = G.sapphire, ONX = G.onyx, OPL = G.opal, EME = G.emerald, AME = G.amethyst; const Y0 = SEA + 1, TOP = WL - 1; // floor at 4, spires at 11, water surface at 12
+    const h2 = (a, c, k) => BC.util.hash2(a + 400, c + 400, k);
+    for (let a = -40; a <= 39; a++) for (let c = -20; c <= 19; c++) {
+      const edge = a === -40 || a === 39 || c === -20 || c === 19; const corner = (a <= -38 || a >= 37) && (c <= -18 || c >= 17);
+      for (let y = Y0; y <= TOP; y++) P(a, c, y, 0);
+      // floor: onyx with an opal lattice and an amethyst aisle
+      P(a, c, Y0, ((a + c) % 8 === 0 || (a - c) % 8 === 0) ? OPL : (Math.abs(c) <= 1 ? AME : ONX));
+      // walls: sapphire with an emerald band; corner towers of diamond up to the spire line
+      if (corner) { for (let y = Y0 + 1; y <= TOP; y++) P(a, c, y, DIA); continue; }
+      if (edge) { for (let y = Y0 + 1; y <= Y0 + 5; y++) P(a, c, y, y === Y0 + 3 ? EME : SAP); }
+      // pillars every eight blocks, two rows, with emerald capitals
+      if (!edge && Math.abs(c) === 8 && a % 8 === 0 && Math.abs(a) <= 32) { for (let y = Y0 + 1; y <= Y0 + 4; y++) P(a, c, y, DIA); P(a, c, Y0 + 5, EME); }
+      // roof: diamond skylight down the middle, emerald ribs, amethyst between
+      P(a, c, Y0 + 6, Math.abs(c) <= 3 ? DIA : (a % 8 === 0 ? EME : AME));
+      // above the roof: spires, a dusting of sand, otherwise the sea
+      let topId = 15; const spire = (Math.abs(a) <= 2 && Math.abs(c) <= 2) || (Math.abs(c) === 12 && a % 10 === 0 && Math.abs(a) <= 30);
+      if (spire) topId = Math.abs(c) <= 2 ? DIA : AME; else if (Math.abs(c) > 3 && h2(a, c, 5) < 0.55) topId = h2(a, c, 6) < 0.8 ? 5 : 16;
+      P(a, c, TOP, topId);
+    }
+    // the throne at the far end, a gem garden along each wall, treasure chests
+    for (let c = -1; c <= 1; c++) { P(34, c, Y0 + 1, DIA); P(35, c, Y0 + 1, DIA); P(35, c, Y0 + 2, DIA); } P(35, 0, Y0 + 3, OPL); P(33, 0, Y0 + 1, OPL);
+    for (let a = -30; a <= 30; a += 2) for (const c of [-16, 15]) { P(a, c, Y0 + 1, a % 4 === 0 ? EME : OPL); }
+    for (let a = -24; a <= 24; a += 12) for (const c of [-12, 11]) { P(a, c, Y0 + 1, AME); P(a, c, Y0 + 2, DIA); }
+    const chestAt = (a, c) => { P(a, c, Y0 + 1, 73); const slots = new Array(BC.CHEST_SLOTS).fill(null); BC.GEMS.forEach((gd, i) => { slots[i] = { type: 'gem', id: gd.id, count: 6 }; slots[i + 6] = { type: 'block', id: BC.GEM_BLOCK[gd.id], count: 4 }; }); slots[12] = { type: 'block', id: 227, count: 8 }; this.chests.set(K(a, c, Y0 + 1), slots); };
+    chestAt(36, -6); chestAt(36, 5); chestAt(-36, -6); chestAt(-36, 5);
+    // the secret way in: a pit on the sea floor beyond the near wall, a flooded tunnel under the foundation, and a moon pool inside
+    for (let a = -46; a <= -35; a++) for (const c of [-1, 0]) { for (const y of [SEA - 1, SEA]) P(a, c, y, 15); }
+    for (const c of [-1, 0]) { P(-36, c, Y0, 15); P(-35, c, Y0, 15); P(-46, c, Y0 + 1, 15); P(-45, c, Y0 + 1, 15); }
+    for (let a = -48; a <= -43; a++) for (let c = -3; c <= 2; c++) { if ((a === -46 || a === -45) && (c === -1 || c === 0)) continue; P(a, c, Y0, ONX); }
+    P(-49, 0, Y0, AME); P(-49, 0, Y0 + 1, AME);
+    this.wonders.push({ id: 'crystal_fort', x: cx, z: cz, y: Y0 + 1 });
+  };
 })();

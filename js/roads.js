@@ -1,10 +1,16 @@
 window.BC = window.BC || {};
 // Yellow brick roads: a road between every pair of villages, found by A* over the terrain (gentle slopes, around water, trees and landmarks).
-BC.ORE_PRICE = { 195: 12, 196: 6, 197: 3 };
+BC.ORE_PRICE = { 195: 12, 196: 6, 197: 3, 400: 30, 401: 20, 402: 8, 403: 12, 404: 24, 405: 6 };
 BC.ORE_TEACH = {
   195: 'Gold! Prospectors once read the plants: horsetail, and in Australia eucalyptus leaves, take up traces of gold from deep roots, and sampling leaves still finds buried deposits.',
   196: 'Silver. Florists use a silver compound to block ethylene, the ripening gas, so cut flowers last twice as long. In soil it is toxic to roots and microbes.',
   197: 'Copper. A micronutrient every plant needs for photosynthesis and lignin: a pinch per acre. Peaty soils run short and cereals get pale, twisted tips.',
+  400: 'Diamond! Pure carbon from 150 km down. In West Africa prospectors look for the Pandanus candelabrum palm: it grows only on the kimberlite that carries diamonds.',
+  401: 'Sapphire. Aluminium oxide tinted blue by iron and titanium. Aluminium is the commonest metal in soil, and in acid soils it dissolves and poisons roots, which is why farmers lime.',
+  402: 'Black onyx. Banded quartz laid down layer by layer from silica water, the same silica that grasses and horsetails pull from the soil to stiffen their stems.',
+  403: 'Opal. Silica spheres with water trapped between them. Grasses make microscopic opal grains called phytoliths in their leaves; they wear down the teeth of grazing animals.',
+  404: 'Emerald. Beryl coloured by chromium. Chromium in soil is a plant poison at high levels, and the serpentine barrens where it is common grow their own rare, stunted flora.',
+  405: 'Amethyst. Quartz turned violet by iron and natural radiation. Most of the world\'s amethyst comes from basalt geodes in southern Brazil and Uruguay.',
 };
 (function () {
   const P = BC.World.prototype;

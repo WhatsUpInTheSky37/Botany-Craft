@@ -91,7 +91,7 @@ BC.World = class World {
     const set = (y, id) => { this.blocks[this.idx(x, y, z)] = id; };
     for (let y = 0; y <= h; y++) {
       const d = h - y; let id = B.STONE;
-      if (d >= 5) { id = y === 0 ? B.STONE : (d === 5 ? B.GRAVEL : B.STONE); if (y >= 1 && y <= 5 && id === B.STONE) { const r = BC.util.hash2((x >> 1) + y * 977, z >> 1, 919); const deep = y <= 2 ? 1.6 : 1; if (r < 0.004 * deep) id = 195; else if (r < 0.014 * deep) id = 196; else if (r < 0.036) id = 197; } }
+      if (d >= 5) { id = y === 0 ? B.STONE : (d === 5 ? B.GRAVEL : B.STONE); if (y >= 1 && y <= 5 && id === B.STONE) { const r = BC.util.hash2((x >> 1) + y * 977, z >> 1, 919); const deep = y <= 2 ? 1.6 : 1; if (r < 0.004 * deep) id = 195; else if (r < 0.014 * deep) id = 196; else if (r < 0.036) id = 197; else { const q = BC.util.hash2((x >> 1) + y * 1301, z >> 1, 733); if (q < 0.0007 * deep) id = 400; else if (q < 0.0014 * deep) id = 404; else if (q < 0.0022 * deep) id = 401; else if (q < 0.0032) id = 403; else if (q < 0.0045) id = 402; else if (q < 0.0068) id = 405; } } }
       else switch (biome) {
         case 'temperate': id = d === 0 ? (under ? B.GLEY : B.GRASS_A) : d < 4 ? B.ALFISOL : B.GRAVEL; break;
         case 'prairie': id = d === 0 ? (under ? B.GLEY : B.GRASS_M) : d < 4 ? B.MOLLISOL : B.GRAVEL; break;

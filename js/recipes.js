@@ -147,6 +147,13 @@ BC.RECIPES = [
     { id: 'copperblock', cat: 'build', name: 'Copper block', out: { type: 'block', id: 229, count: 1 }, ins: [{ label: 'copper ore', n: 4, match: oreOf(197) }, { label: 'charcoal', n: 1, match: ing('charcoal') }], note: 'Copper was the first metal people smelted, around 7,000 years ago. It kills algae and fungus on contact, so copper tape keeps slugs off raised beds and copper rings guard young trees. Bright copper roofs turn brown within a year.' },
     { id: 'verdigris', cat: 'build', name: 'Weathered copper', out: { type: 'block', id: 230, count: 1 }, ins: [{ label: 'copper block', n: 1, match: oreOf(229) }, { label: 'mineral salts', n: 1, match: ing('mineral_salts') }], note: 'Rain, salt and carbon dioxide turn copper blue-green over twenty years: the Statue of Liberty was brown in 1886. The same copper salt, mixed with lime, is Bordeaux mixture, the fungicide that saved the French vineyards from downy mildew in 1885.' },
   ].forEach(r => BC.RECIPES.push(r));
+  // ---------- gems: cut the ore, set four gems into a crystal block ----------
+  const gemOf = id => it => it.type === 'gem' && it.id === id;
+  BC.GEMS.forEach(gd => {
+    const low = gd.name.toLowerCase();
+    BC.RECIPES.push({ id: 'cut_' + gd.id, cat: 'build', name: 'Cut ' + low, out: { type: 'gem', id: gd.id, count: 2 }, ins: [{ label: low + ' ore', n: 1, match: oreOf(BC.GEM_ORE[gd.id]) }], note: gd.teach });
+    BC.RECIPES.push({ id: gd.id + 'block', cat: 'build', name: gd.name + ' block', out: { type: 'block', id: BC.GEM_BLOCK[gd.id], count: 1 }, ins: [{ label: 'cut ' + low, n: 4, match: gemOf(gd.id) }], note: gd.id === 'onyx' ? 'Four onyx set into a polished black block.' : 'Four ' + low + ' set into one translucent block that glows from within. Light bends as it enters crystal, which is why a cut gem sparkles: every facet is a tiny mirror.' });
+  });
   // ---------- carpentry: 20 shapes for realistic villages and homes ----------
   const carp = (id, name, blockId, count, planksN, note, extraIns) => ({ id, cat: 'carpentry', name, out: { type: 'block', id: blockId, count }, ins: [{ label: 'planks', n: planksN, match: plank }].concat(extraIns || []), note });
   [

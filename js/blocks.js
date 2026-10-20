@@ -186,6 +186,22 @@ window.BC = window.BC || {};
   face(292, 'Balcony', 'balcony', { tex: ['boardwalk', P, P], extra: iso });
   BC.CARPENTRY = [231, 232, 233, 234, 235, 236, 240, 244, 248, 252, 256, 260, 264, 268, 272, 276, 280, 284, 288, 292];
   BC.METALS = [227, 228, 229, 230];
+  // ---------- gems: ore in the bedrock, cut gems, and translucent crystal blocks (ids 400+, clear of leaf ids) ----------
+  BC.GEMS = [
+    { id: 'diamond', name: 'Diamond', color: '#dff6ff', price: 30, teach: 'Pure carbon squeezed 150 km down and shot to the surface in kimberlite pipes. The hardest natural thing there is. In West Africa the thorny Pandanus candelabrum palm grows only on kimberlite soil, so botanists prospect for diamonds by looking for the plant.' },
+    { id: 'sapphire', name: 'Sapphire', color: '#2f5fd8', price: 20, teach: 'Corundum, aluminium oxide, second only to diamond in hardness. Traces of iron and titanium make it blue; the same mineral with chromium is a ruby. Montana\'s Yogo Gulch sapphires are the best in America.' },
+    { id: 'onyx', name: 'Black onyx', color: '#1a1520', price: 8, teach: 'Banded chalcedony: quartz grown in layers so fine it looks like black glass. Most black onyx sold today is grey agate soaked in sugar and then acid, a trick the Romans already used.' },
+    { id: 'opal', name: 'Opal', color: '#f0e6f4', price: 12, teach: 'Not a crystal at all but hydrated silica spheres stacked like oranges, which split light into flashes of colour. Grasses make opal too: phytoliths, microscopic opal grains in their leaves that blunt grazers\' teeth and last thousands of years in soil, so archaeologists read ancient fields from them.' },
+    { id: 'emerald', name: 'Emerald', color: '#1fa85a', price: 24, teach: 'Beryl coloured green by a pinch of chromium or vanadium. Nearly every emerald is flawed inside; jewellers call the inclusions its garden. North Carolina\'s Hiddenite mines are the only US source.' },
+    { id: 'amethyst', name: 'Amethyst', color: '#8a4ad8', price: 6, teach: 'Quartz with traces of iron, turned violet by natural radiation underground. Heat it and it becomes yellow citrine. Geodes form when silica-rich water fills a gas bubble in lava and crystals grow inward over millions of years.' },
+  ];
+  BC.GEM_BY_ID = {}; BC.GEM_ORE = {}; BC.GEM_BLOCK = {};
+  BC.GEMS.forEach((gd, i) => {
+    BC.GEM_BY_ID[gd.id] = gd; BC.GEM_ORE[gd.id] = 400 + i; BC.GEM_BLOCK[gd.id] = 410 + i;
+    def(400 + i, { name: gd.name + ' ore', solid: true, rock: true, ore: true, gem: gd.id, tex: ['ore_' + gd.id, 'ore_' + gd.id, 'ore_' + gd.id] });
+    if (gd.id === 'onyx') def(410 + i, { name: gd.name + ' block', solid: true, rock: true, gemBlock: gd.id, tex: ['gem_onyx', 'gem_onyx', 'gem_onyx'] });
+    else def(410 + i, { name: gd.name + ' block', solid: true, gemBlock: gd.id, transparent: true, cutout: true, lit: true, shape: [[0, 0, 0, 1, 1, 1, 'gem_' + gd.id]], tex: ['gem_' + gd.id, 'gem_' + gd.id, 'gem_' + gd.id] });
+  });
   B[83].special = 'birdhouse'; // the birdhouse now attracts birds too
   B[77].special = 'rain_barrel'; // and rain barrels hold rain for sprinklers and drip lines
   // how tall a block really is for standing on (slabs, boardwalks, tables are not full cubes)
@@ -195,7 +211,7 @@ window.BC = window.BC || {};
   BC.BLOCKS = B;
   BC.BLOCK = {
     AIR: 0, GRASS_A: 1, ALFISOL: 2, GRASS_M: 3, MOLLISOL: 4, SAND: 5, CALICHE: 6, FLOOR_O: 7, OXISOL: 8, MOSS: 9, PODZOL_E: 10, PODZOL_B: 11,
-    PEAT: 12, GLEY: 13, STONE: 14, WATER: 15, GRAVEL: 16, COMPOST: 17, FENCE: 18, PLANKS: 19, GLASS: 154, POND_LINER: 199, SOLAR: 220, SNOW: 222, TUNDRA: 223, PERMAFROST: 224, ICE: 225, GOLD: 227, SILVER: 228, COPPER: 229, VERDIGRIS: 230,
+    PEAT: 12, GLEY: 13, STONE: 14, WATER: 15, GRAVEL: 16, COMPOST: 17, FENCE: 18, PLANKS: 19, GLASS: 154, POND_LINER: 199, SOLAR: 220, SNOW: 222, TUNDRA: 223, PERMAFROST: 224, ICE: 225, GOLD: 227, SILVER: 228, COPPER: 229, VERDIGRIS: 230, SAND_SEA: 5,
   };
   BC.leafIdFor = t => leafIdx(BC.TREES.indexOf(t));
   BC.isSolid = id => !!(B[id] && B[id].solid);
